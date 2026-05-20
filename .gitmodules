@@ -1,0 +1,3 @@
+[submodule "app-generator"]
+	path = app-generator
+	url = https://github.com/rhymion/app-generator.git
