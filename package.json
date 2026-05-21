@@ -1,0 +1,15 @@
+{
+  "name": "app-template",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Template repository for the Rhymion App Generator. Edit prj/, then deploy.",
+  "scripts": {
+    "setup": "git submodule update --init --recursive && bash scripts/sync-prj.sh && npm --prefix app-generator install && npm --prefix app-generator run docker:test:up && npm --prefix app-generator exec -- prisma db push && npm --prefix app-generator exec -- prisma generate",
+    "sync": "bash scripts/sync-prj.sh",
+    "dev": "bash scripts/sync-prj.sh && npm --prefix app-generator run dev:test",
+    "build": "bash scripts/sync-prj.sh && npm --prefix app-generator run build:all",
+    "start": "npm --prefix app-generator run start:test",
+    "deploy": "bash scripts/sync-prj.sh && vercel --cwd app-generator",
+    "deploy:prod": "bash scripts/sync-prj.sh && vercel --cwd app-generator --prod"
+  }
+}
