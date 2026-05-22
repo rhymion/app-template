@@ -4,12 +4,18 @@
   "private": true,
   "description": "Template repository for the Rhymion App Generator. Edit prj/, then deploy.",
   "scripts": {
-    "setup": "git submodule update --init --recursive && bash scripts/sync-prj.sh && npm --prefix app-generator install && npm --prefix app-generator run docker:test:up && npm --prefix app-generator exec -- prisma db push && npm --prefix app-generator exec -- prisma generate",
+    "setup": "bash scripts/setup.sh",
     "sync": "bash scripts/sync-prj.sh",
-    "dev": "bash scripts/sync-prj.sh && npm --prefix app-generator run dev:test",
+    "dev": "bash scripts/sync-prj.sh && npm --prefix app-generator run dev:all",
     "build": "bash scripts/sync-prj.sh && npm --prefix app-generator run build:all",
-    "start": "npm --prefix app-generator run start:test",
-    "deploy": "bash scripts/sync-prj.sh && vercel --cwd app-generator",
-    "deploy:prod": "bash scripts/sync-prj.sh && vercel --cwd app-generator --prod"
+    "start": "npm --prefix app-generator run start",
+    "cleanup": "npm --prefix app-generator run cleanup:all",
+    "env:use": "npm --prefix app-generator run env:use",
+    "env:current": "npm --prefix app-generator run env:current",
+    "ports:generate": "npm --prefix app-generator run ports:generate",
+    "ports:check": "npm --prefix app-generator run ports:check",
+    "vercel-build": "bash scripts/sync-prj.sh && npm --prefix app-generator install && npm --prefix app-generator run vercel-build",
+    "deploy": "bash scripts/sync-prj.sh && vercel",
+    "deploy:prod": "bash scripts/sync-prj.sh && vercel --prod"
   }
 }

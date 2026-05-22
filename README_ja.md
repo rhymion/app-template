@@ -51,14 +51,12 @@ cd app-template
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r app-generator/requirements.txt
 
-# 一括ブートストラップ（submodule init / prj/ 同期 / npm install / DB 起動 / schema 反映）
+# 一括ブートストラップ（submodule init → prj/ 同期 → npm install →
+# Postgres 起動 → 接続待機 → schema push → Prisma client 生成）
 npm run setup
-
-# ジェネレータ用 .env（必要に応じて編集）
-cp app-generator/.env.test app-generator/.env
 ```
 
-`npm run setup` は冪等です。submodule や依存を更新したらいつでも再実行できます。
+`npm run setup` は冪等です。submodule や依存を更新したらいつでも再実行できます。ローカル DB には `app-generator/.env.test` をそのまま利用します。カスタマイズしたい場合のみ `cp app-generator/.env.test app-generator/.env` してください。
 
 ---
 
@@ -67,9 +65,9 @@ cp app-generator/.env.test app-generator/.env
 ### 1. ローカル（npm）
 
 ```bash
-npm run dev       # prj/ → app-generator/ を同期して next dev
-npm run build     # 同期 → コード生成 → prisma + next build
-npm start         # ビルド済みアプリを起動
+npm run dev       # prj/ → app-generator/ を同期し、コード生成 + DB prep を実行して next dev を起動（テスト DB）
+npm run build     # 同期 → コード生成 → prisma + next build（テスト DB）
+npm start         # ビルド済みアプリを起動。check:build でビルドの鮮度を確認してからサーバを起動する
 ```
 
 この 3 コマンドで `app-generator/package.json` の長大なスクリプト群を覆えます。元のコマンドはすべて `npm --prefix app-generator run <name>` で従来通り呼び出せます。
@@ -78,13 +76,12 @@ npm start         # ビルド済みアプリを起動
 
 初回設定（Vercel ダッシュボード）：
 
-1. このリポジトリを Vercel に Import。
-2. **Root Directory** を `app-generator` に設定。
-3. **Include source files outside of the Root Directory** を有効化（ビルド時に `../prj` を参照可能にする）。
-4. Framework Preset は **Next.js**（自動検出）。
-5. 環境変数を追加。少なくとも `DATABASE_URL` / `AUTH_SECRET` / `NEXTAUTH_URL`。詳細は `app-generator/.env.example`。
+1. このリポジトリを Vercel に Import。**Root Directory はリポジトリ直下のまま**にする（`app-generator/` を指定しない）。
+2. Build / Install / Output コマンドはデフォルトのままで OK。`vercel.json` が `npm run vercel-build` を呼び、その先頭で `prj/` が `app-generator/` に上書きコピーされてから `next build` が走ります。
+3. Framework Preset は **Next.js**（`vercel.json` で指定済み）。
+4. 環境変数を追加。少なくとも `DATABASE_URL` / `AUTH_SECRET` / `NEXTAUTH_URL`。詳細は `app-generator/.env.example`。
 
-これ以降、push（あるいは本番ブランチへの merge）のたびに自動デプロイされます。Vercel は `app-generator/` 内で `npm run vercel-build` を実行し、その先頭で `prj:sync` が `../prj/` を上書きコピーします。追加設定は不要です。
+これ以降、push（あるいは本番ブランチへの merge）のたびに自動デプロイされます。ダッシュボードでの追加設定は不要です。
 
 ### 3. Vercel CLI
 
@@ -95,7 +92,7 @@ npm run deploy           # プレビュー
 npm run deploy:prod      # 本番
 ```
 
-どちらも `prj/` を同期してから `vercel --cwd app-generator` を実行します。初回は Vercel CLI が対象プロジェクトとのリンクを促します。
+どちらも `prj/` を同期してからテンプレートルートで `vercel` を実行します。Vercel CLI は `vercel.json` を読むので git push と同じビルドパイプラインがサーバ側で走ります。初回はプロジェクトとのリンクが促されます。
 
 ---
 
@@ -114,6 +111,8 @@ PORT=4000 npm start
 |---------|---------|------|
 | `app-generator/.env` | `NEXTAUTH_URL` | ローカルログインを使う場合は新しいポートに合わせる |
 | `app-generator/docker-compose.test.yml` | Postgres の `ports:` | ホストの 5432 が埋まっている場合のみ変更。あわせて `DATABASE_URL` も更新 |
+
+ジェネレータ内部サービスのポートは `app-generator/config/ports.yaml` で管理されます。このファイルを編集したら `npm --prefix app-generator run ports:generate` を実行して env ファイルを再生成してください。
 
 Vercel 上のポートはプラットフォーム管理のため変更不要です。
 
@@ -144,9 +143,9 @@ git commit -m "Bump app-generator"
 | 症状 | 対処 |
 |------|------|
 | `app-generator/` が空 | `git submodule update --init --recursive` |
-| Vercel ビルドで `../prj` が見つからない | プロジェクト設定で "Include source files outside of the Root Directory" を有効化 |
+| Vercel ビルドで sync がスキップされる | Root Directory がリポジトリ直下になっているか確認（`app-generator/` を指定しないこと）。`vercel.json` が読まれないと sync が走らない |
 | ポート 3000 が使用中 | `PORT=4000 npm run dev` |
-| ローカル DB に接続できない | `npm --prefix app-generator run docker:test:up` |
+| ローカル DB に接続できない | `npm run setup` を再実行（Postgres を待つ）、または `npm --prefix app-generator run docker:up` |
 
 ---
 

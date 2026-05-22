@@ -22,7 +22,7 @@ echo "==> npm install"
 npm install
 
 echo "==> docker compose up (test Postgres)"
-npm run docker:test:up
+npm run docker:up:test
 
 echo "==> wait for Postgres to accept connections"
 for i in $(seq 1 60); do
@@ -36,11 +36,14 @@ for i in $(seq 1 60); do
   fi
 done
 
-echo "==> prisma db push (using .env.test)"
-npx dotenv -e .env.test -- prisma db push
+echo "==> set up test environment symlink"
+npm run env:use -- test
+
+echo "==> prisma db push (using env:use test)"
+npm run db:push
 
 echo "==> prisma generate"
-npx prisma generate
+npm run db:generate
 
 echo
-echo "Setup complete. Next: 'npm run dev' from the repository root."
+echo "Setup complete. Next: 'npm run dev' from the repository root (or 'npm run start' to run production build)."

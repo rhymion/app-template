@@ -51,14 +51,12 @@ cd app-template
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r app-generator/requirements.txt
 
-# Bootstrap: init submodule, sync prj/, install npm deps, start DB, push schema
+# Bootstrap: init submodule, sync prj/, install npm deps,
+# start Postgres, wait for it, push schema, generate client.
 npm run setup
-
-# .env for the generator (edit as needed)
-cp app-generator/.env.test app-generator/.env
 ```
 
-`npm run setup` is idempotent — re-run it any time the submodule or deps change.
+`npm run setup` is idempotent — re-run it any time the submodule or deps change. It uses `app-generator/.env.test` for the local database; copy it to `app-generator/.env` only if you want to customise it.
 
 ---
 
@@ -67,9 +65,9 @@ cp app-generator/.env.test app-generator/.env
 ### 1. Local (npm)
 
 ```bash
-npm run dev       # syncs prj/ → app-generator/, then runs next dev
-npm run build     # syncs, generates code, runs prisma + next build
-npm start         # serves the built app
+npm run dev       # syncs prj/ → app-generator/, runs code generation + DB prep, then starts next dev (test DB)
+npm run build     # syncs, generates code, runs prisma + next build (test DB)
+npm start         # serves the built app; runs check:build first (warns if build is stale), then starts the server
 ```
 
 These three commands replace the longer list in `app-generator/package.json`. The full set is still available via `npm --prefix app-generator run <name>`.
@@ -78,13 +76,12 @@ These three commands replace the longer list in `app-generator/package.json`. Th
 
 One-time setup (Vercel dashboard):
 
-1. Import this repository into Vercel.
-2. Set **Root Directory** to `app-generator`.
-3. Enable **Include source files outside of the Root Directory** so `../prj` is visible at build time.
-4. Framework Preset: **Next.js** (auto-detected).
-5. Add environment variables — at minimum `DATABASE_URL`, `AUTH_SECRET`, `NEXTAUTH_URL`. See `app-generator/.env.example`.
+1. Import this repository into Vercel. **Keep Root Directory at the repo root** — do not point it at `app-generator/`.
+2. Build/Install/Output commands: leave the defaults. They are read from `vercel.json`, which routes the build through `npm run vercel-build` so `prj/` is overlay-copied onto `app-generator/` before `next build` runs.
+3. Framework Preset: **Next.js** (set by `vercel.json`).
+4. Add environment variables — at minimum `DATABASE_URL`, `AUTH_SECRET`, `NEXTAUTH_URL`. See `app-generator/.env.example`.
 
-After that, every push (or merge to your production branch) triggers a deploy. Vercel runs `npm run vercel-build` inside `app-generator/`, which calls `prj:sync` to overlay `../prj/` before building. No extra config needed.
+After that, every push (or merge to your production branch) triggers a deploy. No extra dashboard configuration is needed.
 
 ### 3. Vercel — CLI
 
@@ -95,7 +92,7 @@ npm run deploy           # preview deploy
 npm run deploy:prod      # production deploy
 ```
 
-Both commands sync `prj/` first, then run `vercel --cwd app-generator`. The first time you run this, Vercel CLI will prompt you to link the directory to a Vercel project.
+Both commands sync `prj/` first, then run `vercel` from the template root. Vercel CLI reads `vercel.json` so the same build pipeline used by git-push deploys runs on the server. The first time you run this, Vercel CLI will prompt you to link the directory to a Vercel project.
 
 ---
 
@@ -114,6 +111,8 @@ Other places that reference the port:
 |------|---------|-------|
 | `app-generator/.env` | `NEXTAUTH_URL` | Must match the chosen port for login to work locally. |
 | `app-generator/docker-compose.test.yml` | Postgres `ports:` | Change if the host's 5432 is taken. Also update `DATABASE_URL`. |
+
+Port configuration for the generator's internal services is managed via `app-generator/config/ports.yaml`. After editing that file, run `npm --prefix app-generator run ports:generate` to regenerate the env files.
 
 For Vercel deploys the port is managed by the platform — no change needed.
 
@@ -144,9 +143,9 @@ git commit -m "Bump app-generator"
 | Symptom | Fix |
 |---------|-----|
 | `app-generator/` is empty | `git submodule update --init --recursive` |
-| Vercel build can't find `../prj` | Enable "Include source files outside of the Root Directory" in Vercel project settings |
+| Vercel build skips the sync | Make sure Root Directory is the repo root (not `app-generator/`) so `vercel.json` is picked up |
 | Port 3000 already in use | `PORT=4000 npm run dev` |
-| Local DB connection refused | `npm --prefix app-generator run docker:test:up` |
+| Local DB connection refused | Re-run `npm run setup` (it waits for Postgres) or `npm --prefix app-generator run docker:up` |
 
 ---
 
