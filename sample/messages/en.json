@@ -1,0 +1,151 @@
+{
+  "Home": {
+    "welcome": "Welcome to our app generation PoC site"
+  },
+  "Common": {
+    "add": "Add",
+    "addEntity": "Add {entity}",
+    "adding": "Adding...",
+    "backDialogTitle": "Go Back to List",
+    "backMessage": "All unsaved messages will be lost. Are you sure you want to return to the list?",
+    "cancel": "Cancel",
+    "chart": "Chart",
+    "close": "Close",
+    "delete": "Delete",
+    "deleteDialogTitle": "Delete {entity}",
+    "deleteMessage": "Are you sure you want to delete this {entity}? Deleted data cannot be recovered.",
+    "edit": "Edit",
+    "editEntity": "Edit {entity}",
+    "goBack": "Go Back",
+    "imageUrl": "Image URL",
+    "save": "Save"
+  },
+  "EntityLabel": {
+    "tenant": "Tenant"
+  },
+  "Fields": {
+    "actions": "Actions",
+    "avatar": "Avatar",
+    "chartType": "Chart Type",
+    "comments": "Comments",
+    "dateOfBirth": "Date of Birth",
+    "filterField": "Filter Field",
+    "filterValue": "Filter Value",
+    "gender": "Gender",
+    "groupByField": "Group By Field",
+    "itemName": "Item Name",
+    "judgement": "Judgement",
+    "max": "Max",
+    "maxLength": "Max Length",
+    "order": "No.",
+    "path": "Path",
+    "phone": "Phone",
+    "reference": "Reference",
+    "regex": "Regex",
+    "required": "Required",
+    "type": "Type",
+    "url": "URL",
+    "writtenBy": "Written By"
+  },
+  "Chart": {
+    "month": "Month",
+    "nextWeek": "Next Week",
+    "nextMonth": "Next Month",
+    "nextYear": "Next Year",
+    "prevWeek": "Prev Week",
+    "prevMonth": "Prev Month",
+    "prevYear": "Prev Year",
+    "weekStart": "Week Start",
+    "year": "Year"
+  },
+  "ShiftStatus": {
+    "scheduled": "Scheduled",
+    "approved": "Approved",
+    "cancelled": "Cancelled"
+  },
+  "ShiftTemplate": {
+    "copyToShifts": "Copy to Shifts",
+    "copyToShiftsExplanation": "Copy Shift Templates to Shifts"
+  },
+  "DayOfWeek": {
+    "sunday": "Sunday",
+    "monday": "Monday",
+    "tuesday": "Tuesday",
+    "wednesday": "Wednesday",
+    "thursday": "Thursday",
+    "friday": "Friday",
+    "saturday": "Saturday"
+  },
+  "Header": {
+    "signIn": "Sign In",
+    "signOut": "Sign Out",
+    "openMenu": "Open menu",
+    "closeMenu": "Close menu",
+    "language": "Language"
+  },
+  "Nav": {
+    "home": "Home"
+  },
+  "Auth": {
+    "signInTitle": "Sign in to your account",
+    "signInWithGoogle": "Sign in with Google",
+    "orDivider": "or",
+    "registerTitle": "Create your account",
+    "emailPlaceholder": "Email address",
+    "namePlaceholder": "Full name",
+    "passwordPlaceholder": "Password",
+    "signInButton": "Sign in",
+    "registerButton": "Register",
+    "noAccount": "No account? Register.",
+    "haveAccount": "Already have an account? Sign in",
+    "invalidCredentials": "Invalid credentials",
+    "loginError": "An error occurred during login",
+    "confirmPasswordPlaceholder": "Confirm password",
+    "passwordMismatch": "Passwords do not match",
+    "emailInUse": "Email address is already in use",
+    "registrationFailed": "Registration failed",
+    "mfaCodeLabel": "6-digit authentication code",
+    "mfaHelper": "Open your authenticator app and enter the current code, or use a recovery code.",
+    "mfaRequired": "Enter the 6-digit code from your authenticator app to finish signing in.",
+    "mfaInvalid": "That code did not match. Try again with a fresh 6-digit code, or use a recovery code."
+  },
+  "Mfa": {
+    "title": "Two-factor authentication",
+    "disabledIntro": "Add a second factor to your account. You will need an authenticator app (Google Authenticator, 1Password, Authy, ...).",
+    "enableButton": "Enable MFA",
+    "pendingIntro": "Scan the QR code with your authenticator app, or copy the secret manually. Then enter the 6-digit code below to confirm.",
+    "manualEntryLabel": "Manual entry secret:",
+    "qrAlt": "Two-factor authentication QR code",
+    "verifyCodeLabel": "6-digit code",
+    "verifyButton": "Verify and enable",
+    "cancelButton": "Cancel",
+    "recoveryWarning": "Save these recovery codes somewhere safe. Each can be used once if you lose access to your authenticator. They will not be shown again.",
+    "recoveryAck": "I've saved my recovery codes",
+    "enabledStatus": "Two-factor authentication is enabled on this account.",
+    "disableIntro": "To turn MFA off, enter a current 6-digit code (or a recovery code).",
+    "disableCodeLabel": "6-digit or recovery code",
+    "disableButton": "Disable MFA"
+  },
+  "Setting": {
+    "title": "Account settings",
+    "mfaTitle": "Two-factor authentication",
+    "mfaBody": "Enable a second factor for credentials sign-in.",
+    "accountsTitle": "Connected accounts",
+    "accountsBody": "Manage which providers can sign you into this account."
+  },
+  "LinkedAccounts": {
+    "title": "Connected accounts",
+    "intro": "These providers can sign you into this account. You can connect another OAuth provider with the same email, or detach one as long as you keep at least one way to sign in.",
+    "emptyState": "No OAuth providers are connected yet.",
+    "detach": "Detach this provider",
+    "cannotDetach": "Removing this would leave you with no way to sign in.",
+    "detachAria": "Detach {provider}",
+    "connectMore": "Connect another provider",
+    "connectButton": "Connect {provider}",
+    "passwordlessNotice": "This is your only sign-in method. Set a password on the account before detaching it.",
+    "registrationFailed": "Registration failed",
+    "errorLastSignInMethod": "Cannot detach: you would no longer be able to sign in.",
+    "errorNotFound": "Linked account not found.",
+    "errorUnknown": "Something went wrong. Please try again."
+  }
+}
