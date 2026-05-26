@@ -85,14 +85,24 @@ npm start         # ビルド済みアプリを起動。check:build でビルド
 
 ### 3. Vercel CLI
 
-テンプレートのルートから：
+`app-generator` ディレクトリから：
+
+```bash
+cd app-generator
+vercel          # プレビュー
+vercel --prod   # 本番
+```
+
+`vercel-build` スクリプトがビルド前に自動で `prj:sync` を実行するため、**手動での `prj:sync` は不要**です。
+
+テンプレートルートのショートカットを使う場合（こちらも `prj/` を同期してから Vercel を実行します）：
 
 ```bash
 npm run deploy           # プレビュー
 npm run deploy:prod      # 本番
 ```
 
-どちらも `prj/` を同期してからテンプレートルートで `vercel` を実行します。Vercel CLI は `vercel.json` を読むので git push と同じビルドパイプラインがサーバ側で走ります。初回はプロジェクトとのリンクが促されます。
+初回はいずれの方法でもプロジェクトとのリンクが促されます。
 
 ---
 

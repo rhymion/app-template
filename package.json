@@ -10,11 +10,6 @@
     "build": "bash scripts/sync-prj.sh && npm --prefix app-generator run build:all",
     "start": "npm --prefix app-generator run start",
     "cleanup": "npm --prefix app-generator run cleanup:all",
-    "env:use": "npm --prefix app-generator run env:use",
-    "env:current": "npm --prefix app-generator run env:current",
-    "ports:generate": "npm --prefix app-generator run ports:generate",
-    "ports:check": "npm --prefix app-generator run ports:check",
-    "vercel-build": "bash scripts/sync-prj.sh && npm --prefix app-generator install && npm --prefix app-generator run vercel-build",
     "deploy": "bash scripts/sync-prj.sh && vercel",
     "deploy:prod": "bash scripts/sync-prj.sh && vercel --prod"
   }

@@ -85,14 +85,24 @@ After that, every push (or merge to your production branch) triggers a deploy. N
 
 ### 3. Vercel — CLI
 
-From the template root:
+From the `app-generator` directory:
+
+```bash
+cd app-generator
+vercel          # preview deploy
+vercel --prod   # production deploy
+```
+
+The `vercel-build` script automatically runs `prj:sync` before building — you do **not** need to run it manually before deploying.
+
+Alternatively, use the template-root shortcuts (these also sync `prj/` before invoking Vercel):
 
 ```bash
 npm run deploy           # preview deploy
 npm run deploy:prod      # production deploy
 ```
 
-Both commands sync `prj/` first, then run `vercel` from the template root. Vercel CLI reads `vercel.json` so the same build pipeline used by git-push deploys runs on the server. The first time you run this, Vercel CLI will prompt you to link the directory to a Vercel project.
+The first time you run either approach, Vercel CLI will prompt you to link the directory to a Vercel project.
 
 ---
 
