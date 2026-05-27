@@ -1,3 +1,24 @@
+-- One-shot helper to mint cuid2-format ids for the backfill below.
+-- Format-compatible with @paralleldrive/cuid2 (24 base36 chars, leading
+-- lowercase letter) but uses random() instead of the reference algorithm's
+-- sha3 mixer. Sufficient for unique backfill; dropped at the end of this
+-- migration. App code keeps generating real cuid2s via Prisma.
+CREATE OR REPLACE FUNCTION pg_temp.gen_cuid() RETURNS TEXT AS $$
+DECLARE
+  result TEXT := chr(97 + (random() * 26)::int);  -- first char: a-z
+  v INT;
+BEGIN
+  FOR i IN 1..23 LOOP
+    v := (random() * 36)::int;
+    result := result || CASE
+      WHEN v < 10 THEN chr(48 + v)   -- '0'-'9'
+      ELSE              chr(87 + v)  -- 'a'-'z'  (87 + 10 = 97)
+    END;
+  END LOOP;
+  RETURN result;
+END;
+$$ LANGUAGE plpgsql VOLATILE;
+
 -- Aligns the migration history with the schema state that earlier dev
 -- environments reached via `prisma db push`. Generated with
 -- `prisma migrate diff --from-migrations prisma/migrations --to-schema`.
@@ -13,10 +34,10 @@
 -- because they already accepted that data loss.
 
 -- DropForeignKey
-ALTER TABLE "_UserOrganizations" DROP CONSTRAINT "_UserOrganizations_B_fkey";
+ALTER TABLE "_UserOrganizations" DROP CONSTRAINT IF EXISTS "_UserOrganizations_B_fkey";
 
 -- DropForeignKey
-ALTER TABLE "_UserRoles" DROP CONSTRAINT "_UserRoles_B_fkey";
+ALTER TABLE "_UserRoles" DROP CONSTRAINT IF EXISTS "_UserRoles_B_fkey";
 
 -- DropForeignKey
 ALTER TABLE "approvable" DROP CONSTRAINT "approvable_creator_id_fkey";
@@ -340,13 +361,13 @@ DECLARE
 BEGIN
   -- product: each product must have its own unique attachable (1:1 relation)
   FOR rec IN SELECT id FROM "product" WHERE "attachable_id" IS NULL LOOP
-    new_id := gen_random_uuid()::text;
+    new_id := pg_temp.gen_cuid();
     INSERT INTO "attachable" ("id") VALUES (new_id);
     UPDATE "product" SET "attachable_id" = new_id WHERE id = rec.id;
   END LOOP;
   -- resource: same pattern
   FOR rec IN SELECT id FROM "resource" WHERE "attachable_id" IS NULL LOOP
-    new_id := gen_random_uuid()::text;
+    new_id := pg_temp.gen_cuid();
     INSERT INTO "attachable" ("id") VALUES (new_id);
     UPDATE "resource" SET "attachable_id" = new_id WHERE id = rec.id;
   END LOOP;
@@ -575,9 +596,29 @@ ALTER TABLE "Account" ADD CONSTRAINT "Account_userId_fkey" FOREIGN KEY ("userId"
 -- AddForeignKey
 ALTER TABLE "Session" ADD CONSTRAINT "Session_userId_fkey" FOREIGN KEY ("userId") REFERENCES "user"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
--- AddForeignKey
-ALTER TABLE "_UserRoles" ADD CONSTRAINT "_UserRoles_B_fkey" FOREIGN KEY ("B") REFERENCES "user"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+-- AddForeignKey (idempotent: skip if already exists)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.table_constraints
+    WHERE constraint_name = '_UserRoles_B_fkey'
+      AND table_name = '_UserRoles'
+  ) THEN
+    ALTER TABLE "_UserRoles" ADD CONSTRAINT "_UserRoles_B_fkey"
+      FOREIGN KEY ("B") REFERENCES "user"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+  END IF;
+END $$;
 
--- AddForeignKey
-ALTER TABLE "_UserOrganizations" ADD CONSTRAINT "_UserOrganizations_B_fkey" FOREIGN KEY ("B") REFERENCES "user"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+-- AddForeignKey (idempotent: skip if already exists)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.table_constraints
+    WHERE constraint_name = '_UserOrganizations_B_fkey'
+      AND table_name = '_UserOrganizations'
+  ) THEN
+    ALTER TABLE "_UserOrganizations" ADD CONSTRAINT "_UserOrganizations_B_fkey"
+      FOREIGN KEY ("B") REFERENCES "user"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+  END IF;
+END $$;
 
