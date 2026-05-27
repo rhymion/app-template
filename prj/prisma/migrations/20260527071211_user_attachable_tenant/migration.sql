@@ -199,6 +199,9 @@ ALTER TABLE "tenant"
   ADD COLUMN IF NOT EXISTS "status" TEXT NOT NULL DEFAULT 'active',
   ADD COLUMN IF NOT EXISTS "updated_at" TIMESTAMPTZ(0),
   ADD COLUMN IF NOT EXISTS "updater_id" TEXT;
+-- Backfill null/empty tenant names before setting NOT NULL
+UPDATE "tenant" SET "name" = COALESCE(NULLIF("name", ''), "id", 'default')
+WHERE "name" IS NULL OR "name" = '';
 ALTER TABLE "tenant" ALTER COLUMN "name" SET NOT NULL;
 
 -- ─────────────────────────────────────────────────────────────────────────────
@@ -222,6 +225,15 @@ ALTER TABLE "tenant" ALTER COLUMN "name" SET NOT NULL;
 -- Note: FK constraints on user.creator_id / user.updater_id are added in Step 11
 -- so self-referential inserts are safe here.
 -- ─────────────────────────────────────────────────────────────────────────────
+-- Ensure 'default' tenant exists before user migration (FK requires it)
+-- tenant new columns (slug, status, updated_at) were added in Step 3
+INSERT INTO "tenant" ("id", "name", "slug", "status", "created_at", "updated_at")
+VALUES ('default', 'Default', 'default', 'active', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+ON CONFLICT ("id") DO UPDATE SET
+  "slug" = COALESCE("tenant"."slug", 'default'),
+  "status" = COALESCE("tenant"."status", 'active'),
+  "updated_at" = CURRENT_TIMESTAMP;
+
 INSERT INTO "user" (
   id, name, email, password, api_key, image,
   "emailVerified", tenant_id, mfa_secret, mfa_enabled,
@@ -264,11 +276,34 @@ WHERE "user_id" IS NULL AND "user_account_id" IS NOT NULL;
 -- slug: lowercase name, non-alphanumeric chars replaced with hyphens
 -- updated_at: CURRENT_TIMESTAMP for all existing rows
 -- ─────────────────────────────────────────────────────────────────────────────
+-- Step 6: Backfill tenant.slug / updated_at (robust version)
+-- COALESCE: name-derived slug first, fallback to id if result is empty
 UPDATE "tenant"
 SET
-  "slug" = lower(regexp_replace(name, '[^a-zA-Z0-9]', '-', 'g')),
+  "slug" = COALESCE(
+    NULLIF(lower(regexp_replace("name", '[^a-zA-Z0-9]+', '-', 'g')), ''),
+    "id"
+  ),
   "updated_at" = CURRENT_TIMESTAMP
-WHERE "slug" IS NULL;
+WHERE "slug" IS NULL OR "slug" = '';
+
+-- Deduplicate slugs: append first 6 chars of id as suffix
+DO $$
+DECLARE
+  rec RECORD;
+BEGIN
+  FOR rec IN
+    SELECT id, slug FROM "tenant"
+    WHERE slug IN (
+      SELECT slug FROM "tenant" GROUP BY slug HAVING count(*) > 1
+    )
+    ORDER BY id
+  LOOP
+    UPDATE "tenant"
+    SET slug = rec.slug || '-' || substring(rec.id, 1, 6)
+    WHERE id = rec.id;
+  END LOOP;
+END $$;
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- Step 7: Create attachable records and backfill product.attachable_id
