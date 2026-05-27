@@ -28,9 +28,15 @@ jobs:
           path: ~/.cache/Cypress
           key: cypress-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
       - run: npm ci
+      - name: Install app-generator Node.js dependencies
+        working-directory: app-generator
+        run: npm install
       - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
+      - name: Install app-generator Python dependencies
+        working-directory: app-generator
+        run: pip install -r requirements.txt
       - name: Generate code, start test database, push schema and build
         run: npm run test:e2e:build
       - name: Run API E2E tests
