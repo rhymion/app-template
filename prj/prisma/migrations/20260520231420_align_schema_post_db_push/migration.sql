@@ -164,10 +164,12 @@ ALTER TABLE "leave_request" DROP COLUMN "user_account_id",
 ADD COLUMN     "user_id" TEXT NOT NULL;
 
 -- AlterTable
-ALTER TABLE "product" ADD COLUMN     "attachable_id" TEXT NOT NULL;
+-- NOTE: Added as nullable first; NOT NULL is applied after backfill below.
+ALTER TABLE "product" ADD COLUMN     "attachable_id" TEXT;
 
 -- AlterTable
-ALTER TABLE "resource" ADD COLUMN     "attachable_id" TEXT NOT NULL;
+-- NOTE: Added as nullable first; NOT NULL is applied after backfill below.
+ALTER TABLE "resource" ADD COLUMN     "attachable_id" TEXT;
 
 -- AlterTable
 ALTER TABLE "shift" DROP COLUMN "user_account_id",
@@ -326,6 +328,33 @@ CREATE TABLE "VerificationToken" (
     "token" TEXT NOT NULL,
     "expires" TIMESTAMP(3) NOT NULL
 );
+
+-- Backfill: create one 'attachable' record for each existing product/resource
+-- that has a NULL attachable_id, then apply NOT NULL constraint.
+-- Required because these tables may contain rows from earlier 'prisma db push'
+-- environments; adding NOT NULL directly would fail with a constraint violation.
+DO $$
+DECLARE
+  rec RECORD;
+  new_id TEXT;
+BEGIN
+  -- product: each product must have its own unique attachable (1:1 relation)
+  FOR rec IN SELECT id FROM "product" WHERE "attachable_id" IS NULL LOOP
+    new_id := gen_random_uuid()::text;
+    INSERT INTO "attachable" ("id") VALUES (new_id);
+    UPDATE "product" SET "attachable_id" = new_id WHERE id = rec.id;
+  END LOOP;
+  -- resource: same pattern
+  FOR rec IN SELECT id FROM "resource" WHERE "attachable_id" IS NULL LOOP
+    new_id := gen_random_uuid()::text;
+    INSERT INTO "attachable" ("id") VALUES (new_id);
+    UPDATE "resource" SET "attachable_id" = new_id WHERE id = rec.id;
+  END LOOP;
+END $$;
+
+-- Apply NOT NULL after backfill is complete
+ALTER TABLE "product" ALTER COLUMN "attachable_id" SET NOT NULL;
+ALTER TABLE "resource" ALTER COLUMN "attachable_id" SET NOT NULL;
 
 -- CreateIndex
 CREATE UNIQUE INDEX "user_email_key" ON "user"("email");
