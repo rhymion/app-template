@@ -20,7 +20,7 @@ Only these four task types are in scope for this project:
 ## Output scope
 
 - All generated and edited files **must be saved under `prj/`**.
-- Schema YAML: `prj/code_generator/schema/`
+- Schema YAML: `prj/code_generator/json_schema.yaml`
 - Never write outside `prj/` unless explicitly updating docs already there.
 
 ## Rules

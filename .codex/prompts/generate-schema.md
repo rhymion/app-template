@@ -4,13 +4,13 @@ See also: `app-generator/.codex/prompts/generate-schema.md` for the full rules a
 
 ## proj_c constraints
 
-- Output schema YAML to `prj/code_generator/schema/` only.
+- Output schema YAML to `prj/code_generator/json_schema.yaml` only.
 - Do not edit any files outside `prj/`.
 - Do not touch `app-generator/` source files.
 
 ## Task flow
 
-1. Create or update schema YAML in `prj/code_generator/schema/`.
+1. Create or update schema YAML in `prj/code_generator/json_schema.yaml`.
 2. Run `generate-code` scoped to `prj/` output.
 3. Run completion gate (see `app-generator/.codex/prompts/generate-schema.md`).
 
