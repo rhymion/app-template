@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
-# First-time (and idempotent) bootstrap for app-template.
+# Idempotent bootstrap for app-template.
 # - Initializes the app-generator submodule
-# - Syncs prj/ into app-generator/
-# - Installs npm deps
-# - Starts the local Postgres test container and waits for it
-# - Pushes the Prisma schema and generates the client
+# - Installs npm deps (root + app-generator)
+# - Creates Python venv under app-generator/.venv and installs Python deps
+# Note: start the local database separately with:
+#   npm --prefix app-generator run docker:up:dev   (development)
+#   npm --prefix app-generator run docker:up:test  (test)
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -13,37 +14,18 @@ cd "$ROOT"
 echo "==> git submodule update --init --recursive"
 git submodule update --init --recursive
 
-echo "==> sync prj/ -> app-generator/"
-bash scripts/sync-prj.sh
-
-cd app-generator
-
-echo "==> npm install"
+echo "==> npm install (root)"
 npm install
 
-echo "==> docker compose up (test Postgres)"
-npm run docker:up:test
+echo "==> npm install (app-generator)"
+npm --prefix app-generator install
 
-echo "==> wait for Postgres to accept connections"
-for i in $(seq 1 60); do
-  if docker compose -f docker-compose.test.yml exec -T postgres-test pg_isready -U postgres >/dev/null 2>&1; then
-    break
-  fi
-  sleep 1
-  if [[ "$i" == "60" ]]; then
-    echo "Postgres did not become ready within 60s." >&2
-    exit 1
-  fi
-done
+echo "==> Python venv (app-generator/.venv)"
+python3 -m venv app-generator/.venv 2>/dev/null || true
 
-echo "==> set up test environment symlink"
-npm run env:use -- test
-
-echo "==> prisma db push (using env:use test)"
-npm run db:push
-
-echo "==> prisma generate"
-npm run db:generate
+echo "==> pip install -r app-generator/requirements.txt"
+app-generator/.venv/bin/pip install -r app-generator/requirements.txt
 
 echo
-echo "Setup complete. Next: 'npm run dev' from the repository root (or 'npm run start' to run production build)."
+echo "Setup complete."
+echo "Next: start your local database, then run 'npm run dev' from the repository root."

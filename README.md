@@ -47,16 +47,12 @@ app-template/
 git clone --recurse-submodules <your-fork-of-app-template>
 cd app-template
 
-# Python deps for the code generator
-python3 -m venv .venv && source .venv/bin/activate
-pip install -r app-generator/requirements.txt
-
-# Bootstrap: init submodule, sync prj/, install npm deps,
-# start Postgres, wait for it, push schema, generate client.
+# Bootstrap: init submodule, install npm deps (root + app-generator),
+# create Python venv under app-generator/.venv, install Python deps.
 npm run setup
 ```
 
-`npm run setup` is idempotent — re-run it any time the submodule or deps change. It uses `app-generator/.env.test` for the local database; copy it to `app-generator/.env` only if you want to customise it.
+`npm run setup` is idempotent — re-run it any time the submodule or deps change. To start your local database, run `npm --prefix app-generator run docker:up:dev` (dev) or `docker:up:test` (test) separately.
 
 ---
 
@@ -65,12 +61,12 @@ npm run setup
 ### 1. Local (npm)
 
 ```bash
-npm run dev       # syncs prj/ → app-generator/, runs code generation + DB prep, then starts next dev (test DB)
-npm run build     # syncs, generates code, runs prisma + next build (test DB)
-npm start         # serves the built app; runs check:build first (warns if build is stale), then starts the server
+npm run dev       # syncs prj/ → app-generator/, then starts the Next.js dev server
+npm run build     # syncs prj/ → app-generator/, then runs next build
+npm start         # starts the built Next.js app (app-generator/start)
 ```
 
-These three commands replace the longer list in `app-generator/package.json`. The full set is still available via `npm --prefix app-generator run <name>`.
+These three commands are thin wrappers around `app-generator/package.json`. The full set is still available via `npm --prefix app-generator run <name>`.
 
 ### 2. Vercel — git push / merge
 
@@ -121,8 +117,6 @@ Other places that reference the port:
 |------|---------|-------|
 | `app-generator/.env` | `NEXTAUTH_URL` | Must match the chosen port for login to work locally. |
 | `app-generator/docker-compose.test.yml` | Postgres `ports:` | Change if the host's 5432 is taken. Also update `DATABASE_URL`. |
-
-Port configuration for the generator's internal services is managed via `app-generator/config/ports.yaml`. After editing that file, run `npm --prefix app-generator run ports:generate` to regenerate the env files.
 
 For Vercel deploys the port is managed by the platform — no change needed.
 
@@ -211,7 +205,7 @@ The test database uses `app-generator/.env.test`, which is checked in and requir
 | `app-generator/` is empty | `git submodule update --init --recursive` |
 | Vercel build skips the sync | Make sure Root Directory is the repo root (not `app-generator/`) so `vercel.json` is picked up |
 | Port 3000 already in use | `PORT=4000 npm run dev` |
-| Local DB connection refused | Re-run `npm run setup` (it waits for Postgres) or `npm --prefix app-generator run docker:up:dev` |
+| Local DB connection refused | Start Docker manually: `npm --prefix app-generator run docker:up:dev` (or `docker:up:test` for test DB) |
 
 ---
 

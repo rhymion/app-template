@@ -47,16 +47,12 @@ app-template/
 git clone --recurse-submodules <your-fork-of-app-template>
 cd app-template
 
-# コードジェネレータ用 Python 依存
-python3 -m venv .venv && source .venv/bin/activate
-pip install -r app-generator/requirements.txt
-
-# 一括ブートストラップ（submodule init → prj/ 同期 → npm install →
-# Postgres 起動 → 接続待機 → schema push → Prisma client 生成）
+# 一括ブートストラップ（submodule init → npm install（root + app-generator）→
+# app-generator/.venv に Python venv 作成 → Python 依存インストール）
 npm run setup
 ```
 
-`npm run setup` は冪等です。submodule や依存を更新したらいつでも再実行できます。ローカル DB には `app-generator/.env.test` をそのまま利用します。カスタマイズしたい場合のみ `cp app-generator/.env.test app-generator/.env` してください。
+`npm run setup` は冪等です。submodule や依存を更新したらいつでも再実行できます。ローカル DB は別途 `npm --prefix app-generator run docker:up:dev`（開発）または `docker:up:test`（テスト）で起動してください。
 
 ---
 
@@ -65,12 +61,12 @@ npm run setup
 ### 1. ローカル（npm）
 
 ```bash
-npm run dev       # prj/ → app-generator/ を同期し、コード生成 + DB prep を実行して next dev を起動（テスト DB）
-npm run build     # 同期 → コード生成 → prisma + next build（テスト DB）
-npm start         # ビルド済みアプリを起動。check:build でビルドの鮮度を確認してからサーバを起動する
+npm run dev       # prj/ → app-generator/ を同期し、Next.js dev サーバを起動
+npm run build     # prj/ → app-generator/ を同期し、next build を実行
+npm start         # ビルド済み Next.js アプリを起動（app-generator/start）
 ```
 
-この 3 コマンドで `app-generator/package.json` の長大なスクリプト群を覆えます。元のコマンドはすべて `npm --prefix app-generator run <name>` で従来通り呼び出せます。
+この 3 コマンドは `app-generator/package.json` の薄いラッパーです。元のコマンドはすべて `npm --prefix app-generator run <name>` で従来通り呼び出せます。
 
 ### 2. Vercel（git push / merge）
 
@@ -121,8 +117,6 @@ PORT=4000 npm start
 |---------|---------|------|
 | `app-generator/.env` | `NEXTAUTH_URL` | ローカルログインを使う場合は新しいポートに合わせる |
 | `app-generator/docker-compose.test.yml` | Postgres の `ports:` | ホストの 5432 が埋まっている場合のみ変更。あわせて `DATABASE_URL` も更新 |
-
-ジェネレータ内部サービスのポートは `app-generator/config/ports.yaml` で管理されます。このファイルを編集したら `npm --prefix app-generator run ports:generate` を実行して env ファイルを再生成してください。
 
 Vercel 上のポートはプラットフォーム管理のため変更不要です。
 
@@ -211,7 +205,7 @@ npm run deploy:prod
 | `app-generator/` が空 | `git submodule update --init --recursive` |
 | Vercel ビルドで sync がスキップされる | Root Directory がリポジトリ直下になっているか確認（`app-generator/` を指定しないこと）。`vercel.json` が読まれないと sync が走らない |
 | ポート 3000 が使用中 | `PORT=4000 npm run dev` |
-| ローカル DB に接続できない | `npm run setup` を再実行（Postgres を待つ）、または `npm --prefix app-generator run docker:up:dev` |
+| ローカル DB に接続できない | Docker を手動起動: `npm --prefix app-generator run docker:up:dev`（開発）または `docker:up:test`（テスト） |
 
 ---
 
