@@ -150,12 +150,12 @@ For Vercel deploys the port is managed by the platform — no change needed.
 
 ## Editing the Schema
 
-The application schema is defined in YAML files under `prj/code_generator/schema/`.
+The application schema is defined in `prj/code_generator/json_schema.yaml`.
 Changes to the schema require running the code generator to regenerate application files.
 
 ### Method A: Manual Editing
 
-1. Edit YAML files in `prj/code_generator/schema/`
+1. Edit `prj/code_generator/json_schema.yaml`
 2. Refer to the schema reference documentation:
    - `app-generator/docs/knowledge/schema-yaml-configuration.md`
    - Online docs at the app-generator repository
@@ -175,7 +175,7 @@ Use Claude Code or Codex to design or update the schema:
 Select the `generate-schema` task and describe what you need.
 
 The AI will:
-- Create or update schema YAML in `prj/code_generator/schema/`
+- Create or update `prj/code_generator/json_schema.yaml`
 - Run `npm run generate-code` to regenerate application files
 - Verify the build succeeds
 
