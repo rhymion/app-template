@@ -211,7 +211,7 @@ npm run deploy:prod
 | `app-generator/` が空 | `git submodule update --init --recursive` |
 | Vercel ビルドで sync がスキップされる | Root Directory がリポジトリ直下になっているか確認（`app-generator/` を指定しないこと）。`vercel.json` が読まれないと sync が走らない |
 | ポート 3000 が使用中 | `PORT=4000 npm run dev` |
-| ローカル DB に接続できない | `npm run setup` を再実行（Postgres を待つ）、または `npm --prefix app-generator run docker:up` |
+| ローカル DB に接続できない | `npm run setup` を再実行（Postgres を待つ）、または `npm --prefix app-generator run docker:up:dev` |
 
 ---
 

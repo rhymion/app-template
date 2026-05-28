@@ -211,7 +211,7 @@ The test database uses `app-generator/.env.test`, which is checked in and requir
 | `app-generator/` is empty | `git submodule update --init --recursive` |
 | Vercel build skips the sync | Make sure Root Directory is the repo root (not `app-generator/`) so `vercel.json` is picked up |
 | Port 3000 already in use | `PORT=4000 npm run dev` |
-| Local DB connection refused | Re-run `npm run setup` (it waits for Postgres) or `npm --prefix app-generator run docker:up` |
+| Local DB connection refused | Re-run `npm run setup` (it waits for Postgres) or `npm --prefix app-generator run docker:up:dev` |
 
 ---
 
