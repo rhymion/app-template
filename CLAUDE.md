@@ -27,7 +27,7 @@ All generated and edited files **must** live under `prj/`:
 
 | Artifact | Path |
 |----------|------|
-| Schema YAML | `prj/code_generator/schema/` |
+| Schema YAML | `prj/code_generator/json_schema.yaml` |
 | Components | `prj/components/` |
 | App pages / routes | `prj/app/` |
 | Other source files | `prj/<relevant subdir>/` |
