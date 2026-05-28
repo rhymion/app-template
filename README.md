@@ -66,9 +66,11 @@ npm run setup
 npm run dev       # syncs prj/ → app-generator/, then starts the Next.js dev server
 npm run build     # syncs prj/ → app-generator/, then runs next build
 npm start         # starts the built Next.js app (app-generator/start)
+npm run test:e2e:build # syncs prj/ → app-generator/, then runs next build in test environment
+npm run test:e2e:cy:start # starts the built Next.js app and start E2E testing
 ```
 
-These three commands are thin wrappers around `app-generator/package.json`. The full set is still available via `npm --prefix app-generator run <name>`.
+These three commands are thin wrappers around `app-generator/package.json`. The full set is still available via `npm --prefix app-generator run <name>`. As app-generator does not provide setting files for production, you have to create them when you want to build in local, using setting files for testing and so on.
 
 ### 2. Vercel — git push / merge
 
@@ -105,14 +107,11 @@ After that, every push (or merge to your production branch) triggers a deploy. N
 From the `app-generator` directory:
 
 ```bash
-cd app-generator
 vercel          # preview deploy
 vercel --prod   # production deploy
 ```
 
 The build script in `app-generator/` automatically syncs `prj/` before building — you do **not** need to sync manually before deploying. The first time you run this, Vercel CLI will prompt you to link the directory to a Vercel project.
-
-> **Note:** Do not run deploy scripts from the repo root — those have been removed. Always deploy from `app-generator/`.
 
 ---
 
@@ -179,8 +178,8 @@ The AI will:
 - Run `npm run generate-code` to regenerate application files
 - Verify the build succeeds
 
-> **Note:** All generated and edited files are saved under `prj/`. The `app-generator/`
-> submodule is not modified.
+> **Note:** All generated and edited files are saved under `prj/`. The change in 
+> `app-generator/`submodule is temporary.
 
 ---
 
@@ -225,7 +224,6 @@ After forking and completing [First-time setup](#first-time-setup):
 For a one-shot production deploy from the CLI:
 
 ```bash
-cd app-generator
 vercel --prod
 ```
 

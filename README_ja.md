@@ -66,9 +66,11 @@ npm run setup
 npm run dev       # prj/ → app-generator/ を同期し、Next.js dev サーバを起動
 npm run build     # prj/ → app-generator/ を同期し、next build を実行
 npm start         # ビルド済み Next.js アプリを起動（app-generator/start）
+npm run test:e2e:build # prj/ → app-generator/ を同期し、テスト環境で next build を実行
+npm run test:e2e:cy:start # ビルド済み Next.js アプリを起動し、E2Eテストを開始
 ```
 
-この 3 コマンドは `app-generator/package.json` の薄いラッパーです。元のコマンドはすべて `npm --prefix app-generator run <name>` で従来通り呼び出せます。
+この 3 コマンドは `app-generator/package.json` の薄いラッパーです。元のコマンドはすべて `npm --prefix app-generator run <name>` で従来通り呼び出せます。なお、Production環境用の設定ファイルは app-generator では用意していないので、ローカルでビルドする場合はテスト用の設定ファイルなどを参考に作成してください。
 
 ### 2. Vercel（git push / merge）
 
@@ -105,14 +107,11 @@ npm start         # ビルド済み Next.js アプリを起動（app-generator/s
 `app-generator` ディレクトリから：
 
 ```bash
-cd app-generator
 vercel          # プレビュー
 vercel --prod   # 本番
 ```
 
 `app-generator/` 内のビルドスクリプトがビルド前に自動で `prj/` を同期するため、**手動での `prj:sync` は不要**です。初回はプロジェクトとのリンクが促されます。
-
-> **注意：** リポジトリルートからデプロイスクリプトを実行しないでください — それらは削除されました。デプロイは必ず `app-generator/` から行ってください。
 
 ---
 
@@ -130,7 +129,7 @@ PORT=4000 npm start
 | ファイル | 設定項目 | 備考 |
 |---------|---------|------|
 | `app-generator/.env` | `NEXTAUTH_URL` | ローカルログインを使う場合は新しいポートに合わせる |
-| `app-generator/docker-compose.test.yml` | Postgres の `ports:` | ホストの 5432 が埋まっている場合のみ変更。あわせて `DATABASE_URL` も更新 |
+| `app-generator/docker-compose.test.yml` | Postgres の `ports:` | ホストの 5432 が埋まっている場合は変更。あわせて `DATABASE_URL` も更新 |
 
 Vercel 上のポートはプラットフォーム管理のため変更不要です。
 
@@ -180,7 +179,7 @@ AI が行う処理:
 - ビルドが通ることを確認します
 
 > **注意:** 生成・編集されるファイルはすべて `prj/` 配下に保存されます。
-> `app-generator/` サブモジュールは変更されません。
+> `app-generator/` サブモジュールは変更は一時的なものです。
 
 ---
 
@@ -225,7 +224,6 @@ npm run sync   # 他の操作なしで prj/ → app-generator/ をコピー
 CLI から本番に一発デプロイする場合：
 
 ```bash
-cd app-generator
 vercel --prod
 ```
 
