@@ -20,11 +20,11 @@ app-template/
 │   └── messages/ja.json
 ├── app-generator/       ← submodule (do not edit directly)
 ├── scripts/sync-prj.sh  ← copies prj/. → app-generator/
-├── package.json         ← top-level deploy commands
+├── package.json         ← local dev/build shortcuts
 └── README.md
 ```
 
-**Rule of thumb:** edit `prj/`, never `app-generator/`. Every deploy command runs `scripts/sync-prj.sh` first, which overlay-copies `prj/.` onto `app-generator/`.
+**Rule of thumb:** edit `prj/`, never `app-generator/`. Every local dev/build command runs `scripts/sync-prj.sh` first, which overlay-copies `prj/.` onto `app-generator/`.
 
 ---
 
@@ -72,9 +72,9 @@ These three commands are thin wrappers around `app-generator/package.json`. The 
 
 One-time setup (Vercel dashboard):
 
-1. Import this repository into Vercel. **Keep Root Directory at the repo root** — do not point it at `app-generator/`.
-2. Build/Install/Output commands: leave the defaults. They are read from `vercel.json`, which routes the build through `npm run vercel-build` so `prj/` is overlay-copied onto `app-generator/` before `next build` runs.
-3. Framework Preset: **Next.js** (set by `vercel.json`).
+1. Import this repository into Vercel. Set **Root Directory to `app-generator/`**.
+2. Build/Install/Output commands: leave the defaults. They are read from `app-generator/vercel.json`, which syncs `prj/` into `app-generator/` before `next build` runs.
+3. Framework Preset: **Next.js** (set by `app-generator/vercel.json`).
 4. Add environment variables — at minimum `DATABASE_URL`, `AUTH_SECRET`, `NEXTAUTH_URL`. See `app-generator/.env.example`.
 
 After that, every push (or merge to your production branch) triggers a deploy. No extra dashboard configuration is needed.
@@ -89,16 +89,9 @@ vercel          # preview deploy
 vercel --prod   # production deploy
 ```
 
-The `vercel-build` script automatically runs `prj:sync` before building — you do **not** need to run it manually before deploying.
+The build script in `app-generator/` automatically syncs `prj/` before building — you do **not** need to sync manually before deploying. The first time you run this, Vercel CLI will prompt you to link the directory to a Vercel project.
 
-Alternatively, use the template-root shortcuts (these also sync `prj/` before invoking Vercel):
-
-```bash
-npm run deploy           # preview deploy
-npm run deploy:prod      # production deploy
-```
-
-The first time you run either approach, Vercel CLI will prompt you to link the directory to a Vercel project.
+> **Note:** Do not run deploy scripts from the repo root — those have been removed. Always deploy from `app-generator/`.
 
 ---
 
@@ -164,7 +157,7 @@ Fork (or use as a template) this repo. All your changes go into `prj/`. The gene
 
 ### prj:sync flow
 
-Every `dev`, `build`, and `deploy` command runs `scripts/sync-prj.sh` first, which overlay-copies `prj/.` onto `app-generator/`. You can also trigger it manually:
+Every `dev` and `build` command runs `scripts/sync-prj.sh` first, which overlay-copies `prj/.` onto `app-generator/`. You can also trigger it manually:
 
 ```bash
 npm run sync   # copy prj/ → app-generator/ without starting anything else
@@ -176,14 +169,15 @@ Workflow: edit `prj/` → run `npm run dev` (syncs automatically) → generator 
 
 After forking and completing [First-time setup](#first-time-setup):
 
-1. Import your fork into Vercel. Keep **Root Directory** at the repo root.
+1. Import your fork into Vercel. Set **Root Directory to `app-generator/`**.
 2. Add environment variables (`DATABASE_URL`, `AUTH_SECRET`, `NEXTAUTH_URL` at minimum — see `app-generator/.env.example`).
 3. Every push to your production branch triggers a deploy automatically.
 
 For a one-shot production deploy from the CLI:
 
 ```bash
-npm run deploy:prod
+cd app-generator
+vercel --prod
 ```
 
 ### Environment variable handoff
@@ -203,7 +197,7 @@ The test database uses `app-generator/.env.test`, which is checked in and requir
 | Symptom | Fix |
 |---------|-----|
 | `app-generator/` is empty | `git submodule update --init --recursive` |
-| Vercel build skips the sync | Make sure Root Directory is the repo root (not `app-generator/`) so `vercel.json` is picked up |
+| Vercel build skips the sync | Make sure Root Directory is set to `app-generator/` (not the repo root) so `app-generator/vercel.json` is picked up |
 | Port 3000 already in use | `PORT=4000 npm run dev` |
 | Local DB connection refused | Start Docker manually: `npm --prefix app-generator run docker:up:dev` (or `docker:up:test` for test DB) |
 

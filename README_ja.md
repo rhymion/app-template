@@ -20,11 +20,11 @@ app-template/
 │   └── messages/ja.json
 ├── app-generator/       ← submodule（直接編集しない）
 ├── scripts/sync-prj.sh  ← prj/. → app-generator/ をコピー
-├── package.json         ← トップレベルのデプロイコマンド
+├── package.json         ← ローカルの dev/build ショートカット
 └── README.md
 ```
 
-**原則**：`prj/` のみを編集し、`app-generator/` は直接いじらない。各デプロイコマンドは最初に `scripts/sync-prj.sh` を実行し、`prj/.` を `app-generator/` に上書きコピーします。
+**原則**：`prj/` のみを編集し、`app-generator/` は直接いじらない。各ローカル dev/build コマンドは最初に `scripts/sync-prj.sh` を実行し、`prj/.` を `app-generator/` に上書きコピーします。
 
 ---
 
@@ -72,9 +72,9 @@ npm start         # ビルド済み Next.js アプリを起動（app-generator/s
 
 初回設定（Vercel ダッシュボード）：
 
-1. このリポジトリを Vercel に Import。**Root Directory はリポジトリ直下のまま**にする（`app-generator/` を指定しない）。
-2. Build / Install / Output コマンドはデフォルトのままで OK。`vercel.json` が `npm run vercel-build` を呼び、その先頭で `prj/` が `app-generator/` に上書きコピーされてから `next build` が走ります。
-3. Framework Preset は **Next.js**（`vercel.json` で指定済み）。
+1. このリポジトリを Vercel に Import。**Root Directory を `app-generator/` に設定する**。
+2. Build / Install / Output コマンドはデフォルトのままで OK。`app-generator/vercel.json` が読まれ、その中のビルドスクリプトが `prj/` を `app-generator/` に上書きコピーしてから `next build` を実行します。
+3. Framework Preset は **Next.js**（`app-generator/vercel.json` で指定済み）。
 4. 環境変数を追加。少なくとも `DATABASE_URL` / `AUTH_SECRET` / `NEXTAUTH_URL`。詳細は `app-generator/.env.example`。
 
 これ以降、push（あるいは本番ブランチへの merge）のたびに自動デプロイされます。ダッシュボードでの追加設定は不要です。
@@ -89,16 +89,9 @@ vercel          # プレビュー
 vercel --prod   # 本番
 ```
 
-`vercel-build` スクリプトがビルド前に自動で `prj:sync` を実行するため、**手動での `prj:sync` は不要**です。
+`app-generator/` 内のビルドスクリプトがビルド前に自動で `prj/` を同期するため、**手動での `prj:sync` は不要**です。初回はプロジェクトとのリンクが促されます。
 
-テンプレートルートのショートカットを使う場合（こちらも `prj/` を同期してから Vercel を実行します）：
-
-```bash
-npm run deploy           # プレビュー
-npm run deploy:prod      # 本番
-```
-
-初回はいずれの方法でもプロジェクトとのリンクが促されます。
+> **注意：** リポジトリルートからデプロイスクリプトを実行しないでください — それらは削除されました。デプロイは必ず `app-generator/` から行ってください。
 
 ---
 
@@ -164,7 +157,7 @@ your-app/           ← app-template のフォーク
 
 ### prj:sync の流れ
 
-`dev` / `build` / `deploy` の各コマンドは最初に `scripts/sync-prj.sh` を実行し、`prj/.` を `app-generator/` に上書きコピーします。手動で呼び出すことも可能です：
+`dev` / `build` の各コマンドは最初に `scripts/sync-prj.sh` を実行し、`prj/.` を `app-generator/` に上書きコピーします。手動で呼び出すことも可能です：
 
 ```bash
 npm run sync   # 他の操作なしで prj/ → app-generator/ をコピー
@@ -176,14 +169,15 @@ npm run sync   # 他の操作なしで prj/ → app-generator/ をコピー
 
 フォーク後、[初回セットアップ](#初回セットアップ) を終えたら：
 
-1. フォークリポジトリを Vercel に Import。**Root Directory はリポジトリ直下**のままにする。
+1. フォークリポジトリを Vercel に Import。**Root Directory を `app-generator/` に設定する**。
 2. 環境変数を追加（最低限 `DATABASE_URL`・`AUTH_SECRET`・`NEXTAUTH_URL` — 詳細は `app-generator/.env.example`）。
 3. 以降は本番ブランチへの push のたびに自動デプロイされます。
 
 CLI から本番に一発デプロイする場合：
 
 ```bash
-npm run deploy:prod
+cd app-generator
+vercel --prod
 ```
 
 ### 環境変数の引き継ぎ
@@ -203,7 +197,7 @@ npm run deploy:prod
 | 症状 | 対処 |
 |------|------|
 | `app-generator/` が空 | `git submodule update --init --recursive` |
-| Vercel ビルドで sync がスキップされる | Root Directory がリポジトリ直下になっているか確認（`app-generator/` を指定しないこと）。`vercel.json` が読まれないと sync が走らない |
+| Vercel ビルドで sync がスキップされる | Root Directory が `app-generator/` に設定されているか確認（リポジトリ直下を指定しないこと）。`app-generator/vercel.json` が読まれないと sync が走らない |
 | ポート 3000 が使用中 | `PORT=4000 npm run dev` |
 | ローカル DB に接続できない | Docker を手動起動: `npm --prefix app-generator run docker:up:dev`（開発）または `docker:up:test`（テスト） |
 
