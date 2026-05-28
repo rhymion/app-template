@@ -172,7 +172,7 @@ Fork (or use as a template) this repo. All your changes go into `prj/`. The gene
 
 ### prj:sync flow
 
-Every `dev` and `build` command runs `scripts/sync-prj.sh` first, which overlay-copies `prj/.` onto `app-generator/`. You can also trigger it manually — though in normal use this is not necessary, since sync is already embedded in `dev`, `start`, `test:e2e:build`, and the app-generator's `vercel-build`. Run it only when you want to verify the sync in isolation:
+Every `dev` and `build` command runs `scripts/sync-prj.sh` first, which overlay-copies `prj/.` onto `app-generator/`. You can also trigger it manually — though in normal use this is not necessary, since sync is already embedded in `dev`, `build`, `test:e2e:build`, and the app-generator's `vercel-build`. Run it only when you want to verify the sync in isolation:
 
 ```bash
 npm run sync   # copy prj/ → app-generator/ without starting anything else

@@ -172,7 +172,7 @@ your-app/           ← app-template のフォーク
 
 ### prj:sync の流れ
 
-`dev` / `build` の各コマンドは最初に `scripts/sync-prj.sh` を実行し、`prj/.` を `app-generator/` に上書きコピーします。手動で呼び出すことも可能ですが、通常は不要です — 同期処理は `dev`・`start`・`test:e2e:build`・app-generator の `vercel-build` に既に含まれています。同期だけを単独で確認したい特殊なケースでのみ使用してください：
+`dev` / `build` の各コマンドは最初に `scripts/sync-prj.sh` を実行し、`prj/.` を `app-generator/` に上書きコピーします。手動で呼び出すことも可能ですが、通常は不要です — 同期処理は `dev`・`build`・`test:e2e:build`・app-generator の `vercel-build` に既に含まれています。同期だけを単独で確認したい特殊なケースでのみ使用してください：
 
 ```bash
 npm run sync   # 他の操作なしで prj/ → app-generator/ をコピー
