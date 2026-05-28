@@ -173,7 +173,7 @@ Fork (or use as a template) this repo. All your changes go into `prj/`. The gene
 Every `dev`, `build`, and `deploy` command runs `scripts/sync-prj.sh` first, which overlay-copies `prj/.` onto `app-generator/`. You can also trigger it manually:
 
 ```bash
-npm run prj:sync   # copy prj/ → app-generator/ without starting anything else
+npm run sync   # copy prj/ → app-generator/ without starting anything else
 ```
 
 Workflow: edit `prj/` → run `npm run dev` (syncs automatically) → generator regenerates → app reloads.

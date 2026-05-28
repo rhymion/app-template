@@ -173,7 +173,7 @@ your-app/           ← app-template のフォーク
 `dev` / `build` / `deploy` の各コマンドは最初に `scripts/sync-prj.sh` を実行し、`prj/.` を `app-generator/` に上書きコピーします。手動で呼び出すことも可能です：
 
 ```bash
-npm run prj:sync   # 他の操作なしで prj/ → app-generator/ をコピー
+npm run sync   # 他の操作なしで prj/ → app-generator/ をコピー
 ```
 
 ワークフロー：`prj/` を編集 → `npm run dev`（自動で同期）→ ジェネレーターが再生成 → アプリが再起動。
