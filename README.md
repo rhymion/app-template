@@ -148,6 +148,62 @@ git commit -m "Bump app-generator"
 
 ---
 
+## Usage as a Base Project
+
+`app-template` is designed to be forked and used as the foundation for your own application. The core idea is the **wrapper-project pattern**: your project-specific code lives in `prj/`, while the generator engine (`app-generator/`) stays as an unmodified submodule.
+
+### Wrapper-project pattern
+
+```
+your-app/           ← fork of app-template
+├── prj/            ← YOUR schema, components, custom logic
+│   ├── code_generator/json_schema.yaml
+│   ├── prisma/schema.prisma
+│   ├── components/
+│   ├── lib/
+│   └── messages/ja.json
+├── app-generator/  ← submodule (never edited directly)
+└── scripts/sync-prj.sh
+```
+
+Fork (or use as a template) this repo. All your changes go into `prj/`. The generator engine is pinned at a specific commit and upgraded explicitly — not by editing it in place.
+
+### prj:sync flow
+
+Every `dev`, `build`, and `deploy` command runs `scripts/sync-prj.sh` first, which overlay-copies `prj/.` onto `app-generator/`. You can also trigger it manually:
+
+```bash
+npm run prj:sync   # copy prj/ → app-generator/ without starting anything else
+```
+
+Workflow: edit `prj/` → run `npm run dev` (syncs automatically) → generator regenerates → app reloads.
+
+### Vercel deploy
+
+After forking and completing [First-time setup](#first-time-setup):
+
+1. Import your fork into Vercel. Keep **Root Directory** at the repo root.
+2. Add environment variables (`DATABASE_URL`, `AUTH_SECRET`, `NEXTAUTH_URL` at minimum — see `app-generator/.env.example`).
+3. Every push to your production branch triggers a deploy automatically.
+
+For a one-shot production deploy from the CLI:
+
+```bash
+npm run deploy:prod
+```
+
+### Environment variable handoff
+
+Your `.env` lives in `app-generator/`. When a collaborator clones the repo:
+
+1. Copy `app-generator/.env.example` → `app-generator/.env`
+2. Fill in secrets (`DATABASE_URL`, `AUTH_SECRET`, etc.)
+3. Add the same keys as Vercel environment variables for deployed environments
+
+The test database uses `app-generator/.env.test`, which is checked in and requires no changes for local development.
+
+---
+
 ## Troubleshooting
 
 | Symptom | Fix |

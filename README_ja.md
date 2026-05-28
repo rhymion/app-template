@@ -148,6 +148,62 @@ git commit -m "Bump app-generator"
 
 ---
 
+## ベースプロジェクトとしての使い方
+
+`app-template` はフォークして自分のアプリのベースとして使うことを想定しています。基本パターンは **ラッパープロジェクト方式** — プロジェクト固有のコードは `prj/` に置き、ジェネレーターエンジン（`app-generator/`）は手を加えずサブモジュールとして保持します。
+
+### ラッパープロジェクトパターン
+
+```
+your-app/           ← app-template のフォーク
+├── prj/            ← あなたのスキーマ・コンポーネント・カスタムロジック
+│   ├── code_generator/json_schema.yaml
+│   ├── prisma/schema.prisma
+│   ├── components/
+│   ├── lib/
+│   └── messages/ja.json
+├── app-generator/  ← サブモジュール（直接編集しない）
+└── scripts/sync-prj.sh
+```
+
+このリポジトリをフォーク（またはテンプレートとして利用）します。変更はすべて `prj/` に加えます。ジェネレーターエンジンは特定のコミットに固定され、明示的にアップデートします（直接編集はしません）。
+
+### prj:sync の流れ
+
+`dev` / `build` / `deploy` の各コマンドは最初に `scripts/sync-prj.sh` を実行し、`prj/.` を `app-generator/` に上書きコピーします。手動で呼び出すことも可能です：
+
+```bash
+npm run prj:sync   # 他の操作なしで prj/ → app-generator/ をコピー
+```
+
+ワークフロー：`prj/` を編集 → `npm run dev`（自動で同期）→ ジェネレーターが再生成 → アプリが再起動。
+
+### Vercel デプロイ
+
+フォーク後、[初回セットアップ](#初回セットアップ) を終えたら：
+
+1. フォークリポジトリを Vercel に Import。**Root Directory はリポジトリ直下**のままにする。
+2. 環境変数を追加（最低限 `DATABASE_URL`・`AUTH_SECRET`・`NEXTAUTH_URL` — 詳細は `app-generator/.env.example`）。
+3. 以降は本番ブランチへの push のたびに自動デプロイされます。
+
+CLI から本番に一発デプロイする場合：
+
+```bash
+npm run deploy:prod
+```
+
+### 環境変数の引き継ぎ
+
+`.env` は `app-generator/` に置きます。新しいメンバーがリポジトリをクローンしたとき：
+
+1. `app-generator/.env.example` → `app-generator/.env` にコピー
+2. シークレット（`DATABASE_URL`・`AUTH_SECRET` 等）を記入
+3. 同じキーを Vercel の環境変数にも登録する
+
+テスト用 DB には `app-generator/.env.test` を使用します。このファイルはリポジトリにコミット済みで、ローカル開発では変更不要です。
+
+---
+
 ## トラブルシュート
 
 | 症状 | 対処 |
