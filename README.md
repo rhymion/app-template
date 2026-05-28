@@ -26,6 +26,8 @@ app-template/
 
 **Rule of thumb:** edit `prj/`, never `app-generator/`. Every local dev/build command runs `scripts/sync-prj.sh` first, which overlay-copies `prj/.` onto `app-generator/`.
 
+**The `app-generator/` submodule** is pinned at a specific commit and is generally not modified directly. Local temporary changes (for debugging or experimentation) are fine — they do not affect this repository's history as long as you do not commit the updated submodule pointer. If you need a persistent change to the generator, contribute it upstream to `app-generator` and then update the submodule pin here.
+
 ---
 
 ## Prerequisites
@@ -75,7 +77,26 @@ One-time setup (Vercel dashboard):
 1. Import this repository into Vercel. Set **Root Directory to `app-generator/`**.
 2. Build/Install/Output commands: leave the defaults. They are read from `app-generator/vercel.json`, which syncs `prj/` into `app-generator/` before `next build` runs.
 3. Framework Preset: **Next.js** (set by `app-generator/vercel.json`).
-4. Add environment variables — at minimum `DATABASE_URL`, `AUTH_SECRET`, `NEXTAUTH_URL`. See `app-generator/.env.example`.
+4. Provision the following **Vercel resources** for your project (via Vercel dashboard → Storage):
+   - **PostgreSQL** (accessed via Prisma)
+   - **Blob Store**
+   - **Redis**
+
+5. Add **environment variables**:
+
+   | Variable | Notes |
+   |----------|-------|
+   | `DATABASE_URL` | Postgres connection string |
+   | `POSTGRES_URL` | Vercel Postgres URL |
+   | `PRISMA_DATABASE_URL` | Usually set automatically when Vercel Postgres is connected; if Prisma fails to connect, manually set this to the correct pooling URL |
+   | `REDIS_URL` | Redis connection string |
+   | `BLOB_READ_WRITE_TOKEN` | Vercel Blob token |
+   | `AUTH_SECRET` | Random secret for NextAuth (generate with `openssl rand -base64 32`) |
+   | `NEXTAUTH_URL` | Your deployed app URL |
+
+   See `app-generator/.env.example` for a full list.
+
+6. **CI in forked repositories**: To run CI on a fork of this repo, add `AUTH_SECRET` to your repository's **Settings → Secrets and variables → Actions**.
 
 After that, every push (or merge to your production branch) triggers a deploy. No extra dashboard configuration is needed.
 
@@ -113,6 +134,8 @@ Other places that reference the port:
 
 For Vercel deploys the port is managed by the platform — no change needed.
 
+> **E2E tests and `db push`:** Because `test:e2e:build` uses `cross-env NODE_ENV=test`, an external `PORT` environment variable does not propagate to Prisma. To change the port used by `db push` or E2E tests, **edit `app-generator/.env.test` directly** (or place a `.env.test` override in `prj/` and let sync copy it over). Simply setting `PORT` externally is not enough for these commands.
+
 ---
 
 ## Customising your app
@@ -124,14 +147,6 @@ For Vercel deploys the port is managed by the platform — no change needed.
 `sync-prj.sh` uses `cp -a prj/. app-generator/`, so it only **adds or overwrites** files. It never deletes generator files that aren't in `prj/`. If you need a clean slate, run `git submodule deinit -f app-generator && git submodule update --init --recursive` to reset the submodule.
 
 ---
-
-## Updating the generator
-
-```bash
-git submodule update --remote app-generator
-git add app-generator
-git commit -m "Bump app-generator"
-```
 
 ---
 
@@ -157,7 +172,7 @@ Fork (or use as a template) this repo. All your changes go into `prj/`. The gene
 
 ### prj:sync flow
 
-Every `dev` and `build` command runs `scripts/sync-prj.sh` first, which overlay-copies `prj/.` onto `app-generator/`. You can also trigger it manually:
+Every `dev` and `build` command runs `scripts/sync-prj.sh` first, which overlay-copies `prj/.` onto `app-generator/`. You can also trigger it manually — though in normal use this is not necessary, since sync is already embedded in `dev`, `start`, `test:e2e:build`, and the app-generator's `vercel-build`. Run it only when you want to verify the sync in isolation:
 
 ```bash
 npm run sync   # copy prj/ → app-generator/ without starting anything else
@@ -170,7 +185,7 @@ Workflow: edit `prj/` → run `npm run dev` (syncs automatically) → generator 
 After forking and completing [First-time setup](#first-time-setup):
 
 1. Import your fork into Vercel. Set **Root Directory to `app-generator/`**.
-2. Add environment variables (`DATABASE_URL`, `AUTH_SECRET`, `NEXTAUTH_URL` at minimum — see `app-generator/.env.example`).
+2. Provision Vercel resources (PostgreSQL, Blob Store, Redis) and add environment variables (`REDIS_URL`, `BLOB_READ_WRITE_TOKEN`, `POSTGRES_URL`, `PRISMA_DATABASE_URL`, `DATABASE_URL`, `AUTH_SECRET`, `NEXTAUTH_URL` — see `app-generator/.env.example` and the [Vercel — git push / merge](#2-vercel--git-push--merge) section for details).
 3. Every push to your production branch triggers a deploy automatically.
 
 For a one-shot production deploy from the CLI:
