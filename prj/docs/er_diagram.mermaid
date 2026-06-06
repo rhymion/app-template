@@ -1,0 +1,102 @@
+erDiagram
+    USER {
+        string username
+        int karma
+        string plan_id
+    }
+    PLAN {
+        enum tier "free_premium_vip"
+        int reaction_kinds_allowed
+        int sub_account_limit
+        bool can_view_paid_posts
+    }
+    SUB_ACCOUNT {
+        string parent_user_id
+        string nickname
+    }
+    REACTION {
+        enum type "8_kinds_3_paid"
+        string user_id
+    }
+    CRY_POST {
+        string body
+        string author_user_id
+        enum visibility "public_premium_vip"
+    }
+    TIP_TX {
+        int gross_amount
+        int operator_fee
+        int payment_fee
+        string contract_split_id
+        enum status "pending_held_paid"
+        string user_id
+    }
+    WORK {
+        string title
+        enum pattern "A_or_B"
+        enum status "pending_approved"
+    }
+    CHARACTER {
+        string name
+        string work_id
+        bool official_image
+    }
+    SCENE {
+        string label
+        string work_id
+        string episode
+        string timestamp
+    }
+    MUSIC {
+        string title
+        enum kind "op_cd_bgm_insert"
+    }
+    CHANNEL {
+        string parent_id
+        enum parent_type "work_char_scene"
+        enum kind "general_consider"
+        enum visibility "public_premium_vip"
+    }
+    FC_LINK {
+        enum kind "work_merch_video_music_fund"
+        string url
+    }
+    CREATOR {
+        string name
+        enum role "voice_anim_bgm_etc"
+        enum affiliation "agency_freelance_student"
+    }
+
+    USER }o--|| PLAN : subscribes
+    USER ||--o{ SUB_ACCOUNT : owns
+    USER ||--o{ REACTION : gives
+    USER ||--o{ TIP_TX : initiates
+    USER ||--o{ CRY_POST : posts
+
+    CRY_POST ||--o{ REACTION : receives
+    CRY_POST ||--o{ TIP_TX : attached
+    CRY_POST }o--|| CHANNEL : posted_in
+    CRY_POST }o--o| WORK : about
+    CRY_POST }o--o| CHARACTER : about
+    CRY_POST }o--o| SCENE : about
+    CRY_POST }o--o| MUSIC : about
+    CRY_POST }o--o| CREATOR : about
+
+    WORK ||--o{ CHARACTER : has
+    WORK ||--o{ SCENE : has
+    WORK ||--o{ CHANNEL : owns
+    CHARACTER ||--o{ CHANNEL : owns
+    SCENE ||--o{ CHANNEL : owns
+
+    SCENE }o--o{ CHARACTER : features
+    SCENE }o--o{ MUSIC : uses
+    SCENE }o--o{ CREATOR : credits
+
+    CHARACTER }o--o{ CREATOR : voiced_by
+    MUSIC }o--o{ CREATOR : composed_by
+    MUSIC }o--o{ CREATOR : credits
+
+    CHANNEL ||--o{ FC_LINK : sells
+    CHARACTER ||--o{ FC_LINK : merch
+    WORK ||--o{ FC_LINK : video
+    MUSIC ||--o{ FC_LINK : purchase
