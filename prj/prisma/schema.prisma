@@ -1,4 +1,4 @@
-// This is your Prisma schema file, 
+// This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 // Corresponding Prisma version: 7
 
@@ -10,6 +10,10 @@ generator client {
 datasource db {
   provider = "postgresql"
 }
+
+// ============================================================
+// Common models
+// ============================================================
 
 // Tenant — deployment-level partition (one SaaS customer = one tenant).
 // See docs/multi-tenancy.md for the broader design.
@@ -33,166 +37,6 @@ model tenant {
   updater_id String?
   updater    user?    @relation("TenantUpdater", fields: [updater_id], references: [id])
   users      user[]   @relation("UserTenant")
-
-  @@index([creator_id])
-}
-
-model db_table {
-  id             String      @id @default(cuid())
-  name           String      @unique
-  description    String?
-  commentable_id String      @unique
-  commentable    commentable @relation(fields: [commentable_id], references: [id], onDelete: Cascade)
-  created_at     DateTime    @default(now()) @db.Timestamptz(0)
-  updated_at     DateTime    @updatedAt @db.Timestamptz(0)
-  creator_id     String
-  creator        user        @relation("DbTableCreator", fields: [creator_id], references: [id])
-  updater_id     String
-  updater        user        @relation("DbTableUpdater", fields: [updater_id], references: [id])
-  fields         field[]     @relation("ParentTable")
-  referenced_by  field[]     @relation("ReferenceTable")
-
-  @@index([creator_id])
-}
-
-model field {
-  id           String    @id @default(cuid())
-  name         String
-  type         String
-  db_table_id  String
-  db_table     db_table  @relation("ParentTable", fields: [db_table_id], references: [id], onDelete: Cascade)
-  reference_id String?
-  reference    db_table? @relation("ReferenceTable", fields: [reference_id], references: [id])
-  max_length   Int
-  max          Int?
-  regex        String?
-  required     Boolean   @default(true)
-  created_at   DateTime  @default(now()) @db.Timestamptz(0)
-  updated_at   DateTime  @updatedAt @db.Timestamptz(0)
-}
-
-model commentable {
-  id       String    @id @default(cuid())
-  comments comment[]
-  db_table db_table?
-}
-
-model comment {
-  id             String      @id @default(cuid())
-  message        String
-  commentable_id String
-  commentable    commentable @relation(fields: [commentable_id], references: [id], onDelete: Cascade)
-  created_at     DateTime    @default(now()) @db.Timestamptz(0)
-  updated_at     DateTime    @updatedAt @db.Timestamptz(0)
-  creator_id     String
-  creator        user        @relation("CommentCreator", fields: [creator_id], references: [id])
-
-  @@index([creator_id])
-}
-
-model xxxxx_xxxxx {
-  id           String        @id @default(cuid())
-  name         String        @unique
-  description  String?
-  team         String?
-  created_at   DateTime      @default(now()) @db.Timestamptz(0)
-  updated_at   DateTime      @updatedAt @db.Timestamptz(0)
-  creator_id   String
-  creator      user          @relation("XxxxxXxxxxCreator", fields: [creator_id], references: [id])
-  updater_id   String
-  updater      user          @relation("XxxxxXxxxxUpdater", fields: [updater_id], references: [id])
-  yyyyy_yyyyys yyyyy_yyyyy[]
-
-  @@index([creator_id])
-}
-
-model yyyyy_yyyyy {
-  id             String      @id @default(cuid())
-  name           String
-  type           String
-  xxxxx_xxxxx_id String
-  xxxxx_xxxxx    xxxxx_xxxxx @relation(fields: [xxxxx_xxxxx_id], references: [id], onDelete: Cascade)
-  max_length     Int?
-  max            Int?
-  regex          String?
-  required       Boolean     @default(true)
-  written_by     String
-  created_at     DateTime    @default(now()) @db.Timestamptz(0)
-  updated_at     DateTime    @updatedAt @db.Timestamptz(0)
-}
-
-model parent1 {
-  id              String           @id @default(cuid())
-  name            String           @unique
-  organization_id String
-  organization    organization     @relation(fields: [organization_id], references: [id], onDelete: Cascade)
-  description     String?
-  price           Int
-  due_date        DateTime         @db.Timestamptz(0)
-  image_url       String?
-  created_at      DateTime         @default(now()) @db.Timestamptz(0)
-  updated_at      DateTime         @updatedAt @db.Timestamptz(0)
-  creator_id      String
-  creator         user             @relation("Parent1Creator", fields: [creator_id], references: [id])
-  updater_id      String
-  updater         user             @relation("Parent1Updater", fields: [updater_id], references: [id])
-  parent1_child1s parent1_child1[]
-  parent1_child2s parent1_child2[]
-  parent1_lists   parent1_list[]
-
-  @@index([creator_id])
-  @@index([organization_id])
-}
-
-model parent1_child1 {
-  id         String   @id @default(cuid())
-  order      Int      @default(0)
-  name       String
-  type       String
-  parent1_id String
-  parent1    parent1  @relation(fields: [parent1_id], references: [id], onDelete: Cascade)
-  max_length Int?
-  max        Int?
-  regex      String?
-  required   Boolean  @default(true)
-  written_by String
-  created_at DateTime @default(now()) @db.Timestamptz(0)
-  updated_at DateTime @updatedAt @db.Timestamptz(0)
-}
-
-model parent1_child2 {
-  id         String    @id @default(cuid())
-  name       String
-  parent1_id String
-  parent1    parent1   @relation(fields: [parent1_id], references: [id], onDelete: Cascade)
-  required   Boolean   @default(true)
-  start_date DateTime? @db.Timestamptz(0)
-  end_date   DateTime  @db.Timestamptz(0)
-  created_at DateTime  @default(now()) @db.Timestamptz(0)
-  updated_at DateTime  @updatedAt @db.Timestamptz(0)
-}
-
-model parent1_list {
-  id         String   @id @default(cuid())
-  name       String
-  created_at DateTime @default(now()) @db.Timestamptz(0)
-  updated_at DateTime @updatedAt @db.Timestamptz(0)
-  parent1_id String
-  parent1    parent1  @relation(fields: [parent1_id], references: [id], onDelete: Cascade)
-}
-
-model parent_only {
-  id          String    @id @default(cuid())
-  name        String    @unique
-  description String?
-  login_time  DateTime? @db.Timestamptz(0)
-  logout_time DateTime? @db.Timestamptz(0)
-  created_at  DateTime  @default(now()) @db.Timestamptz(0)
-  updated_at  DateTime  @updatedAt @db.Timestamptz(0)
-  creator_id  String
-  creator     user      @relation("ParentOnlyCreator", fields: [creator_id], references: [id])
-  updater_id  String
-  updater     user      @relation("ParentOnlyUpdater", fields: [updater_id], references: [id])
 
   @@index([creator_id])
 }
@@ -336,6 +180,367 @@ model permission {
   updater    user     @relation("PermissionUpdater", fields: [updater_id], references: [id])
 
   @@unique([name, role_id])
+  @@index([creator_id])
+}
+
+model approvable {
+  id                String             @id @default(cuid())
+  creator_id        String?
+  creator           user?              @relation("ApprovableCreator", fields: [creator_id], references: [id])
+  approval_requests approval_request[]
+  leave_request     leave_request?
+
+  @@index([creator_id])
+}
+
+model approval_flow {
+  id                String             @id @default(cuid())
+  entity_name       String
+  requestor_role_id String?
+  requestor_role    role?              @relation("ApprovalFlowRequestorRole", fields: [requestor_role_id], references: [id])
+  approver_role_id  String
+  approver_role     role               @relation("ApprovalFlowApproverRole", fields: [approver_role_id], references: [id])
+  approval_requests approval_request[]
+  preceded_by       approval_flow[]    @relation("ApprovalFlowOrder")
+  followed_by       approval_flow[]    @relation("ApprovalFlowOrder")
+  created_at        DateTime           @default(now()) @db.Timestamptz(0)
+  updated_at        DateTime           @updatedAt @db.Timestamptz(0)
+  creator_id        String
+  creator           user               @relation("ApprovalFlowCreator", fields: [creator_id], references: [id])
+  updater_id        String
+  updater           user               @relation("ApprovalFlowUpdater", fields: [updater_id], references: [id])
+
+  @@index([creator_id])
+}
+
+model approval_request {
+  id                 String             @id @default(cuid())
+  approvable_id      String
+  approvable         approvable         @relation(fields: [approvable_id], references: [id], onDelete: Cascade)
+  approval_flow_id   String
+  approval_flow      approval_flow      @relation(fields: [approval_flow_id], references: [id])
+  status             Int                @default(0)
+  approval_histories approval_history[]
+  created_at         DateTime           @default(now()) @db.Timestamptz(0)
+  updated_at         DateTime           @updatedAt @db.Timestamptz(0)
+}
+
+model approval_history {
+  id                  String           @id @default(cuid())
+  approval_request_id String
+  approval_request    approval_request @relation(fields: [approval_request_id], references: [id], onDelete: Cascade)
+  pre_status          Int
+  post_status         Int
+  message             String?
+  created_at          DateTime         @default(now()) @db.Timestamptz(0)
+  updated_at          DateTime         @updatedAt @db.Timestamptz(0)
+  creator_id          String
+  creator             user             @relation("ApprovalHistoryCreator", fields: [creator_id], references: [id])
+
+  @@index([creator_id])
+}
+
+model commentable {
+  id       String    @id @default(cuid())
+  comments comment[]
+  db_table db_table?
+}
+
+model comment {
+  id             String      @id @default(cuid())
+  message        String
+  commentable_id String
+  commentable    commentable @relation(fields: [commentable_id], references: [id], onDelete: Cascade)
+  created_at     DateTime    @default(now()) @db.Timestamptz(0)
+  updated_at     DateTime    @updatedAt @db.Timestamptz(0)
+  creator_id     String
+  creator        user        @relation("CommentCreator", fields: [creator_id], references: [id])
+
+  @@index([creator_id])
+}
+
+model attachable {
+  id          String       @id @default(cuid())
+  attachments attachment[]
+  resource    resource?
+  product     product?
+}
+
+model attachment {
+  id            String     @id @default(cuid())
+  type          Int        @default(0)
+  order         Int        @default(0)
+  name          String
+  path          String
+  attachable_id String
+  attachable    attachable @relation(fields: [attachable_id], references: [id], onDelete: Cascade)
+  created_at    DateTime   @default(now()) @db.Timestamptz(0)
+  updated_at    DateTime   @updatedAt @db.Timestamptz(0)
+}
+
+model dashboard {
+  id         String             @id @default(cuid())
+  name       String
+  widgets    dashboard_widget[]
+  created_at DateTime           @default(now()) @db.Timestamptz(0)
+  updated_at DateTime           @updatedAt @db.Timestamptz(0)
+  creator_id String
+  creator    user               @relation("DashboardCreator", fields: [creator_id], references: [id])
+  updater_id String
+  updater    user               @relation("DashboardUpdater", fields: [updater_id], references: [id])
+
+  @@index([creator_id])
+}
+
+model dashboard_widget {
+  id             String    @id @default(cuid())
+  dashboard_id   String
+  dashboard      dashboard @relation(fields: [dashboard_id], references: [id], onDelete: Cascade)
+  name           String
+  entity_name    String
+  chart_type     Int       @default(0)
+  group_by_field String
+  filter_field   String?
+  filter_value   String?
+  order          Int       @default(0)
+  created_at     DateTime  @default(now()) @db.Timestamptz(0)
+  updated_at     DateTime  @updatedAt @db.Timestamptz(0)
+}
+
+// Append-only audit trail for security-relevant events: auth lifecycle
+// (sign-in/out, account creation, sign-in rejection) and CRUD on protected
+// entities (roles, permissions, role assignments, …). Rows must outlive the
+// user they reference, so `actor_user_id` is a plain string with no FK
+// constraint — deleting a user does not cascade-delete their audit history.
+// `actor_user_id` is nullable because some events (rejected sign-in with an
+// unknown email, system-triggered actions) have no resolved actor.
+model audit_log {
+  id            String   @id @default(cuid())
+  actor_user_id String?
+  action        String
+  target_table  String?
+  target_id     String?
+  metadata      Json?
+  created_at    DateTime @default(now()) @db.Timestamptz(0)
+
+  @@index([actor_user_id])
+  @@index([target_table, target_id])
+  @@index([created_at])
+}
+
+// Single-use MFA recovery codes (S5). One row per generated code.
+// `code_hash` is bcrypt of the *normalized* plaintext (uppercased, dashes
+// stripped) so verification doesn't have to guess at the user's
+// punctuation habits. `used_at` is set on first successful verification
+// and the row is then dead weight — kept around so a future "MFA audit
+// log" page can show "X recovery codes used" without joining elsewhere.
+model mfa_recovery_code {
+  id         String    @id @default(cuid())
+  user_id    String
+  user       user      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  code_hash  String
+  used_at    DateTime? @db.Timestamptz(0)
+  created_at DateTime  @default(now()) @db.Timestamptz(0)
+
+  @@index([user_id])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// NextAuth (@next-auth/prisma-adapter) auxiliary tables.
+//
+// `Account`, `Session`, `VerificationToken` are PascalCase by NextAuth
+// contract — the adapter accesses them as `prisma.account`, `prisma.session`,
+// `prisma.verificationToken`, which the Prisma client derives by
+// lower-casing the first letter of the model name.
+//
+// The `User` model required by PrismaAdapter is *the same row* as our
+// domain `user` (see `model user` above) — `prisma.user` resolves to that
+// model since Prisma lower-cases the model name. The adapter writes
+// `emailVerified` / `image` directly into the merged table; the
+// `user_account ↔ User` mirror that existed in earlier versions is gone.
+//
+// `session: { strategy: 'jwt' }` is kept in auth.ts so the Credentials
+// provider keeps working:
+//   - `Account` rows are written on every OAuth sign-in (identity stability
+//     by providerAccountId).
+//   - `Session` is unused today; lights up under Auth.js v5 (database
+//     sessions).
+//   - `VerificationToken` is unused until an Email/magic-link provider is
+//     added.
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              user    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         user     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model db_table {
+  id             String      @id @default(cuid())
+  name           String      @unique
+  description    String?
+  commentable_id String      @unique
+  commentable    commentable @relation(fields: [commentable_id], references: [id], onDelete: Cascade)
+  created_at     DateTime    @default(now()) @db.Timestamptz(0)
+  updated_at     DateTime    @updatedAt @db.Timestamptz(0)
+  creator_id     String
+  creator        user        @relation("DbTableCreator", fields: [creator_id], references: [id])
+  updater_id     String
+  updater        user        @relation("DbTableUpdater", fields: [updater_id], references: [id])
+  fields         field[]     @relation("ParentTable")
+  referenced_by  field[]     @relation("ReferenceTable")
+
+  @@index([creator_id])
+}
+
+model field {
+  id           String    @id @default(cuid())
+  name         String
+  type         String
+  db_table_id  String
+  db_table     db_table  @relation("ParentTable", fields: [db_table_id], references: [id], onDelete: Cascade)
+  reference_id String?
+  reference    db_table? @relation("ReferenceTable", fields: [reference_id], references: [id])
+  max_length   Int
+  max          Int?
+  regex        String?
+  required     Boolean   @default(true)
+  created_at   DateTime  @default(now()) @db.Timestamptz(0)
+  updated_at   DateTime  @updatedAt @db.Timestamptz(0)
+}
+
+model xxxxx_xxxxx {
+  id           String        @id @default(cuid())
+  name         String        @unique
+  description  String?
+  team         String?
+  created_at   DateTime      @default(now()) @db.Timestamptz(0)
+  updated_at   DateTime      @updatedAt @db.Timestamptz(0)
+  creator_id   String
+  creator      user          @relation("XxxxxXxxxxCreator", fields: [creator_id], references: [id])
+  updater_id   String
+  updater      user          @relation("XxxxxXxxxxUpdater", fields: [updater_id], references: [id])
+  yyyyy_yyyyys yyyyy_yyyyy[]
+
+  @@index([creator_id])
+}
+
+model yyyyy_yyyyy {
+  id             String      @id @default(cuid())
+  name           String
+  type           String
+  xxxxx_xxxxx_id String
+  xxxxx_xxxxx    xxxxx_xxxxx @relation(fields: [xxxxx_xxxxx_id], references: [id], onDelete: Cascade)
+  max_length     Int?
+  max            Int?
+  regex          String?
+  required       Boolean     @default(true)
+  written_by     String
+  created_at     DateTime    @default(now()) @db.Timestamptz(0)
+  updated_at     DateTime    @updatedAt @db.Timestamptz(0)
+}
+
+model parent1 {
+  id              String           @id @default(cuid())
+  name            String           @unique
+  organization_id String
+  organization    organization     @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+  description     String?
+  price           Int
+  due_date        DateTime         @db.Timestamptz(0)
+  image_url       String?
+  created_at      DateTime         @default(now()) @db.Timestamptz(0)
+  updated_at      DateTime         @updatedAt @db.Timestamptz(0)
+  creator_id      String
+  creator         user             @relation("Parent1Creator", fields: [creator_id], references: [id])
+  updater_id      String
+  updater         user             @relation("Parent1Updater", fields: [updater_id], references: [id])
+  parent1_child1s parent1_child1[]
+  parent1_child2s parent1_child2[]
+  parent1_lists   parent1_list[]
+
+  @@index([creator_id])
+  @@index([organization_id])
+}
+
+model parent1_child1 {
+  id         String   @id @default(cuid())
+  order      Int      @default(0)
+  name       String
+  type       String
+  parent1_id String
+  parent1    parent1  @relation(fields: [parent1_id], references: [id], onDelete: Cascade)
+  max_length Int?
+  max        Int?
+  regex      String?
+  required   Boolean  @default(true)
+  written_by String
+  created_at DateTime @default(now()) @db.Timestamptz(0)
+  updated_at DateTime @updatedAt @db.Timestamptz(0)
+}
+
+model parent1_child2 {
+  id         String    @id @default(cuid())
+  name       String
+  parent1_id String
+  parent1    parent1   @relation(fields: [parent1_id], references: [id], onDelete: Cascade)
+  required   Boolean   @default(true)
+  start_date DateTime? @db.Timestamptz(0)
+  end_date   DateTime  @db.Timestamptz(0)
+  created_at DateTime  @default(now()) @db.Timestamptz(0)
+  updated_at DateTime  @updatedAt @db.Timestamptz(0)
+}
+
+model parent1_list {
+  id         String   @id @default(cuid())
+  name       String
+  created_at DateTime @default(now()) @db.Timestamptz(0)
+  updated_at DateTime @updatedAt @db.Timestamptz(0)
+  parent1_id String
+  parent1    parent1  @relation(fields: [parent1_id], references: [id], onDelete: Cascade)
+}
+
+model parent_only {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  description String?
+  login_time  DateTime? @db.Timestamptz(0)
+  logout_time DateTime? @db.Timestamptz(0)
+  created_at  DateTime  @default(now()) @db.Timestamptz(0)
+  updated_at  DateTime  @updatedAt @db.Timestamptz(0)
+  creator_id  String
+  creator     user      @relation("ParentOnlyCreator", fields: [creator_id], references: [id])
+  updater_id  String
+  updater     user      @relation("ParentOnlyUpdater", fields: [updater_id], references: [id])
+
   @@index([creator_id])
 }
 
@@ -516,205 +721,4 @@ model leave_request {
   updater       user       @relation("LeaveRequestUpdater", fields: [updater_id], references: [id])
 
   @@index([creator_id])
-}
-
-model approvable {
-  id                String             @id @default(cuid())
-  creator_id        String?
-  creator           user?              @relation("ApprovableCreator", fields: [creator_id], references: [id])
-  approval_requests approval_request[]
-  leave_request     leave_request?
-
-  @@index([creator_id])
-}
-
-model approval_flow {
-  id                String             @id @default(cuid())
-  entity_name       String
-  requestor_role_id String?
-  requestor_role    role?              @relation("ApprovalFlowRequestorRole", fields: [requestor_role_id], references: [id])
-  approver_role_id  String
-  approver_role     role               @relation("ApprovalFlowApproverRole", fields: [approver_role_id], references: [id])
-  approval_requests approval_request[]
-  preceded_by       approval_flow[]    @relation("ApprovalFlowOrder")
-  followed_by       approval_flow[]    @relation("ApprovalFlowOrder")
-  created_at        DateTime           @default(now()) @db.Timestamptz(0)
-  updated_at        DateTime           @updatedAt @db.Timestamptz(0)
-  creator_id        String
-  creator           user               @relation("ApprovalFlowCreator", fields: [creator_id], references: [id])
-  updater_id        String
-  updater           user               @relation("ApprovalFlowUpdater", fields: [updater_id], references: [id])
-
-  @@index([creator_id])
-}
-
-model approval_request {
-  id                 String             @id @default(cuid())
-  approvable_id      String
-  approvable         approvable         @relation(fields: [approvable_id], references: [id], onDelete: Cascade)
-  approval_flow_id   String
-  approval_flow      approval_flow      @relation(fields: [approval_flow_id], references: [id])
-  status             Int                @default(0)
-  approval_histories approval_history[]
-  created_at         DateTime           @default(now()) @db.Timestamptz(0)
-  updated_at         DateTime           @updatedAt @db.Timestamptz(0)
-}
-
-model approval_history {
-  id                  String           @id @default(cuid())
-  approval_request_id String
-  approval_request    approval_request @relation(fields: [approval_request_id], references: [id], onDelete: Cascade)
-  pre_status          Int
-  post_status         Int
-  message             String?
-  created_at          DateTime         @default(now()) @db.Timestamptz(0)
-  updated_at          DateTime         @updatedAt @db.Timestamptz(0)
-  creator_id          String
-  creator             user             @relation("ApprovalHistoryCreator", fields: [creator_id], references: [id])
-
-  @@index([creator_id])
-}
-
-model attachable {
-  id          String       @id @default(cuid())
-  attachments attachment[]
-  resource    resource?
-  product     product?
-}
-
-model attachment {
-  id            String     @id @default(cuid())
-  type          Int        @default(0)
-  order         Int        @default(0)
-  name          String
-  path          String
-  attachable_id String
-  attachable    attachable @relation(fields: [attachable_id], references: [id], onDelete: Cascade)
-  created_at    DateTime   @default(now()) @db.Timestamptz(0)
-  updated_at    DateTime   @updatedAt @db.Timestamptz(0)
-}
-
-model dashboard {
-  id         String             @id @default(cuid())
-  name       String
-  widgets    dashboard_widget[]
-  created_at DateTime           @default(now()) @db.Timestamptz(0)
-  updated_at DateTime           @updatedAt @db.Timestamptz(0)
-  creator_id String
-  creator    user               @relation("DashboardCreator", fields: [creator_id], references: [id])
-  updater_id String
-  updater    user               @relation("DashboardUpdater", fields: [updater_id], references: [id])
-
-  @@index([creator_id])
-}
-
-model dashboard_widget {
-  id             String    @id @default(cuid())
-  dashboard_id   String
-  dashboard      dashboard @relation(fields: [dashboard_id], references: [id], onDelete: Cascade)
-  name           String
-  entity_name    String
-  chart_type     Int       @default(0)
-  group_by_field String
-  filter_field   String?
-  filter_value   String?
-  order          Int       @default(0)
-  created_at     DateTime  @default(now()) @db.Timestamptz(0)
-  updated_at     DateTime  @updatedAt @db.Timestamptz(0)
-}
-
-// Append-only audit trail for security-relevant events: auth lifecycle
-// (sign-in/out, account creation, sign-in rejection) and CRUD on protected
-// entities (roles, permissions, role assignments, …). Rows must outlive the
-// user they reference, so `actor_user_id` is a plain string with no FK
-// constraint — deleting a user does not cascade-delete their audit history.
-// `actor_user_id` is nullable because some events (rejected sign-in with an
-// unknown email, system-triggered actions) have no resolved actor.
-model audit_log {
-  id            String   @id @default(cuid())
-  actor_user_id String?
-  action        String
-  target_table  String?
-  target_id     String?
-  metadata      Json?
-  created_at    DateTime @default(now()) @db.Timestamptz(0)
-
-  @@index([actor_user_id])
-  @@index([target_table, target_id])
-  @@index([created_at])
-}
-
-// Single-use MFA recovery codes (S5). One row per generated code.
-// `code_hash` is bcrypt of the *normalized* plaintext (uppercased, dashes
-// stripped) so verification doesn't have to guess at the user's
-// punctuation habits. `used_at` is set on first successful verification
-// and the row is then dead weight — kept around so a future "MFA audit
-// log" page can show "X recovery codes used" without joining elsewhere.
-model mfa_recovery_code {
-  id         String    @id @default(cuid())
-  user_id    String
-  user       user      @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  code_hash  String
-  used_at    DateTime? @db.Timestamptz(0)
-  created_at DateTime  @default(now()) @db.Timestamptz(0)
-
-  @@index([user_id])
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// NextAuth (@next-auth/prisma-adapter) auxiliary tables.
-//
-// `Account`, `Session`, `VerificationToken` are PascalCase by NextAuth
-// contract — the adapter accesses them as `prisma.account`, `prisma.session`,
-// `prisma.verificationToken`, which the Prisma client derives by
-// lower-casing the first letter of the model name.
-//
-// The `User` model required by PrismaAdapter is *the same row* as our
-// domain `user` (see `model user` above) — `prisma.user` resolves to that
-// model since Prisma lower-cases the model name. The adapter writes
-// `emailVerified` / `image` directly into the merged table; the
-// `user_account ↔ User` mirror that existed in earlier versions is gone.
-//
-// `session: { strategy: 'jwt' }` is kept in auth.ts so the Credentials
-// provider keeps working:
-//   - `Account` rows are written on every OAuth sign-in (identity stability
-//     by providerAccountId).
-//   - `Session` is unused today; lights up under Auth.js v5 (database
-//     sessions).
-//   - `VerificationToken` is unused until an Email/magic-link provider is
-//     added.
-// ─────────────────────────────────────────────────────────────────────────────
-
-model Account {
-  id                String  @id @default(cuid())
-  userId            String
-  type              String
-  provider          String
-  providerAccountId String
-  refresh_token     String?
-  access_token      String?
-  expires_at        Int?
-  token_type        String?
-  scope             String?
-  id_token          String?
-  session_state     String?
-  user              user    @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([provider, providerAccountId])
-}
-
-model Session {
-  id           String   @id @default(cuid())
-  sessionToken String   @unique
-  userId       String
-  expires      DateTime
-  user         user     @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
-
-model VerificationToken {
-  identifier String
-  token      String   @unique
-  expires    DateTime
-
-  @@unique([identifier, token])
 }
