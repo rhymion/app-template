@@ -300,7 +300,7 @@ definitions:
         minLength: 1
         x-entity-select: true
       requestor_role_id:
-        type:
+        type: 
           - string
           - "null"
         pattern: "^c[a-z0-9]{24,}$"
@@ -1615,15 +1615,12 @@ definitions:
       - id
       - product_id
       - quantity
-      - reserved_quantity
     x-display:
       table:
         - product:
             primary: true
             width: 200
         - quantity:
-            width: 100
-        - reserved_quantity:
             width: 100
     properties:
       id:
@@ -1637,9 +1634,6 @@ definitions:
           target: product
           labelField: name
       quantity:
-        type: integer
-        minimum: 0
-      reserved_quantity:
         type: integer
         minimum: 0
       location:
@@ -1681,6 +1675,30 @@ definitions:
       - id
       - order_no
       - customer_id
+    x-reservation:
+      mode: count
+      transaction:
+        strategy: conditional_update
+      lines: items
+      pool:
+        entity: inventory
+        quantityField: quantity
+        reservedField: reserved_quantity
+      request:
+        quantityField: quantity
+        criteria:
+          product_id: product_id
+      policy:
+        orderBy:
+          - expiration_date: asc_nulls_last
+          - lot_number: asc
+          - id: asc
+      result:
+        allocationEntity: inventory_allocation
+        parentField: purchase_order_id
+        lineField: purchase_per_item_id
+        poolField: inventory_id
+        quantityField: quantity
     x-display:
       table:
         - order_no:
@@ -1760,6 +1778,43 @@ definitions:
             type: array
             items:
               $ref: "#/definitions/purchase_per_item"
+
+  inventory_allocation:
+    type: object
+    required:
+      - id
+      - purchase_order_id
+      - purchase_per_item_id
+      - inventory_id
+      - quantity
+    properties:
+      id:
+        type: string
+        pattern: "^c[a-z0-9]{24,}$"
+      purchase_order_id:
+        type: string
+        pattern: "^c[a-z0-9]{24,}$"
+        x-relationship:
+          type: many-to-one
+          target: purchase_order
+          labelField: order_no
+      purchase_per_item_id:
+        type: string
+        pattern: "^c[a-z0-9]{24,}$"
+        x-relationship:
+          type: many-to-one
+          target: purchase_per_item
+          labelField: id
+      inventory_id:
+        type: string
+        pattern: "^c[a-z0-9]{24,}$"
+        x-relationship:
+          type: many-to-one
+          target: inventory
+          labelField: lot_number
+      quantity:
+        type: integer
+        minimum: 1
 
   leave_request:
     type: object

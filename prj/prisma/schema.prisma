@@ -296,8 +296,8 @@ model dashboard_widget {
   id             String    @id @default(cuid())
   dashboard_id   String
   dashboard      dashboard @relation(fields: [dashboard_id], references: [id], onDelete: Cascade)
-  name           String
-  entity_name    String
+  name            String
+  entity_name     String
   chart_type      Int
   group_by_field  String
   stack_mode      Int?
@@ -665,7 +665,7 @@ model inventory {
   product_id        String
   product           product   @relation(fields: [product_id], references: [id], onDelete: Cascade)
   quantity          Int
-  reserved_quantity Int
+  reserved_quantity Int       @default(0)
   location          String?
   lot_number        String?
   expiration_date   DateTime?
@@ -675,7 +675,26 @@ model inventory {
   creator           user      @relation("InventoryCreator", fields: [creator_id], references: [id])
   updater_id        String
   updater           user      @relation("InventoryUpdater", fields: [updater_id], references: [id])
+  inventory_allocations inventory_allocation[]
 
+  @@index([creator_id])
+}
+
+model inventory_allocation {
+  id                   String            @id @default(cuid())
+  purchase_order_id    String
+  purchase_order       purchase_order    @relation(fields: [purchase_order_id], references: [id], onDelete: Cascade)
+  purchase_per_item_id String
+  purchase_per_item    purchase_per_item @relation(fields: [purchase_per_item_id], references: [id], onDelete: Cascade)
+  inventory_id         String
+  inventory            inventory         @relation(fields: [inventory_id], references: [id])
+  quantity             Int
+  creator_id           String
+  updater_id           String
+  created_at           DateTime          @default(now()) @db.Timestamptz(0)
+
+  @@index([purchase_order_id])
+  @@index([inventory_id])
   @@index([creator_id])
 }
 
@@ -691,6 +710,7 @@ model purchase_order {
   creator     user                @relation("PurchaseOrderCreator", fields: [creator_id], references: [id])
   updater_id  String
   updater     user                @relation("PurchaseOrderUpdater", fields: [updater_id], references: [id])
+  inventory_allocations inventory_allocation[]
 
   @@index([creator_id])
 }
@@ -705,6 +725,7 @@ model purchase_per_item {
   price             Int?
   created_at        DateTime       @default(now()) @db.Timestamptz(0)
   updated_at        DateTime       @updatedAt @db.Timestamptz(0)
+  inventory_allocations inventory_allocation[]
 }
 
 model leave_request {
