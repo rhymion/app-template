@@ -19,6 +19,8 @@ definitions:
         - name:
             primary: true
             width: 150
+        - additional_info:
+            width: 250
     properties:
       id:
         type: string
@@ -50,6 +52,12 @@ definitions:
           - string
           - "null"
         format: uri
+      mfa_enabled:
+        type: boolean
+        default: false
+        x-custom-component:
+          target:
+            - upsert
 
   role:
     type: object
@@ -80,9 +88,13 @@ definitions:
       test: true
       fields:
         - name
-        - email
         - image
         - roles
+    x-custom-components:
+      - name: MfaToggle
+        path: "@/components/_standard/MfaToggle"
+        target:
+          - view
     x-relationships:
       roles:
         type: many-to-many
@@ -101,13 +113,20 @@ definitions:
 
   setting:
     x-generate:
-      list: true
+      list: false
       view: true
       new: false
       edit: true
       delete: false
       invalidate: false
       api: true
+      fields:
+        - name
+        - email
+        - image
+        - password
+        - api_key
+        - mfa_enabled
     x-relationships:
       roles:
         type: many-to-many
@@ -409,8 +428,6 @@ definitions:
             x-outputType: list
             items:
               $ref: "#/definitions/approval_request"
-          leave_request:
-            $ref: "#/definitions/leave_request"
 
   commentable:
     type: object
@@ -576,10 +593,39 @@ definitions:
       chart_type:
         type: integer
         minimum: 0
-        maximum: 1
+        maximum: 3
         enum:
-          - Pie
-          - Bar
+          - pie
+          - column
+          - bar
+          - line
+        default: 1
+      stack_mode:
+        type:
+          - integer
+          - "null"
+        minimum: 0
+        maximum: 2
+        enum:
+          - grouped
+          - stacked
+          - standardized
+      series_field:
+        type:
+          - string
+          - "null"
+      group_by_bucket:
+        type:
+          - integer
+          - "null"
+        minimum: 0
+        maximum: 4
+        enum:
+          - day
+          - week
+          - month
+          - quarter
+          - year
       group_by_field:
         type: string
         minLength: 1
