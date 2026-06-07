@@ -57,6 +57,12 @@ model user {
   // cascade to users.
   tenant_id                 String              @default("default")
   tenant                    tenant              @relation("UserTenant", fields: [tenant_id], references: [id], onDelete: Restrict)
+  plan_id                   String?
+  plan                      plan?               @relation("UserPlan", fields: [plan_id], references: [id])
+  sub_accounts              sub_account[]       @relation("UserSubAccounts")
+  cry_posts                 cry_post[]          @relation("UserCryPosts")
+  reactions                 reaction[]          @relation("UserReactions")
+  tip_txs                   tip_tx[]            @relation("UserTipTxs")
   // MFA / TOTP (S5). `mfa_secret` is AES-256-GCM ciphertext produced by
   // lib/mfa/crypto.ts; `mfa_enabled` only flips true after a successful
   // first-code verification. `mfa_recovery_codes` is the back-relation
@@ -97,6 +103,212 @@ model user {
   @@index([api_key])
   @@index([creator_id])
   @@index([tenant_id])
+}
+
+model plan {
+  id                      String   @id @default(cuid())
+  tier                    Int
+  reaction_kinds_allowed  Int
+  sub_account_limit       Int
+  can_view_paid_posts     Boolean
+  users                   user[]   @relation("UserPlan")
+  created_at              DateTime @default(now()) @db.Timestamptz(0)
+  updated_at              DateTime @updatedAt @db.Timestamptz(0)
+}
+
+model sub_account {
+  id              String   @id @default(cuid())
+  parent_user_id  String
+  parent_user     user     @relation("UserSubAccounts", fields: [parent_user_id], references: [id], onDelete: Cascade)
+  nickname        String
+  created_at      DateTime @default(now()) @db.Timestamptz(0)
+  updated_at      DateTime @updatedAt @db.Timestamptz(0)
+
+  @@index([parent_user_id])
+}
+
+model work {
+  id          String      @id @default(cuid())
+  title       String
+  pattern     Int
+  status      Int
+  characters  character[]
+  scenes      scene[]
+  channels    channel[]
+  fc_links    fc_link[]
+  cry_posts   cry_post[]
+  created_at  DateTime    @default(now()) @db.Timestamptz(0)
+  updated_at  DateTime    @updatedAt @db.Timestamptz(0)
+}
+
+model character {
+  id              String      @id @default(cuid())
+  name            String
+  work_id         String
+  work            work        @relation(fields: [work_id], references: [id], onDelete: Cascade)
+  official_image  Boolean
+  channels        channel[]
+  scenes          scene[]     @relation("SceneCharacters")
+  creators        creator[]   @relation("CreatorCharacters")
+  fc_links        fc_link[]
+  cry_posts       cry_post[]
+  created_at      DateTime    @default(now()) @db.Timestamptz(0)
+  updated_at      DateTime    @updatedAt @db.Timestamptz(0)
+
+  @@index([work_id])
+}
+
+model scene {
+  id          String      @id @default(cuid())
+  label       String
+  work_id     String
+  work        work        @relation(fields: [work_id], references: [id], onDelete: Cascade)
+  episode     String
+  timestamp   String
+  channels    channel[]
+  characters  character[] @relation("SceneCharacters")
+  music       music[]     @relation("SceneMusics")
+  creators    creator[]   @relation("SceneCredits")
+  cry_posts   cry_post[]
+  created_at  DateTime    @default(now()) @db.Timestamptz(0)
+  updated_at  DateTime    @updatedAt @db.Timestamptz(0)
+
+  @@index([work_id])
+}
+
+model music {
+  id            String      @id @default(cuid())
+  title         String
+  kind          Int
+  scenes        scene[]     @relation("SceneMusics")
+  composers     creator[]   @relation("ComposerMusics")
+  credits       creator[]   @relation("CreditedMusics")
+  fc_links      fc_link[]
+  cry_posts     cry_post[]
+  created_at    DateTime    @default(now()) @db.Timestamptz(0)
+  updated_at    DateTime    @updatedAt @db.Timestamptz(0)
+}
+
+model creator {
+  id                 String      @id @default(cuid())
+  name               String
+  role               Int
+  affiliation        Int
+  voiced_characters  character[] @relation("CreatorCharacters")
+  composed_musics    music[]     @relation("ComposerMusics")
+  credited_musics    music[]     @relation("CreditedMusics")
+  credited_scenes    scene[]     @relation("SceneCredits")
+  cry_posts          cry_post[]
+  created_at         DateTime    @default(now()) @db.Timestamptz(0)
+  updated_at         DateTime    @updatedAt @db.Timestamptz(0)
+}
+
+model channel {
+  id           String      @id @default(cuid())
+  parent_id    String
+  parent_type  Int
+  kind         Int
+  visibility   Int
+  work_id      String?
+  work         work?       @relation(fields: [work_id], references: [id], onDelete: Cascade)
+  character_id String?
+  character    character?  @relation(fields: [character_id], references: [id], onDelete: Cascade)
+  scene_id     String?
+  scene        scene?      @relation(fields: [scene_id], references: [id], onDelete: Cascade)
+  cry_posts    cry_post[]
+  fc_links     fc_link[]
+  created_at   DateTime    @default(now()) @db.Timestamptz(0)
+  updated_at   DateTime    @updatedAt @db.Timestamptz(0)
+
+  @@index([work_id])
+  @@index([character_id])
+  @@index([scene_id])
+}
+
+model fc_link {
+  id             String      @id @default(cuid())
+  kind           Int
+  url            String
+  contract_split_id String?
+  work_id        String?
+  work           work?       @relation(fields: [work_id], references: [id], onDelete: Cascade)
+  character_id   String?
+  character      character?  @relation(fields: [character_id], references: [id], onDelete: Cascade)
+  music_id       String?
+  music          music?      @relation(fields: [music_id], references: [id], onDelete: Cascade)
+  channel_id     String?
+  channel        channel?    @relation(fields: [channel_id], references: [id], onDelete: Cascade)
+  created_at     DateTime    @default(now()) @db.Timestamptz(0)
+  updated_at     DateTime    @updatedAt @db.Timestamptz(0)
+
+  @@index([work_id])
+  @@index([character_id])
+  @@index([music_id])
+  @@index([channel_id])
+}
+
+model cry_post {
+  id              String      @id @default(cuid())
+  body            String
+  author_user_id  String
+  author          user        @relation("UserCryPosts", fields: [author_user_id], references: [id], onDelete: Cascade)
+  visibility      Int
+  channel_id      String
+  channel         channel     @relation(fields: [channel_id], references: [id], onDelete: Cascade)
+  work_id         String?
+  work            work?       @relation(fields: [work_id], references: [id], onDelete: Cascade)
+  character_id    String?
+  character       character?  @relation(fields: [character_id], references: [id], onDelete: Cascade)
+  scene_id        String?
+  scene           scene?      @relation(fields: [scene_id], references: [id], onDelete: Cascade)
+  music_id        String?
+  music           music?      @relation(fields: [music_id], references: [id], onDelete: Cascade)
+  creator_id      String?
+  creator         creator?    @relation(fields: [creator_id], references: [id], onDelete: Cascade)
+  reactions       reaction[]
+  tip_txs         tip_tx[]
+  created_at      DateTime    @default(now()) @db.Timestamptz(0)
+  updated_at      DateTime    @updatedAt @db.Timestamptz(0)
+
+  @@index([author_user_id])
+  @@index([channel_id])
+  @@index([work_id])
+  @@index([character_id])
+  @@index([scene_id])
+  @@index([music_id])
+  @@index([creator_id])
+}
+
+model reaction {
+  id           String   @id @default(cuid())
+  type         Int
+  user_id      String
+  user         user     @relation("UserReactions", fields: [user_id], references: [id], onDelete: Cascade)
+  cry_post_id  String
+  cry_post     cry_post @relation(fields: [cry_post_id], references: [id], onDelete: Cascade)
+  created_at   DateTime @default(now()) @db.Timestamptz(0)
+  updated_at   DateTime @updatedAt @db.Timestamptz(0)
+
+  @@index([user_id])
+  @@index([cry_post_id])
+}
+
+model tip_tx {
+  id                String   @id @default(cuid())
+  gross_amount      Int
+  operator_fee      Int
+  payment_fee       Int
+  contract_split_id String
+  status            Int
+  user_id           String
+  user              user     @relation("UserTipTxs", fields: [user_id], references: [id], onDelete: Cascade)
+  cry_post_id       String
+  cry_post          cry_post @relation(fields: [cry_post_id], references: [id], onDelete: Cascade)
+  created_at        DateTime @default(now()) @db.Timestamptz(0)
+  updated_at        DateTime @updatedAt @db.Timestamptz(0)
+
+  @@index([user_id])
+  @@index([cry_post_id])
 }
 
 model role {

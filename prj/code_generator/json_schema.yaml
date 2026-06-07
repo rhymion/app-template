@@ -663,3 +663,1010 @@ definitions:
             type: array
             items:
               $ref: "#/definitions/dashboard_widget"
+
+  plan:
+    type: object
+    required:
+      - id
+      - tier
+      - reaction_kinds_allowed
+      - sub_account_limit
+      - can_view_paid_posts
+    properties:
+      id:
+        type: string
+        pattern: "^c[a-z0-9]{24,}$"
+      tier:
+        type: integer
+        minimum: 0
+        maximum: 2
+        enum:
+          - free
+          - premium
+          - vip
+      reaction_kinds_allowed:
+        type: integer
+        minimum: 0
+      sub_account_limit:
+        type: integer
+        minimum: 0
+      can_view_paid_posts:
+        type: boolean
+
+  plan_detail:
+    x-generate:
+      list: true
+      view: true
+      new: true
+      edit: true
+      delete: true
+      invalidate: false
+      api: true
+      test: true
+    x-relationships:
+      users:
+        type: many-to-many
+        target: user
+        labelField: name
+    allOf:
+      - $ref: "#/definitions/plan"
+      - type: object
+        properties:
+          users:
+            type: array
+            x-outputType: list
+            items:
+              $ref: "#/definitions/user"
+
+  sub_account:
+    type: object
+    required:
+      - id
+      - parent_user_id
+      - nickname
+    properties:
+      id:
+        type: string
+        pattern: "^c[a-z0-9]{24,}$"
+      parent_user_id:
+        type: string
+        pattern: "^c[a-z0-9]{24,}$"
+        x-relationship:
+          type: many-to-one
+          target: user
+          labelField: name
+      nickname:
+        type: string
+        minLength: 1
+
+  sub_account_detail:
+    x-generate:
+      list: true
+      view: true
+      new: true
+      edit: true
+      delete: true
+      invalidate: false
+      api: true
+      test: true
+    allOf:
+      - $ref: "#/definitions/sub_account"
+      - type: object
+        properties:
+          parent_user:
+            $ref: "#/definitions/user"
+
+  work:
+    type: object
+    required:
+      - id
+      - title
+      - pattern
+      - status
+    properties:
+      id:
+        type: string
+        pattern: "^c[a-z0-9]{24,}$"
+      title:
+        type: string
+        minLength: 1
+      pattern:
+        type: integer
+        minimum: 0
+        maximum: 1
+        enum:
+          - A
+          - B
+      status:
+        type: integer
+        minimum: 0
+        maximum: 1
+        enum:
+          - pending
+          - approved
+
+  work_detail:
+    x-generate:
+      list: true
+      view: true
+      new: true
+      edit: true
+      delete: true
+      invalidate: false
+      api: true
+      test: true
+    x-relationships:
+      characters:
+        type: many-to-many
+        target: character
+        labelField: name
+      scenes:
+        type: many-to-many
+        target: scene
+        labelField: label
+      channels:
+        type: many-to-many
+        target: channel
+        labelField: parent_type
+      fc_links:
+        type: many-to-many
+        target: fc_link
+        labelField: url
+      cry_posts:
+        type: many-to-many
+        target: cry_post
+        labelField: body
+    allOf:
+      - $ref: "#/definitions/work"
+      - type: object
+        properties:
+          characters:
+            type: array
+            x-outputType: list
+            items:
+              $ref: "#/definitions/character"
+          scenes:
+            type: array
+            x-outputType: list
+            items:
+              $ref: "#/definitions/scene"
+          channels:
+            type: array
+            x-outputType: list
+            items:
+              $ref: "#/definitions/channel"
+          fc_links:
+            type: array
+            x-outputType: list
+            items:
+              $ref: "#/definitions/fc_link"
+          cry_posts:
+            type: array
+            x-outputType: list
+            items:
+              $ref: "#/definitions/cry_post"
+
+  character:
+    type: object
+    required:
+      - id
+      - name
+      - work_id
+      - official_image
+    properties:
+      id:
+        type: string
+        pattern: "^c[a-z0-9]{24,}$"
+      name:
+        type: string
+        minLength: 1
+      work_id:
+        type: string
+        pattern: "^c[a-z0-9]{24,}$"
+        x-relationship:
+          type: many-to-one
+          target: work
+          labelField: title
+      official_image:
+        type: boolean
+
+  character_detail:
+    x-generate:
+      list: true
+      view: true
+      new: true
+      edit: true
+      delete: true
+      invalidate: false
+      api: true
+      test: true
+    x-relationships:
+      work:
+        type: many-to-one
+        target: work
+        labelField: title
+      scenes:
+        type: many-to-many
+        target: scene
+        labelField: label
+      creators:
+        type: many-to-many
+        target: creator
+        labelField: name
+      fc_links:
+        type: many-to-many
+        target: fc_link
+        labelField: url
+      cry_posts:
+        type: many-to-many
+        target: cry_post
+        labelField: body
+    allOf:
+      - $ref: "#/definitions/character"
+      - type: object
+        properties:
+          work:
+            $ref: "#/definitions/work"
+          scenes:
+            type: array
+            x-outputType: list
+            items:
+              $ref: "#/definitions/scene"
+          creators:
+            type: array
+            x-outputType: list
+            items:
+              $ref: "#/definitions/creator"
+          fc_links:
+            type: array
+            x-outputType: list
+            items:
+              $ref: "#/definitions/fc_link"
+          cry_posts:
+            type: array
+            x-outputType: list
+            items:
+              $ref: "#/definitions/cry_post"
+
+  scene:
+    type: object
+    required:
+      - id
+      - label
+      - work_id
+      - episode
+      - timestamp
+    properties:
+      id:
+        type: string
+        pattern: "^c[a-z0-9]{24,}$"
+      label:
+        type: string
+        minLength: 1
+      work_id:
+        type: string
+        pattern: "^c[a-z0-9]{24,}$"
+        x-relationship:
+          type: many-to-one
+          target: work
+          labelField: title
+      episode:
+        type: string
+        minLength: 1
+      timestamp:
+        type: string
+        minLength: 1
+
+  scene_detail:
+    x-generate:
+      list: true
+      view: true
+      new: true
+      edit: true
+      delete: true
+      invalidate: false
+      api: true
+      test: true
+    x-relationships:
+      work:
+        type: many-to-one
+        target: work
+        labelField: title
+      characters:
+        type: many-to-many
+        target: character
+        labelField: name
+      music:
+        type: many-to-many
+        target: music
+        labelField: title
+      creators:
+        type: many-to-many
+        target: creator
+        labelField: name
+      channels:
+        type: many-to-many
+        target: channel
+        labelField: parent_type
+      cry_posts:
+        type: many-to-many
+        target: cry_post
+        labelField: body
+    allOf:
+      - $ref: "#/definitions/scene"
+      - type: object
+        properties:
+          work:
+            $ref: "#/definitions/work"
+          characters:
+            type: array
+            x-outputType: list
+            items:
+              $ref: "#/definitions/character"
+          music:
+            type: array
+            x-outputType: list
+            items:
+              $ref: "#/definitions/music"
+          creators:
+            type: array
+            x-outputType: list
+            items:
+              $ref: "#/definitions/creator"
+          channels:
+            type: array
+            x-outputType: list
+            items:
+              $ref: "#/definitions/channel"
+          cry_posts:
+            type: array
+            x-outputType: list
+            items:
+              $ref: "#/definitions/cry_post"
+
+  music:
+    type: object
+    required:
+      - id
+      - title
+      - kind
+    properties:
+      id:
+        type: string
+        pattern: "^c[a-z0-9]{24,}$"
+      title:
+        type: string
+        minLength: 1
+      kind:
+        type: integer
+        minimum: 0
+        maximum: 3
+        enum:
+          - op
+          - cd
+          - bgm
+          - insert
+
+  music_detail:
+    x-generate:
+      list: true
+      view: true
+      new: true
+      edit: true
+      delete: true
+      invalidate: false
+      api: true
+      test: true
+    x-relationships:
+      scenes:
+        type: many-to-many
+        target: scene
+        labelField: label
+      composers:
+        type: many-to-many
+        target: creator
+        labelField: name
+      credits:
+        type: many-to-many
+        target: creator
+        labelField: name
+      channels:
+        type: many-to-many
+        target: channel
+        labelField: parent_type
+      fc_links:
+        type: many-to-many
+        target: fc_link
+        labelField: url
+      cry_posts:
+        type: many-to-many
+        target: cry_post
+        labelField: body
+    allOf:
+      - $ref: "#/definitions/music"
+      - type: object
+        properties:
+          scenes:
+            type: array
+            x-outputType: list
+            items:
+              $ref: "#/definitions/scene"
+          composers:
+            type: array
+            x-outputType: list
+            items:
+              $ref: "#/definitions/creator"
+          credits:
+            type: array
+            x-outputType: list
+            items:
+              $ref: "#/definitions/creator"
+          channels:
+            type: array
+            x-outputType: list
+            items:
+              $ref: "#/definitions/channel"
+          fc_links:
+            type: array
+            x-outputType: list
+            items:
+              $ref: "#/definitions/fc_link"
+          cry_posts:
+            type: array
+            x-outputType: list
+            items:
+              $ref: "#/definitions/cry_post"
+
+  creator:
+    type: object
+    required:
+      - id
+      - name
+      - role
+      - affiliation
+    properties:
+      id:
+        type: string
+        pattern: "^c[a-z0-9]{24,}$"
+      name:
+        type: string
+        minLength: 1
+      role:
+        type: integer
+        minimum: 0
+        maximum: 3
+        enum:
+          - voice
+          - anim
+          - bgm
+          - etc
+      affiliation:
+        type: integer
+        minimum: 0
+        maximum: 2
+        enum:
+          - agency
+          - freelance
+          - student
+
+  creator_detail:
+    x-generate:
+      list: true
+      view: true
+      new: true
+      edit: true
+      delete: true
+      invalidate: false
+      api: true
+      test: true
+    x-relationships:
+      voiced_characters:
+        type: many-to-many
+        target: character
+        labelField: name
+      composed_musics:
+        type: many-to-many
+        target: music
+        labelField: title
+      credited_musics:
+        type: many-to-many
+        target: music
+        labelField: title
+      credited_scenes:
+        type: many-to-many
+        target: scene
+        labelField: label
+      cry_posts:
+        type: many-to-many
+        target: cry_post
+        labelField: body
+    allOf:
+      - $ref: "#/definitions/creator"
+      - type: object
+        properties:
+          voiced_characters:
+            type: array
+            x-outputType: list
+            items:
+              $ref: "#/definitions/character"
+          composed_musics:
+            type: array
+            x-outputType: list
+            items:
+              $ref: "#/definitions/music"
+          credited_musics:
+            type: array
+            x-outputType: list
+            items:
+              $ref: "#/definitions/music"
+          credited_scenes:
+            type: array
+            x-outputType: list
+            items:
+              $ref: "#/definitions/scene"
+          cry_posts:
+            type: array
+            x-outputType: list
+            items:
+              $ref: "#/definitions/cry_post"
+
+  channel:
+    type: object
+    required:
+      - id
+      - parent_id
+      - parent_type
+      - kind
+      - visibility
+    properties:
+      id:
+        type: string
+        pattern: "^c[a-z0-9]{24,}$"
+      parent_id:
+        type: string
+        pattern: "^c[a-z0-9]{24,}$"
+      parent_type:
+        type: integer
+        minimum: 0
+        maximum: 2
+        enum:
+          - work
+          - character
+          - scene
+      kind:
+        type: integer
+        minimum: 0
+        maximum: 1
+        enum:
+          - general
+          - consider
+      visibility:
+        type: integer
+        minimum: 0
+        maximum: 2
+        enum:
+          - public
+          - premium
+          - vip
+
+  channel_detail:
+    x-generate:
+      list: true
+      view: true
+      new: true
+      edit: true
+      delete: true
+      invalidate: false
+      api: true
+      test: true
+    x-relationships:
+      work:
+        type: many-to-one
+        target: work
+        labelField: title
+      character:
+        type: many-to-one
+        target: character
+        labelField: name
+      scene:
+        type: many-to-one
+        target: scene
+        labelField: label
+      cry_posts:
+        type: many-to-many
+        target: cry_post
+        labelField: body
+      fc_links:
+        type: many-to-many
+        target: fc_link
+        labelField: url
+    allOf:
+      - $ref: "#/definitions/channel"
+      - type: object
+        properties:
+          work:
+            $ref: "#/definitions/work"
+          character:
+            $ref: "#/definitions/character"
+          scene:
+            $ref: "#/definitions/scene"
+          cry_posts:
+            type: array
+            x-outputType: list
+            items:
+              $ref: "#/definitions/cry_post"
+          fc_links:
+            type: array
+            x-outputType: list
+            items:
+              $ref: "#/definitions/fc_link"
+
+  fc_link:
+    type: object
+    required:
+      - id
+      - kind
+      - url
+    properties:
+      id:
+        type: string
+        pattern: "^c[a-z0-9]{24,}$"
+      kind:
+        type: integer
+        minimum: 0
+        maximum: 4
+        enum:
+          - work
+          - merch
+          - video
+          - music
+          - fund
+      url:
+        type: string
+        format: uri
+      work_id:
+        type:
+          - string
+          - "null"
+        pattern: "^c[a-z0-9]{24,}$"
+        x-relationship:
+          type: many-to-one
+          target: work
+          labelField: title
+      character_id:
+        type:
+          - string
+          - "null"
+        pattern: "^c[a-z0-9]{24,}$"
+        x-relationship:
+          type: many-to-one
+          target: character
+          labelField: name
+      music_id:
+        type:
+          - string
+          - "null"
+        pattern: "^c[a-z0-9]{24,}$"
+        x-relationship:
+          type: many-to-one
+          target: music
+          labelField: title
+      channel_id:
+        type:
+          - string
+          - "null"
+        pattern: "^c[a-z0-9]{24,}$"
+        x-relationship:
+          type: many-to-one
+          target: channel
+          labelField: parent_type
+
+  fc_link_detail:
+    x-generate:
+      list: true
+      view: true
+      new: true
+      edit: true
+      delete: true
+      invalidate: false
+      api: true
+      test: true
+    allOf:
+      - $ref: "#/definitions/fc_link"
+      - type: object
+        properties:
+          work:
+            $ref: "#/definitions/work"
+          character:
+            $ref: "#/definitions/character"
+          music:
+            $ref: "#/definitions/music"
+          channel:
+            $ref: "#/definitions/channel"
+
+  cry_post:
+    type: object
+    required:
+      - id
+      - body
+      - author_user_id
+      - visibility
+      - channel_id
+    properties:
+      id:
+        type: string
+        pattern: "^c[a-z0-9]{24,}$"
+      body:
+        type: string
+        minLength: 1
+      author_user_id:
+        type: string
+        pattern: "^c[a-z0-9]{24,}$"
+        x-relationship:
+          type: many-to-one
+          target: user
+          labelField: name
+      visibility:
+        type: integer
+        minimum: 0
+        maximum: 2
+        enum:
+          - public
+          - premium
+          - vip
+      channel_id:
+        type: string
+        pattern: "^c[a-z0-9]{24,}$"
+        x-relationship:
+          type: many-to-one
+          target: channel
+          labelField: parent_type
+      work_id:
+        type:
+          - string
+          - "null"
+        pattern: "^c[a-z0-9]{24,}$"
+        x-relationship:
+          type: many-to-one
+          target: work
+          labelField: title
+      character_id:
+        type:
+          - string
+          - "null"
+        pattern: "^c[a-z0-9]{24,}$"
+        x-relationship:
+          type: many-to-one
+          target: character
+          labelField: name
+      scene_id:
+        type:
+          - string
+          - "null"
+        pattern: "^c[a-z0-9]{24,}$"
+        x-relationship:
+          type: many-to-one
+          target: scene
+          labelField: label
+      music_id:
+        type:
+          - string
+          - "null"
+        pattern: "^c[a-z0-9]{24,}$"
+        x-relationship:
+          type: many-to-one
+          target: music
+          labelField: title
+      creator_id:
+        type:
+          - string
+          - "null"
+        pattern: "^c[a-z0-9]{24,}$"
+        x-relationship:
+          type: many-to-one
+          target: creator
+          labelField: name
+
+  cry_post_detail:
+    x-generate:
+      list: true
+      view: true
+      new: true
+      edit: true
+      delete: true
+      invalidate: false
+      api: true
+      test: true
+    x-relationships:
+      author:
+        type: many-to-one
+        target: user
+        labelField: name
+      channel:
+        type: many-to-one
+        target: channel
+        labelField: parent_type
+      work:
+        type: many-to-one
+        target: work
+        labelField: title
+      character:
+        type: many-to-one
+        target: character
+        labelField: name
+      scene:
+        type: many-to-one
+        target: scene
+        labelField: label
+      music:
+        type: many-to-one
+        target: music
+        labelField: title
+      creator:
+        type: many-to-one
+        target: creator
+        labelField: name
+      reactions:
+        type: many-to-many
+        target: reaction
+        labelField: type
+      tip_txs:
+        type: many-to-many
+        target: tip_tx
+        labelField: status
+    allOf:
+      - $ref: "#/definitions/cry_post"
+      - type: object
+        properties:
+          author:
+            $ref: "#/definitions/user"
+          channel:
+            $ref: "#/definitions/channel"
+          work:
+            $ref: "#/definitions/work"
+          character:
+            $ref: "#/definitions/character"
+          scene:
+            $ref: "#/definitions/scene"
+          music:
+            $ref: "#/definitions/music"
+          creator:
+            $ref: "#/definitions/creator"
+          reactions:
+            type: array
+            x-outputType: list
+            items:
+              $ref: "#/definitions/reaction"
+          tip_txs:
+            type: array
+            x-outputType: list
+            items:
+              $ref: "#/definitions/tip_tx"
+
+  reaction:
+    type: object
+    required:
+      - id
+      - type
+      - user_id
+      - cry_post_id
+    properties:
+      id:
+        type: string
+        pattern: "^c[a-z0-9]{24,}$"
+      type:
+        type: integer
+        minimum: 0
+        maximum: 7
+        enum:
+          - kind_0
+          - kind_1
+          - kind_2
+          - kind_3
+          - kind_4
+          - kind_5
+          - kind_6
+          - kind_7
+      user_id:
+        type: string
+        pattern: "^c[a-z0-9]{24,}$"
+        x-relationship:
+          type: many-to-one
+          target: user
+          labelField: name
+      cry_post_id:
+        type: string
+        pattern: "^c[a-z0-9]{24,}$"
+        x-relationship:
+          type: many-to-one
+          target: cry_post
+          labelField: body
+
+  reaction_detail:
+    x-generate:
+      list: true
+      view: true
+      new: true
+      edit: true
+      delete: true
+      invalidate: false
+      api: true
+      test: true
+    allOf:
+      - $ref: "#/definitions/reaction"
+      - type: object
+        properties:
+          user:
+            $ref: "#/definitions/user"
+          cry_post:
+            $ref: "#/definitions/cry_post"
+
+  tip_tx:
+    type: object
+    required:
+      - id
+      - gross_amount
+      - operator_fee
+      - payment_fee
+      - contract_split_id
+      - status
+      - user_id
+      - cry_post_id
+    properties:
+      id:
+        type: string
+        pattern: "^c[a-z0-9]{24,}$"
+      gross_amount:
+        type: integer
+        minimum: 0
+      operator_fee:
+        type: integer
+        minimum: 0
+      payment_fee:
+        type: integer
+        minimum: 0
+      contract_split_id:
+        type: string
+        minLength: 1
+      status:
+        type: integer
+        minimum: 0
+        maximum: 2
+        enum:
+          - pending
+          - held
+          - paid
+      user_id:
+        type: string
+        pattern: "^c[a-z0-9]{24,}$"
+        x-relationship:
+          type: many-to-one
+          target: user
+          labelField: name
+      cry_post_id:
+        type: string
+        pattern: "^c[a-z0-9]{24,}$"
+        x-relationship:
+          type: many-to-one
+          target: cry_post
+          labelField: body
+
+  tip_tx_detail:
+    x-generate:
+      list: true
+      view: true
+      new: true
+      edit: true
+      delete: true
+      invalidate: false
+      api: true
+      test: true
+    allOf:
+      - $ref: "#/definitions/tip_tx"
+      - type: object
+        properties:
+          user:
+            $ref: "#/definitions/user"
+          cry_post:
+            $ref: "#/definitions/cry_post"
+
