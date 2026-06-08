@@ -812,10 +812,6 @@ definitions:
         type: many-to-many
         target: fc_link
         labelField: url
-      cry_posts:
-        type: many-to-many
-        target: cry_post
-        labelField: body
     allOf:
       - $ref: "#/definitions/work"
       - type: object
@@ -840,11 +836,6 @@ definitions:
             x-outputType: list
             items:
               $ref: "#/definitions/fc_link"
-          cry_posts:
-            type: array
-            x-outputType: list
-            items:
-              $ref: "#/definitions/cry_post"
 
   character:
     type: object
@@ -897,10 +888,6 @@ definitions:
         type: many-to-many
         target: fc_link
         labelField: url
-      cry_posts:
-        type: many-to-many
-        target: cry_post
-        labelField: body
     allOf:
       - $ref: "#/definitions/character"
       - type: object
@@ -922,11 +909,6 @@ definitions:
             x-outputType: list
             items:
               $ref: "#/definitions/fc_link"
-          cry_posts:
-            type: array
-            x-outputType: list
-            items:
-              $ref: "#/definitions/cry_post"
 
   scene:
     type: object
@@ -988,10 +970,6 @@ definitions:
         type: many-to-many
         target: channel
         labelField: parent_type
-      cry_posts:
-        type: many-to-many
-        target: cry_post
-        labelField: body
     allOf:
       - $ref: "#/definitions/scene"
       - type: object
@@ -1018,11 +996,6 @@ definitions:
             x-outputType: list
             items:
               $ref: "#/definitions/channel"
-          cry_posts:
-            type: array
-            x-outputType: list
-            items:
-              $ref: "#/definitions/cry_post"
 
   music:
     type: object
@@ -1070,18 +1043,10 @@ definitions:
         type: many-to-many
         target: creator
         labelField: name
-      channels:
-        type: many-to-many
-        target: channel
-        labelField: parent_type
       fc_links:
         type: many-to-many
         target: fc_link
         labelField: url
-      cry_posts:
-        type: many-to-many
-        target: cry_post
-        labelField: body
     allOf:
       - $ref: "#/definitions/music"
       - type: object
@@ -1101,21 +1066,11 @@ definitions:
             x-outputType: list
             items:
               $ref: "#/definitions/creator"
-          channels:
-            type: array
-            x-outputType: list
-            items:
-              $ref: "#/definitions/channel"
           fc_links:
             type: array
             x-outputType: list
             items:
               $ref: "#/definitions/fc_link"
-          cry_posts:
-            type: array
-            x-outputType: list
-            items:
-              $ref: "#/definitions/cry_post"
 
   creator:
     type: object
@@ -1176,10 +1131,6 @@ definitions:
         type: many-to-many
         target: scene
         labelField: label
-      cry_posts:
-        type: many-to-many
-        target: cry_post
-        labelField: body
     allOf:
       - $ref: "#/definitions/creator"
       - type: object
@@ -1204,11 +1155,6 @@ definitions:
             x-outputType: list
             items:
               $ref: "#/definitions/scene"
-          cry_posts:
-            type: array
-            x-outputType: list
-            items:
-              $ref: "#/definitions/cry_post"
 
   channel:
     type: object
@@ -1218,6 +1164,11 @@ definitions:
       - parent_type
       - kind
       - visibility
+    x-bridge:
+      - role: commentable
+        target: commentable
+        via: commentable_id
+        kind: one_to_one_bridge
     properties:
       id:
         type: string
@@ -1248,6 +1199,38 @@ definitions:
           - public
           - premium
           - vip
+      commentable_id:
+        type:
+          - string
+          - "null"
+        pattern: "^c[a-z0-9]{24,}$"
+      work_id:
+        type:
+          - string
+          - "null"
+        pattern: "^c[a-z0-9]{24,}$"
+        x-relationship:
+          type: many-to-one
+          target: work
+          labelField: title
+      character_id:
+        type:
+          - string
+          - "null"
+        pattern: "^c[a-z0-9]{24,}$"
+        x-relationship:
+          type: many-to-one
+          target: character
+          labelField: name
+      scene_id:
+        type:
+          - string
+          - "null"
+        pattern: "^c[a-z0-9]{24,}$"
+        x-relationship:
+          type: many-to-one
+          target: scene
+          labelField: label
 
   channel_detail:
     x-generate:
@@ -1390,7 +1373,6 @@ definitions:
       - id
       - body
       - author_user_id
-      - visibility
       - channel_id
     properties:
       id:
@@ -1406,14 +1388,6 @@ definitions:
           type: many-to-one
           target: user
           labelField: name
-      visibility:
-        type: integer
-        minimum: 0
-        maximum: 2
-        enum:
-          - public
-          - premium
-          - vip
       channel_id:
         type: string
         pattern: "^c[a-z0-9]{24,}$"
@@ -1421,51 +1395,6 @@ definitions:
           type: many-to-one
           target: channel
           labelField: parent_type
-      work_id:
-        type:
-          - string
-          - "null"
-        pattern: "^c[a-z0-9]{24,}$"
-        x-relationship:
-          type: many-to-one
-          target: work
-          labelField: title
-      character_id:
-        type:
-          - string
-          - "null"
-        pattern: "^c[a-z0-9]{24,}$"
-        x-relationship:
-          type: many-to-one
-          target: character
-          labelField: name
-      scene_id:
-        type:
-          - string
-          - "null"
-        pattern: "^c[a-z0-9]{24,}$"
-        x-relationship:
-          type: many-to-one
-          target: scene
-          labelField: label
-      music_id:
-        type:
-          - string
-          - "null"
-        pattern: "^c[a-z0-9]{24,}$"
-        x-relationship:
-          type: many-to-one
-          target: music
-          labelField: title
-      creator_id:
-        type:
-          - string
-          - "null"
-        pattern: "^c[a-z0-9]{24,}$"
-        x-relationship:
-          type: many-to-one
-          target: creator
-          labelField: name
 
   cry_post_detail:
     x-generate:
@@ -1486,30 +1415,6 @@ definitions:
         type: many-to-one
         target: channel
         labelField: parent_type
-      work:
-        type: many-to-one
-        target: work
-        labelField: title
-      character:
-        type: many-to-one
-        target: character
-        labelField: name
-      scene:
-        type: many-to-one
-        target: scene
-        labelField: label
-      music:
-        type: many-to-one
-        target: music
-        labelField: title
-      creator:
-        type: many-to-one
-        target: creator
-        labelField: name
-      reactions:
-        type: many-to-many
-        target: reaction
-        labelField: type
       tip_txs:
         type: many-to-many
         target: tip_tx
@@ -1522,21 +1427,6 @@ definitions:
             $ref: "#/definitions/user"
           channel:
             $ref: "#/definitions/channel"
-          work:
-            $ref: "#/definitions/work"
-          character:
-            $ref: "#/definitions/character"
-          scene:
-            $ref: "#/definitions/scene"
-          music:
-            $ref: "#/definitions/music"
-          creator:
-            $ref: "#/definitions/creator"
-          reactions:
-            type: array
-            x-outputType: list
-            items:
-              $ref: "#/definitions/reaction"
           tip_txs:
             type: array
             x-outputType: list
@@ -1549,7 +1439,7 @@ definitions:
       - id
       - type
       - user_id
-      - cry_post_id
+      - comment_id
     properties:
       id:
         type: string
@@ -1574,13 +1464,13 @@ definitions:
           type: many-to-one
           target: user
           labelField: name
-      cry_post_id:
+      comment_id:
         type: string
         pattern: "^c[a-z0-9]{24,}$"
         x-relationship:
           type: many-to-one
-          target: cry_post
-          labelField: body
+          target: comment
+          labelField: message
 
   reaction_detail:
     x-generate:
@@ -1598,8 +1488,8 @@ definitions:
         properties:
           user:
             $ref: "#/definitions/user"
-          cry_post:
-            $ref: "#/definitions/cry_post"
+          comment:
+            $ref: "#/definitions/comment"
 
   tip_tx:
     type: object
