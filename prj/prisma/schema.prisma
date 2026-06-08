@@ -99,13 +99,20 @@ model user {
   updated_dashboards        dashboard[]         @relation("DashboardUpdater")
   created_tenants           tenant[]            @relation("TenantCreator")
   updated_tenants           tenant[]            @relation("TenantUpdater")
-  created_works             work[]              @relation("WorkCreatedByUser")
-  created_characters        character[]         @relation("CharacterCreatedByUser")
-  created_scenes            scene[]             @relation("SceneCreatedByUser")
-  created_musics            music[]             @relation("MusicCreatedByUser")
-  created_creators          creator[]           @relation("CreatorCreatedByUser")
-  created_channels          channel[]           @relation("ChannelCreatedByUser")
-  created_plans             plan[]              @relation("PlanCreatedByUser")
+  created_works             work[]              @relation("WorkCreator")
+  updated_works             work[]              @relation("WorkUpdater")
+  created_characters        character[]         @relation("CharacterCreator")
+  updated_characters        character[]         @relation("CharacterUpdater")
+  created_scenes            scene[]             @relation("SceneCreator")
+  updated_scenes            scene[]             @relation("SceneUpdater")
+  created_musics            music[]             @relation("MusicCreator")
+  updated_musics            music[]             @relation("MusicUpdater")
+  created_creators          creator[]           @relation("CreatorCreator")
+  updated_creators          creator[]           @relation("CreatorUpdater")
+  created_channels          channel[]           @relation("ChannelCreator")
+  updated_channels          channel[]           @relation("ChannelUpdater")
+  created_plans             plan[]              @relation("PlanCreator")
+  updated_plans             plan[]              @relation("PlanUpdater")
 
   @@index([api_key])
   @@index([creator_id])
@@ -119,12 +126,14 @@ model plan {
   sub_account_limit       Int
   can_view_paid_posts     Boolean
   users                   user[]   @relation("UserPlan")
-  created_by_user_id      String?
-  created_by_user         user?    @relation("PlanCreatedByUser", fields: [created_by_user_id], references: [id])
+  creator_id              String?
+  creator                 user?    @relation("PlanCreator", fields: [creator_id], references: [id])
+  updater_id              String?
+  updater                 user?    @relation("PlanUpdater", fields: [updater_id], references: [id])
   created_at              DateTime @default(now()) @db.Timestamptz(0)
   updated_at              DateTime @updatedAt @db.Timestamptz(0)
 
-  @@index([created_by_user_id])
+  @@index([creator_id])
 }
 
 model sub_account {
@@ -147,12 +156,14 @@ model work {
   scenes              scene[]
   channels            channel[]
   fc_links            fc_link[]
-  created_by_user_id  String?
-  created_by_user     user?       @relation("WorkCreatedByUser", fields: [created_by_user_id], references: [id])
+  creator_id          String?
+  creator             user?       @relation("WorkCreator", fields: [creator_id], references: [id])
+  updater_id          String?
+  updater             user?       @relation("WorkUpdater", fields: [updater_id], references: [id])
   created_at          DateTime    @default(now()) @db.Timestamptz(0)
   updated_at          DateTime    @updatedAt @db.Timestamptz(0)
 
-  @@index([created_by_user_id])
+  @@index([creator_id])
 }
 
 model character {
@@ -165,13 +176,15 @@ model character {
   scenes              scene[]     @relation("SceneCharacters")
   creators            creator[]   @relation("CreatorCharacters")
   fc_links            fc_link[]
-  created_by_user_id  String?
-  created_by_user     user?       @relation("CharacterCreatedByUser", fields: [created_by_user_id], references: [id])
+  creator_id          String?
+  creator             user?       @relation("CharacterCreator", fields: [creator_id], references: [id])
+  updater_id          String?
+  updater             user?       @relation("CharacterUpdater", fields: [updater_id], references: [id])
   created_at          DateTime    @default(now()) @db.Timestamptz(0)
   updated_at          DateTime    @updatedAt @db.Timestamptz(0)
 
   @@index([work_id])
-  @@index([created_by_user_id])
+  @@index([creator_id])
 }
 
 model scene {
@@ -185,13 +198,15 @@ model scene {
   characters          character[] @relation("SceneCharacters")
   music               music[]     @relation("SceneMusics")
   creators            creator[]   @relation("SceneCredits")
-  created_by_user_id  String?
-  created_by_user     user?       @relation("SceneCreatedByUser", fields: [created_by_user_id], references: [id])
+  creator_id          String?
+  creator             user?       @relation("SceneCreator", fields: [creator_id], references: [id])
+  updater_id          String?
+  updater             user?       @relation("SceneUpdater", fields: [updater_id], references: [id])
   created_at          DateTime    @default(now()) @db.Timestamptz(0)
   updated_at          DateTime    @updatedAt @db.Timestamptz(0)
 
   @@index([work_id])
-  @@index([created_by_user_id])
+  @@index([creator_id])
 }
 
 model music {
@@ -202,12 +217,14 @@ model music {
   composers           creator[]   @relation("ComposerMusics")
   credits             creator[]   @relation("CreditedMusics")
   fc_links            fc_link[]
-  created_by_user_id  String?
-  created_by_user     user?       @relation("MusicCreatedByUser", fields: [created_by_user_id], references: [id])
+  creator_id          String?
+  creator             user?       @relation("MusicCreator", fields: [creator_id], references: [id])
+  updater_id          String?
+  updater             user?       @relation("MusicUpdater", fields: [updater_id], references: [id])
   created_at          DateTime    @default(now()) @db.Timestamptz(0)
   updated_at          DateTime    @updatedAt @db.Timestamptz(0)
 
-  @@index([created_by_user_id])
+  @@index([creator_id])
 }
 
 model creator {
@@ -219,12 +236,14 @@ model creator {
   composed_musics     music[]     @relation("ComposerMusics")
   credited_musics     music[]     @relation("CreditedMusics")
   credited_scenes     scene[]     @relation("SceneCredits")
-  created_by_user_id  String?
-  created_by_user     user?       @relation("CreatorCreatedByUser", fields: [created_by_user_id], references: [id])
+  creator_id          String?
+  creator             user?       @relation("CreatorCreator", fields: [creator_id], references: [id])
+  updater_id          String?
+  updater             user?       @relation("CreatorUpdater", fields: [updater_id], references: [id])
   created_at          DateTime    @default(now()) @db.Timestamptz(0)
   updated_at          DateTime    @updatedAt @db.Timestamptz(0)
 
-  @@index([created_by_user_id])
+  @@index([creator_id])
 }
 
 model channel {
@@ -243,15 +262,17 @@ model channel {
   commentable         commentable? @relation("ChannelCommentable", fields: [commentable_id], references: [id])
   cry_posts           cry_post[]
   fc_links            fc_link[]
-  created_by_user_id  String?
-  created_by_user     user?        @relation("ChannelCreatedByUser", fields: [created_by_user_id], references: [id])
+  creator_id          String?
+  creator             user?        @relation("ChannelCreator", fields: [creator_id], references: [id])
+  updater_id          String?
+  updater             user?        @relation("ChannelUpdater", fields: [updater_id], references: [id])
   created_at          DateTime     @default(now()) @db.Timestamptz(0)
   updated_at          DateTime     @updatedAt @db.Timestamptz(0)
 
   @@index([work_id])
   @@index([character_id])
   @@index([scene_id])
-  @@index([created_by_user_id])
+  @@index([creator_id])
 }
 
 model fc_link {

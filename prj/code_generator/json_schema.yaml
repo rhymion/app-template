@@ -96,6 +96,34 @@ definitions:
       roles:
         type: many-to-many
         target: role
+      created_works:
+        type: one-to-many
+        target: work
+        labelField: title
+      created_characters:
+        type: one-to-many
+        target: character
+        labelField: name
+      created_scenes:
+        type: one-to-many
+        target: scene
+        labelField: label
+      created_channels:
+        type: one-to-many
+        target: channel
+        labelField: kind
+      created_music:
+        type: one-to-many
+        target: music
+        labelField: title
+      created_creators:
+        type: one-to-many
+        target: creator
+        labelField: name
+      created_plans:
+        type: one-to-many
+        target: plan
+        labelField: tier
     allOf:
       - $ref: "#/definitions/user"
       - type: object
@@ -107,6 +135,41 @@ definitions:
             x-outputType: list
             items:
               $ref: "#/definitions/role"
+          created_works:
+            type: array
+            x-outputType: list
+            items:
+              $ref: "#/definitions/work"
+          created_characters:
+            type: array
+            x-outputType: list
+            items:
+              $ref: "#/definitions/character"
+          created_scenes:
+            type: array
+            x-outputType: list
+            items:
+              $ref: "#/definitions/scene"
+          created_channels:
+            type: array
+            x-outputType: list
+            items:
+              $ref: "#/definitions/channel"
+          created_music:
+            type: array
+            x-outputType: list
+            items:
+              $ref: "#/definitions/music"
+          created_creators:
+            type: array
+            x-outputType: list
+            items:
+              $ref: "#/definitions/creator"
+          created_plans:
+            type: array
+            x-outputType: list
+            items:
+              $ref: "#/definitions/plan"
 
   setting:
     x-generate:
@@ -692,7 +755,16 @@ definitions:
         minimum: 0
       can_view_paid_posts:
         type: boolean
-      created_by_user_id:
+      creator_id:
+        type:
+          - string
+          - "null"
+        pattern: "^c[a-z0-9]{24,}$"
+        x-relationship:
+          type: many-to-one
+          target: user
+          labelField: name
+      updater_id:
         type:
           - string
           - "null"
@@ -721,7 +793,11 @@ definitions:
         type: many-to-many
         target: user
         labelField: name
-      created_by_user:
+      creator:
+        type: many-to-one
+        target: user
+        labelField: name
+      updater:
         type: many-to-one
         target: user
         labelField: name
@@ -734,7 +810,9 @@ definitions:
             x-outputType: list
             items:
               $ref: "#/definitions/user"
-          created_by_user:
+          creator:
+            $ref: "#/definitions/user"
+          updater:
             $ref: "#/definitions/user"
 
   sub_account:
@@ -803,7 +881,16 @@ definitions:
         enum:
           - pending
           - approved
-      created_by_user_id:
+      creator_id:
+        type:
+          - string
+          - "null"
+        pattern: "^c[a-z0-9]{24,}$"
+        x-relationship:
+          type: many-to-one
+          target: user
+          labelField: name
+      updater_id:
         type:
           - string
           - "null"
@@ -836,7 +923,11 @@ definitions:
         type: many-to-many
         target: scene
         labelField: label
-      created_by_user:
+      creator:
+        type: many-to-one
+        target: user
+        labelField: name
+      updater:
         type: many-to-one
         target: user
         labelField: name
@@ -854,7 +945,9 @@ definitions:
             x-outputType: list
             items:
               $ref: "#/definitions/scene"
-          created_by_user:
+          creator:
+            $ref: "#/definitions/user"
+          updater:
             $ref: "#/definitions/user"
 
   character:
@@ -880,7 +973,16 @@ definitions:
           labelField: title
       official_image:
         type: boolean
-      created_by_user_id:
+      creator_id:
+        type:
+          - string
+          - "null"
+        pattern: "^c[a-z0-9]{24,}$"
+        x-relationship:
+          type: many-to-one
+          target: user
+          labelField: name
+      updater_id:
         type:
           - string
           - "null"
@@ -917,7 +1019,11 @@ definitions:
         type: many-to-many
         target: creator
         labelField: name
-      created_by_user:
+      creator:
+        type: many-to-one
+        target: user
+        labelField: name
+      updater:
         type: many-to-one
         target: user
         labelField: name
@@ -937,7 +1043,9 @@ definitions:
             x-outputType: list
             items:
               $ref: "#/definitions/creator"
-          created_by_user:
+          creator:
+            $ref: "#/definitions/user"
+          updater:
             $ref: "#/definitions/user"
 
   scene:
@@ -968,7 +1076,16 @@ definitions:
       timestamp:
         type: string
         minLength: 1
-      created_by_user_id:
+      creator_id:
+        type:
+          - string
+          - "null"
+        pattern: "^c[a-z0-9]{24,}$"
+        x-relationship:
+          type: many-to-one
+          target: user
+          labelField: name
+      updater_id:
         type:
           - string
           - "null"
@@ -1009,7 +1126,11 @@ definitions:
         type: many-to-many
         target: creator
         labelField: name
-      created_by_user:
+      creator:
+        type: many-to-one
+        target: user
+        labelField: name
+      updater:
         type: many-to-one
         target: user
         labelField: name
@@ -1034,7 +1155,9 @@ definitions:
             x-outputType: list
             items:
               $ref: "#/definitions/creator"
-          created_by_user:
+          creator:
+            $ref: "#/definitions/user"
+          updater:
             $ref: "#/definitions/user"
 
   music:
@@ -1059,7 +1182,16 @@ definitions:
           - cd
           - bgm
           - insert
-      created_by_user_id:
+      creator_id:
+        type:
+          - string
+          - "null"
+        pattern: "^c[a-z0-9]{24,}$"
+        x-relationship:
+          type: many-to-one
+          target: user
+          labelField: name
+      updater_id:
         type:
           - string
           - "null"
@@ -1096,7 +1228,11 @@ definitions:
         type: many-to-many
         target: creator
         labelField: name
-      created_by_user:
+      creator:
+        type: many-to-one
+        target: user
+        labelField: name
+      updater:
         type: many-to-one
         target: user
         labelField: name
@@ -1119,13 +1255,15 @@ definitions:
             x-outputType: list
             items:
               $ref: "#/definitions/creator"
-          created_by_user:
+          creator:
+            $ref: "#/definitions/user"
+          updater:
             $ref: "#/definitions/user"
 
   creator:
     # NOTE: 'creator' is an oshicry domain entity representing a content producer
     # (voice actor, animator, etc.) — distinct from 'user' (the system account holder).
-    # 'created_by_user_id' identifies the system user who registered this creator record.
+    # 'creator_id' identifies the system user who registered this creator record.
     type: object
     required:
       - id
@@ -1156,7 +1294,16 @@ definitions:
           - agency
           - freelance
           - student
-      created_by_user_id:
+      creator_id:
+        type:
+          - string
+          - "null"
+        pattern: "^c[a-z0-9]{24,}$"
+        x-relationship:
+          type: many-to-one
+          target: user
+          labelField: name
+      updater_id:
         type:
           - string
           - "null"
@@ -1197,7 +1344,11 @@ definitions:
         type: many-to-many
         target: scene
         labelField: label
-      created_by_user:
+      creator:
+        type: many-to-one
+        target: user
+        labelField: name
+      updater:
         type: many-to-one
         target: user
         labelField: name
@@ -1225,7 +1376,9 @@ definitions:
             x-outputType: list
             items:
               $ref: "#/definitions/scene"
-          created_by_user:
+          creator:
+            $ref: "#/definitions/user"
+          updater:
             $ref: "#/definitions/user"
 
   channel:
@@ -1315,7 +1468,16 @@ definitions:
           type: many-to-one
           target: scene
           labelField: label
-      created_by_user_id:
+      creator_id:
+        type:
+          - string
+          - "null"
+        pattern: "^c[a-z0-9]{24,}$"
+        x-relationship:
+          type: many-to-one
+          target: user
+          labelField: name
+      updater_id:
         type:
           - string
           - "null"
@@ -1352,7 +1514,11 @@ definitions:
         type: many-to-one
         target: scene
         labelField: label
-      created_by_user:
+      creator:
+        type: many-to-one
+        target: user
+        labelField: name
+      updater:
         type: many-to-one
         target: user
         labelField: name
@@ -1366,7 +1532,9 @@ definitions:
             $ref: "#/definitions/character"
           scene:
             $ref: "#/definitions/scene"
-          created_by_user:
+          creator:
+            $ref: "#/definitions/user"
+          updater:
             $ref: "#/definitions/user"
 
   fc_link:
