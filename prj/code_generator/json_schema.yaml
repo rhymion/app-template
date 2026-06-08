@@ -111,7 +111,7 @@ definitions:
       created_channels:
         type: one-to-many
         target: channel
-        labelField: kind
+        labelField: name
       created_music:
         type: one-to-many
         target: music
@@ -1386,7 +1386,7 @@ definitions:
     required:
       - id
       - parent_id
-      - parent_type
+      - name
       - kind
       - visibility
     x-bridge:
@@ -1406,6 +1406,15 @@ definitions:
         target: scene
         via: scene_id
         kind: one_to_one_bridge
+    x-display:
+      table:
+        - name:
+            primary: true
+            width: 200
+        - kind:
+            width: 120
+        - visibility:
+            width: 120
     properties:
       id:
         type: string
@@ -1413,14 +1422,9 @@ definitions:
       parent_id:
         type: string
         pattern: "^c[a-z0-9]{24,}$"
-      parent_type:
-        type: integer
-        minimum: 0
-        maximum: 2
-        enum:
-          - work
-          - character
-          - scene
+      name:
+        type: string
+        minLength: 1
       kind:
         type: integer
         minimum: 0
@@ -1541,22 +1545,32 @@ definitions:
     type: object
     required:
       - id
-      - kind
+      - name
       - url
+    x-bridge:
+      - role: work_hub
+        target: work
+        via: work_id
+        kind: one_to_one_bridge
+      - role: character_hub
+        target: character
+        via: character_id
+        kind: one_to_one_bridge
+      - role: music_hub
+        target: music
+        via: music_id
+        kind: one_to_one_bridge
+      - role: channel_hub
+        target: channel
+        via: channel_id
+        kind: one_to_one_bridge
     properties:
       id:
         type: string
         pattern: "^c[a-z0-9]{24,}$"
-      kind:
-        type: integer
-        minimum: 0
-        maximum: 4
-        enum:
-          - work
-          - merch
-          - video
-          - music
-          - fund
+      name:
+        type: string
+        minLength: 1
       url:
         type: string
         format: uri
@@ -1595,7 +1609,7 @@ definitions:
         x-relationship:
           type: many-to-one
           target: channel
-          labelField: parent_type
+          labelField: name
 
   fc_link_detail:
     x-generate:
@@ -1647,7 +1661,7 @@ definitions:
         x-relationship:
           type: many-to-one
           target: channel
-          labelField: parent_type
+          labelField: name
 
   cry_post_detail:
     x-generate:
@@ -1667,7 +1681,7 @@ definitions:
       channel:
         type: many-to-one
         target: channel
-        labelField: parent_type
+        labelField: name
     allOf:
       - $ref: "#/definitions/cry_post"
       - type: object

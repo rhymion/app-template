@@ -249,7 +249,7 @@ model creator {
 model channel {
   id                  String       @id @default(cuid())
   parent_id           String
-  parent_type         Int
+  name                String
   kind                Int
   visibility          Int
   work_id             String?
@@ -277,7 +277,7 @@ model channel {
 
 model fc_link {
   id             String      @id @default(cuid())
-  kind           Int
+  name           String
   url            String
   contract_split_id String?
   work_id        String?
