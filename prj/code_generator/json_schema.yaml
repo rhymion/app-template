@@ -804,14 +804,6 @@ definitions:
         type: many-to-many
         target: scene
         labelField: label
-      channels:
-        type: many-to-many
-        target: channel
-        labelField: parent_type
-      fc_links:
-        type: many-to-many
-        target: fc_link
-        labelField: url
     allOf:
       - $ref: "#/definitions/work"
       - type: object
@@ -826,16 +818,6 @@ definitions:
             x-outputType: list
             items:
               $ref: "#/definitions/scene"
-          channels:
-            type: array
-            x-outputType: list
-            items:
-              $ref: "#/definitions/channel"
-          fc_links:
-            type: array
-            x-outputType: list
-            items:
-              $ref: "#/definitions/fc_link"
 
   character:
     type: object
@@ -884,10 +866,6 @@ definitions:
         type: many-to-many
         target: creator
         labelField: name
-      fc_links:
-        type: many-to-many
-        target: fc_link
-        labelField: url
     allOf:
       - $ref: "#/definitions/character"
       - type: object
@@ -904,11 +882,6 @@ definitions:
             x-outputType: list
             items:
               $ref: "#/definitions/creator"
-          fc_links:
-            type: array
-            x-outputType: list
-            items:
-              $ref: "#/definitions/fc_link"
 
   scene:
     type: object
@@ -966,10 +939,6 @@ definitions:
         type: many-to-many
         target: creator
         labelField: name
-      channels:
-        type: many-to-many
-        target: channel
-        labelField: parent_type
     allOf:
       - $ref: "#/definitions/scene"
       - type: object
@@ -991,11 +960,6 @@ definitions:
             x-outputType: list
             items:
               $ref: "#/definitions/creator"
-          channels:
-            type: array
-            x-outputType: list
-            items:
-              $ref: "#/definitions/channel"
 
   music:
     type: object
@@ -1043,10 +1007,6 @@ definitions:
         type: many-to-many
         target: creator
         labelField: name
-      fc_links:
-        type: many-to-many
-        target: fc_link
-        labelField: url
     allOf:
       - $ref: "#/definitions/music"
       - type: object
@@ -1066,11 +1026,6 @@ definitions:
             x-outputType: list
             items:
               $ref: "#/definitions/creator"
-          fc_links:
-            type: array
-            x-outputType: list
-            items:
-              $ref: "#/definitions/fc_link"
 
   creator:
     type: object
@@ -1169,6 +1124,18 @@ definitions:
         target: commentable
         via: commentable_id
         kind: one_to_one_bridge
+      - role: work_hub
+        target: work
+        via: work_id
+        kind: one_to_one_bridge
+      - role: character_hub
+        target: character
+        via: character_id
+        kind: one_to_one_bridge
+      - role: scene_hub
+        target: scene
+        via: scene_id
+        kind: one_to_one_bridge
     properties:
       id:
         type: string
@@ -1255,14 +1222,6 @@ definitions:
         type: many-to-one
         target: scene
         labelField: label
-      cry_posts:
-        type: many-to-many
-        target: cry_post
-        labelField: body
-      fc_links:
-        type: many-to-many
-        target: fc_link
-        labelField: url
     allOf:
       - $ref: "#/definitions/channel"
       - type: object
@@ -1273,16 +1232,6 @@ definitions:
             $ref: "#/definitions/character"
           scene:
             $ref: "#/definitions/scene"
-          cry_posts:
-            type: array
-            x-outputType: list
-            items:
-              $ref: "#/definitions/cry_post"
-          fc_links:
-            type: array
-            x-outputType: list
-            items:
-              $ref: "#/definitions/fc_link"
 
   fc_link:
     type: object
@@ -1415,10 +1364,6 @@ definitions:
         type: many-to-one
         target: channel
         labelField: parent_type
-      tip_txs:
-        type: many-to-many
-        target: tip_tx
-        labelField: status
     allOf:
       - $ref: "#/definitions/cry_post"
       - type: object
@@ -1427,11 +1372,6 @@ definitions:
             $ref: "#/definitions/user"
           channel:
             $ref: "#/definitions/channel"
-          tip_txs:
-            type: array
-            x-outputType: list
-            items:
-              $ref: "#/definitions/tip_tx"
 
   reaction:
     type: object
