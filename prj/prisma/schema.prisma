@@ -120,8 +120,18 @@ model user {
   created_approvables       approvable[]        @relation("ApprovableCreator")
   created_dashboards        dashboard[]         @relation("DashboardCreator")
   updated_dashboards        dashboard[]         @relation("DashboardUpdater")
-  created_tenants           tenant[]            @relation("TenantCreator")
-  updated_tenants           tenant[]            @relation("TenantUpdater")
+  created_tenants               tenant[]            @relation("TenantCreator")
+  updated_tenants               tenant[]            @relation("TenantUpdater")
+  created_supply_pools          supply_pool[]       @relation("SupplyPoolCreator")
+  updated_supply_pools          supply_pool[]       @relation("SupplyPoolUpdater")
+  created_supply_requests       supply_request[]    @relation("SupplyRequestCreator")
+  updated_supply_requests       supply_request[]    @relation("SupplyRequestUpdater")
+  created_room_types            room_type[]         @relation("RoomTypeCreator")
+  updated_room_types            room_type[]         @relation("RoomTypeUpdater")
+  created_rooms                 room[]              @relation("RoomCreator")
+  updated_rooms                 room[]              @relation("RoomUpdater")
+  created_room_reservations     room_reservation[]  @relation("RoomReservationCreator")
+  updated_room_reservations     room_reservation[]  @relation("RoomReservationUpdater")
 
   @@index([api_key])
   @@index([creator_id])
@@ -743,6 +753,114 @@ model leave_request {
   creator       user       @relation("LeaveRequestCreator", fields: [creator_id], references: [id])
   updater_id    String
   updater       user       @relation("LeaveRequestUpdater", fields: [updater_id], references: [id])
+
+  @@index([creator_id])
+}
+
+// ============================================================
+// Cell 2: count mode, no lines (supply_request example)
+// ============================================================
+
+model supply_pool {
+  id                 String              @id @default(cuid())
+  name               String
+  description        String?
+  quantity           Int
+  reserved_quantity  Int                 @default(0)
+  supply_allocations supply_allocation[]
+  created_at         DateTime            @default(now()) @db.Timestamptz(0)
+  updated_at         DateTime            @updatedAt @db.Timestamptz(0)
+  creator_id         String
+  creator            user                @relation("SupplyPoolCreator", fields: [creator_id], references: [id])
+  updater_id         String
+  updater            user                @relation("SupplyPoolUpdater", fields: [updater_id], references: [id])
+
+  @@index([creator_id])
+}
+
+model supply_request {
+  id                 String              @id @default(cuid())
+  name               String
+  description        String?
+  quantity           Int
+  supply_allocations supply_allocation[]
+  created_at         DateTime            @default(now()) @db.Timestamptz(0)
+  updated_at         DateTime            @updatedAt @db.Timestamptz(0)
+  creator_id         String
+  creator            user                @relation("SupplyRequestCreator", fields: [creator_id], references: [id])
+  updater_id         String
+  updater            user                @relation("SupplyRequestUpdater", fields: [updater_id], references: [id])
+
+  @@index([creator_id])
+}
+
+model supply_allocation {
+  id                String         @id @default(cuid())
+  supply_request_id String
+  supply_request    supply_request @relation(fields: [supply_request_id], references: [id], onDelete: Cascade)
+  supply_pool_id    String
+  supply_pool       supply_pool    @relation(fields: [supply_pool_id], references: [id])
+  quantity          Int
+  created_at        DateTime       @default(now()) @db.Timestamptz(0)
+
+  @@index([supply_request_id])
+  @@index([supply_pool_id])
+}
+
+// ============================================================
+// Cell 3: item mode, no lines (room_reservation example)
+// ============================================================
+
+model room_type {
+  id                String             @id @default(cuid())
+  name              String
+  capacity          Int?
+  description       String?
+  rooms             room[]
+  room_reservations room_reservation[]
+  created_at        DateTime           @default(now()) @db.Timestamptz(0)
+  updated_at        DateTime           @updatedAt @db.Timestamptz(0)
+  creator_id        String
+  creator           user               @relation("RoomTypeCreator", fields: [creator_id], references: [id])
+  updater_id        String
+  updater           user               @relation("RoomTypeUpdater", fields: [updater_id], references: [id])
+
+  @@index([creator_id])
+}
+
+model room {
+  id                String             @id @default(cuid())
+  room_no           String
+  room_type_id      String
+  room_type         room_type          @relation(fields: [room_type_id], references: [id], onDelete: Cascade)
+  floor             Int?
+  status            Int                @default(0)
+  room_reservations room_reservation[]
+  created_at        DateTime           @default(now()) @db.Timestamptz(0)
+  updated_at        DateTime           @updatedAt @db.Timestamptz(0)
+  creator_id        String
+  creator           user               @relation("RoomCreator", fields: [creator_id], references: [id])
+  updater_id        String
+  updater           user               @relation("RoomUpdater", fields: [updater_id], references: [id])
+
+  @@index([creator_id])
+}
+
+model room_reservation {
+  id           String    @id @default(cuid())
+  guest_name   String
+  room_type_id String
+  room_type    room_type @relation(fields: [room_type_id], references: [id])
+  room_id      String?
+  room         room?     @relation(fields: [room_id], references: [id])
+  check_in     DateTime  @db.Timestamptz(0)
+  check_out    DateTime  @db.Timestamptz(0)
+  created_at   DateTime  @default(now()) @db.Timestamptz(0)
+  updated_at   DateTime  @updatedAt @db.Timestamptz(0)
+  creator_id   String
+  creator      user      @relation("RoomReservationCreator", fields: [creator_id], references: [id])
+  updater_id   String
+  updater      user      @relation("RoomReservationUpdater", fields: [updater_id], references: [id])
 
   @@index([creator_id])
 }
