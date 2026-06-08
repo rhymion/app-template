@@ -692,6 +692,15 @@ definitions:
         minimum: 0
       can_view_paid_posts:
         type: boolean
+      created_by_user_id:
+        type:
+          - string
+          - "null"
+        pattern: "^c[a-z0-9]{24,}$"
+        x-relationship:
+          type: many-to-one
+          target: user
+          labelField: name
 
   plan_detail:
     x-generate:
@@ -703,9 +712,17 @@ definitions:
       invalidate: false
       api: true
       test: true
+    x-policy:
+      create:
+        roles:
+          - administrator
     x-relationships:
       users:
         type: many-to-many
+        target: user
+        labelField: name
+      created_by_user:
+        type: many-to-one
         target: user
         labelField: name
     allOf:
@@ -717,6 +734,8 @@ definitions:
             x-outputType: list
             items:
               $ref: "#/definitions/user"
+          created_by_user:
+            $ref: "#/definitions/user"
 
   sub_account:
     type: object
@@ -784,6 +803,15 @@ definitions:
         enum:
           - pending
           - approved
+      created_by_user_id:
+        type:
+          - string
+          - "null"
+        pattern: "^c[a-z0-9]{24,}$"
+        x-relationship:
+          type: many-to-one
+          target: user
+          labelField: name
 
   work_detail:
     x-generate:
@@ -795,6 +823,10 @@ definitions:
       invalidate: false
       api: true
       test: true
+    x-policy:
+      create:
+        roles:
+          - administrator
     x-relationships:
       characters:
         type: many-to-many
@@ -804,6 +836,10 @@ definitions:
         type: many-to-many
         target: scene
         labelField: label
+      created_by_user:
+        type: many-to-one
+        target: user
+        labelField: name
     allOf:
       - $ref: "#/definitions/work"
       - type: object
@@ -818,6 +854,8 @@ definitions:
             x-outputType: list
             items:
               $ref: "#/definitions/scene"
+          created_by_user:
+            $ref: "#/definitions/user"
 
   character:
     type: object
@@ -842,6 +880,15 @@ definitions:
           labelField: title
       official_image:
         type: boolean
+      created_by_user_id:
+        type:
+          - string
+          - "null"
+        pattern: "^c[a-z0-9]{24,}$"
+        x-relationship:
+          type: many-to-one
+          target: user
+          labelField: name
 
   character_detail:
     x-generate:
@@ -853,6 +900,10 @@ definitions:
       invalidate: false
       api: true
       test: true
+    x-policy:
+      create:
+        roles:
+          - administrator
     x-relationships:
       work:
         type: many-to-one
@@ -865,6 +916,10 @@ definitions:
       creators:
         type: many-to-many
         target: creator
+        labelField: name
+      created_by_user:
+        type: many-to-one
+        target: user
         labelField: name
     allOf:
       - $ref: "#/definitions/character"
@@ -882,6 +937,8 @@ definitions:
             x-outputType: list
             items:
               $ref: "#/definitions/creator"
+          created_by_user:
+            $ref: "#/definitions/user"
 
   scene:
     type: object
@@ -911,6 +968,15 @@ definitions:
       timestamp:
         type: string
         minLength: 1
+      created_by_user_id:
+        type:
+          - string
+          - "null"
+        pattern: "^c[a-z0-9]{24,}$"
+        x-relationship:
+          type: many-to-one
+          target: user
+          labelField: name
 
   scene_detail:
     x-generate:
@@ -922,6 +988,10 @@ definitions:
       invalidate: false
       api: true
       test: true
+    x-policy:
+      create:
+        roles:
+          - administrator
     x-relationships:
       work:
         type: many-to-one
@@ -938,6 +1008,10 @@ definitions:
       creators:
         type: many-to-many
         target: creator
+        labelField: name
+      created_by_user:
+        type: many-to-one
+        target: user
         labelField: name
     allOf:
       - $ref: "#/definitions/scene"
@@ -960,6 +1034,8 @@ definitions:
             x-outputType: list
             items:
               $ref: "#/definitions/creator"
+          created_by_user:
+            $ref: "#/definitions/user"
 
   music:
     type: object
@@ -983,6 +1059,15 @@ definitions:
           - cd
           - bgm
           - insert
+      created_by_user_id:
+        type:
+          - string
+          - "null"
+        pattern: "^c[a-z0-9]{24,}$"
+        x-relationship:
+          type: many-to-one
+          target: user
+          labelField: name
 
   music_detail:
     x-generate:
@@ -994,6 +1079,10 @@ definitions:
       invalidate: false
       api: true
       test: true
+    x-policy:
+      create:
+        roles:
+          - administrator
     x-relationships:
       scenes:
         type: many-to-many
@@ -1006,6 +1095,10 @@ definitions:
       credits:
         type: many-to-many
         target: creator
+        labelField: name
+      created_by_user:
+        type: many-to-one
+        target: user
         labelField: name
     allOf:
       - $ref: "#/definitions/music"
@@ -1026,8 +1119,13 @@ definitions:
             x-outputType: list
             items:
               $ref: "#/definitions/creator"
+          created_by_user:
+            $ref: "#/definitions/user"
 
   creator:
+    # NOTE: 'creator' is an oshicry domain entity representing a content producer
+    # (voice actor, animator, etc.) — distinct from 'user' (the system account holder).
+    # 'created_by_user_id' identifies the system user who registered this creator record.
     type: object
     required:
       - id
@@ -1058,6 +1156,15 @@ definitions:
           - agency
           - freelance
           - student
+      created_by_user_id:
+        type:
+          - string
+          - "null"
+        pattern: "^c[a-z0-9]{24,}$"
+        x-relationship:
+          type: many-to-one
+          target: user
+          labelField: name
 
   creator_detail:
     x-generate:
@@ -1069,6 +1176,10 @@ definitions:
       invalidate: false
       api: true
       test: true
+    x-policy:
+      create:
+        roles:
+          - administrator
     x-relationships:
       voiced_characters:
         type: many-to-many
@@ -1086,6 +1197,10 @@ definitions:
         type: many-to-many
         target: scene
         labelField: label
+      created_by_user:
+        type: many-to-one
+        target: user
+        labelField: name
     allOf:
       - $ref: "#/definitions/creator"
       - type: object
@@ -1110,6 +1225,8 @@ definitions:
             x-outputType: list
             items:
               $ref: "#/definitions/scene"
+          created_by_user:
+            $ref: "#/definitions/user"
 
   channel:
     type: object
@@ -1198,6 +1315,15 @@ definitions:
           type: many-to-one
           target: scene
           labelField: label
+      created_by_user_id:
+        type:
+          - string
+          - "null"
+        pattern: "^c[a-z0-9]{24,}$"
+        x-relationship:
+          type: many-to-one
+          target: user
+          labelField: name
 
   channel_detail:
     x-generate:
@@ -1209,6 +1335,10 @@ definitions:
       invalidate: false
       api: true
       test: true
+    x-policy:
+      create:
+        roles:
+          - administrator
     x-relationships:
       work:
         type: many-to-one
@@ -1222,6 +1352,10 @@ definitions:
         type: many-to-one
         target: scene
         labelField: label
+      created_by_user:
+        type: many-to-one
+        target: user
+        labelField: name
     allOf:
       - $ref: "#/definitions/channel"
       - type: object
@@ -1232,6 +1366,8 @@ definitions:
             $ref: "#/definitions/character"
           scene:
             $ref: "#/definitions/scene"
+          created_by_user:
+            $ref: "#/definitions/user"
 
   fc_link:
     type: object
