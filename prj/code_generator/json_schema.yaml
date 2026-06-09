@@ -96,6 +96,10 @@ definitions:
       roles:
         type: many-to-many
         target: role
+      sub_accounts:
+        type: one-to-many
+        target: sub_account
+        labelField: name
       created_works:
         type: one-to-many
         target: work
@@ -112,7 +116,7 @@ definitions:
         type: one-to-many
         target: channel
         labelField: name
-      created_music:
+      created_musics:
         type: one-to-many
         target: music
         labelField: title
@@ -135,6 +139,11 @@ definitions:
             x-outputType: list
             items:
               $ref: "#/definitions/role"
+          sub_accounts:
+            type: array
+            x-outputType: list
+            items:
+              $ref: "#/definitions/sub_account"
           created_works:
             type: array
             x-outputType: list
@@ -155,7 +164,7 @@ definitions:
             x-outputType: list
             items:
               $ref: "#/definitions/channel"
-          created_music:
+          created_musics:
             type: array
             x-outputType: list
             items:
@@ -740,13 +749,14 @@ definitions:
         type: string
         pattern: "^c[a-z0-9]{24,}$"
       tier:
-        type: integer
-        minimum: 0
-        maximum: 2
-        enum:
-          - free
-          - premium
-          - vip
+        type: string
+        minLength: 1
+        # minimum: 0
+        # maximum: 2
+        # enum:
+        #   - free
+        #   - premium
+        #   - vip
       reaction_kinds_allowed:
         type: integer
         minimum: 0
@@ -790,7 +800,7 @@ definitions:
     required:
       - id
       - parent_user_id
-      - nickname
+      - name
     properties:
       id:
         type: string
@@ -802,26 +812,9 @@ definitions:
           type: many-to-one
           target: user
           labelField: name
-      nickname:
+      name:
         type: string
         minLength: 1
-
-  sub_account_detail:
-    x-generate:
-      list: true
-      view: true
-      new: true
-      edit: true
-      delete: true
-      invalidate: false
-      api: true
-      test: true
-    allOf:
-      - $ref: "#/definitions/sub_account"
-      - type: object
-        properties:
-          parent_user:
-            $ref: "#/definitions/user"
 
   work:
     type: object
@@ -1208,11 +1201,8 @@ definitions:
       - name
       - kind
       - visibility
+      - commentable_id
     x-bridge:
-      - role: commentable
-        target: commentable
-        via: commentable_id
-        kind: one_to_one_bridge
       - role: work_hub
         target: work
         via: work_id
@@ -1260,10 +1250,12 @@ definitions:
           - premium
           - vip
       commentable_id:
-        type:
-          - string
-          - "null"
+        type: string
         pattern: "^c[a-z0-9]{24,}$"
+        x-relationship:
+          type: one-to-one_bridge
+          target: commentable
+          labelField: id
       work_id:
         type:
           - string
@@ -1423,63 +1415,6 @@ definitions:
           channel:
             $ref: "#/definitions/channel"
 
-  cry_post:
-    type: object
-    required:
-      - id
-      - body
-      - author_user_id
-      - channel_id
-    properties:
-      id:
-        type: string
-        pattern: "^c[a-z0-9]{24,}$"
-      body:
-        type: string
-        minLength: 1
-      author_user_id:
-        type: string
-        pattern: "^c[a-z0-9]{24,}$"
-        x-relationship:
-          type: many-to-one
-          target: user
-          labelField: name
-      channel_id:
-        type: string
-        pattern: "^c[a-z0-9]{24,}$"
-        x-relationship:
-          type: many-to-one
-          target: channel
-          labelField: name
-
-  cry_post_detail:
-    x-generate:
-      list: true
-      view: true
-      new: true
-      edit: true
-      delete: true
-      invalidate: false
-      api: true
-      test: true
-    x-relationships:
-      author:
-        type: many-to-one
-        target: user
-        labelField: name
-      channel:
-        type: many-to-one
-        target: channel
-        labelField: name
-    allOf:
-      - $ref: "#/definitions/cry_post"
-      - type: object
-        properties:
-          author:
-            $ref: "#/definitions/user"
-          channel:
-            $ref: "#/definitions/channel"
-
   reaction:
     type: object
     required:
@@ -1487,6 +1422,10 @@ definitions:
       - type
       - user_id
       - comment_id
+    x-internal:
+      page: false
+      embed: false
+      api: custom
     properties:
       id:
         type: string
@@ -1517,26 +1456,7 @@ definitions:
         x-relationship:
           type: many-to-one
           target: comment
-          labelField: message
-
-  reaction_detail:
-    x-generate:
-      list: true
-      view: true
-      new: true
-      edit: true
-      delete: true
-      invalidate: false
-      api: true
-      test: true
-    allOf:
-      - $ref: "#/definitions/reaction"
-      - type: object
-        properties:
-          user:
-            $ref: "#/definitions/user"
-          comment:
-            $ref: "#/definitions/comment"
+          labelField: id
 
   tip_tx:
     type: object
@@ -1547,8 +1467,7 @@ definitions:
       - payment_fee
       - contract_split_id
       - status
-      - user_id
-      - cry_post_id
+      - comment_id
     properties:
       id:
         type: string
@@ -1573,20 +1492,13 @@ definitions:
           - pending
           - held
           - paid
-      user_id:
+      comment_id:
         type: string
         pattern: "^c[a-z0-9]{24,}$"
         x-relationship:
           type: many-to-one
-          target: user
-          labelField: name
-      cry_post_id:
-        type: string
-        pattern: "^c[a-z0-9]{24,}$"
-        x-relationship:
-          type: many-to-one
-          target: cry_post
-          labelField: body
+          target: comment
+          labelField: message
 
   tip_tx_detail:
     x-generate:
@@ -1602,8 +1514,6 @@ definitions:
       - $ref: "#/definitions/tip_tx"
       - type: object
         properties:
-          user:
-            $ref: "#/definitions/user"
-          cry_post:
-            $ref: "#/definitions/cry_post"
+          comment:
+            $ref: "#/definitions/comment"
 
