@@ -99,7 +99,7 @@ definitions:
       sub_accounts:
         type: one-to-many
         target: sub_account
-        labelField: name
+        labelField: nickname
       created_works:
         type: one-to-many
         target: work
@@ -749,14 +749,13 @@ definitions:
         type: string
         pattern: "^c[a-z0-9]{24,}$"
       tier:
-        type: string
-        minLength: 1
-        # minimum: 0
-        # maximum: 2
-        # enum:
-        #   - free
-        #   - premium
-        #   - vip
+        type: integer
+        minimum: 0
+        maximum: 2
+        enum:
+          - free
+          - premium
+          - vip
       reaction_kinds_allowed:
         type: integer
         minimum: 0
@@ -800,7 +799,7 @@ definitions:
     required:
       - id
       - parent_user_id
-      - name
+      - nickname
     properties:
       id:
         type: string
@@ -812,7 +811,7 @@ definitions:
           type: many-to-one
           target: user
           labelField: name
-      name:
+      nickname:
         type: string
         minLength: 1
 
@@ -823,6 +822,13 @@ definitions:
       - title
       - pattern
       - status
+    x-display:
+      table:
+        - title:
+            primary: true
+            width: 200
+        - status:
+            width: 120
     properties:
       id:
         type: string
@@ -959,6 +965,13 @@ definitions:
       - work_id
       - episode
       - timestamp
+    x-display:
+      table:
+        - label:
+            primary: true
+            width: 200
+        - episode:
+            width: 120
     properties:
       id:
         type: string
@@ -1039,6 +1052,13 @@ definitions:
       - id
       - title
       - kind
+    x-display:
+      table:
+        - title:
+            primary: true
+            width: 200
+        - kind:
+            width: 120
     properties:
       id:
         type: string
