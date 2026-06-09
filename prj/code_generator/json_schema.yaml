@@ -2061,6 +2061,13 @@ definitions:
       - room_no
       - room_type_id
       - status
+    x-display:
+      table:
+        - room_no:
+            primary: true
+            width: 200
+        - room_type:
+            width: 200
     properties:
       id:
         type: string
@@ -2115,12 +2122,30 @@ definitions:
       - room_type_id
       - check_in
       - check_out
+    x-display:
+      table:
+        - room_type:
+            primary: true
+            width: 200
+        - room:
+            width: 200
+            labelField: room_id.room_no
+        - guest_name:
+            width: 200
+        - check_in:
+            width: 150
+        - check_out:
+            width: 150
+      dashboard: true
     x-reservation:
       mode: item
       transaction:
         strategy: row_lock
       pool:
         entity: room
+        statusField: status
+        availableStatus: 0
+        reservedStatus: 2
       request:
         criteria:
           room_type_id: room_type_id
