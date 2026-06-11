@@ -1213,28 +1213,50 @@ definitions:
             items:
               $ref: "#/definitions/scene"
 
+  channelable:
+    type: object
+    required:
+      - id
+    properties:
+      id:
+        type: string
+        pattern: "^c[a-z0-9]{24,}$"
+
+  channelable_detail:
+    x-generate:
+      list: false
+      view: false
+      new: false
+      edit: false
+      delete: false
+      invalidate: false
+      api: false
+      test: false
+    allOf:
+      - $ref: "#/definitions/channelable"
+
   channel:
     type: object
     required:
       - id
-      - parent_id
       - name
       - kind
       - visibility
       - commentable_id
     x-bridge:
-      - role: work_hub
-        target: work
-        via: work_id
-        kind: one_to_one_bridge
-      - role: character_hub
-        target: character
-        via: character_id
-        kind: one_to_one_bridge
-      - role: scene_hub
-        target: scene
-        via: scene_id
-        kind: one_to_one_bridge
+      name: channelable
+      child: channel
+      parentCardinality: exactlyOne
+      parents:
+        - role: work_hub
+          target: work
+          labelField: title
+        - role: character_hub
+          target: character
+          labelField: name
+        - role: scene_hub
+          target: scene
+          labelField: label
     x-display:
       table:
         - name:
@@ -1246,9 +1268,6 @@ definitions:
             width: 120
     properties:
       id:
-        type: string
-        pattern: "^c[a-z0-9]{24,}$"
-      parent_id:
         type: string
         pattern: "^c[a-z0-9]{24,}$"
       name:
@@ -1276,33 +1295,6 @@ definitions:
           type: one-to-one_bridge
           target: commentable
           labelField: id
-      work_id:
-        type:
-          - string
-          - "null"
-        pattern: "^c[a-z0-9]{24,}$"
-        x-relationship:
-          type: many-to-one
-          target: work
-          labelField: title
-      character_id:
-        type:
-          - string
-          - "null"
-        pattern: "^c[a-z0-9]{24,}$"
-        x-relationship:
-          type: many-to-one
-          target: character
-          labelField: name
-      scene_id:
-        type:
-          - string
-          - "null"
-        pattern: "^c[a-z0-9]{24,}$"
-        x-relationship:
-          type: many-to-one
-          target: scene
-          labelField: label
 
   channel_detail:
     x-generate:
@@ -1318,29 +1310,30 @@ definitions:
       create:
         roles:
           - administrator
-    x-relationships:
-      work:
-        type: many-to-one
-        target: work
-        labelField: title
-      character:
-        type: many-to-one
-        target: character
-        labelField: name
-      scene:
-        type: many-to-one
-        target: scene
-        labelField: label
     allOf:
       - $ref: "#/definitions/channel"
-      - type: object
-        properties:
-          work:
-            $ref: "#/definitions/work"
-          character:
-            $ref: "#/definitions/character"
-          scene:
-            $ref: "#/definitions/scene"
+
+  fc_linkable:
+    type: object
+    required:
+      - id
+    properties:
+      id:
+        type: string
+        pattern: "^c[a-z0-9]{24,}$"
+
+  fc_linkable_detail:
+    x-generate:
+      list: false
+      view: false
+      new: false
+      edit: false
+      delete: false
+      invalidate: false
+      api: false
+      test: false
+    allOf:
+      - $ref: "#/definitions/fc_linkable"
 
   fc_link:
     type: object
@@ -1349,22 +1342,22 @@ definitions:
       - name
       - url
     x-bridge:
-      - role: work_hub
-        target: work
-        via: work_id
-        kind: one_to_one_bridge
-      - role: character_hub
-        target: character
-        via: character_id
-        kind: one_to_one_bridge
-      - role: music_hub
-        target: music
-        via: music_id
-        kind: one_to_one_bridge
-      - role: channel_hub
-        target: channel
-        via: channel_id
-        kind: one_to_one_bridge
+      name: fc_linkable
+      child: fc_link
+      parentCardinality: exactlyOne
+      parents:
+        - role: work_hub
+          target: work
+          labelField: title
+        - role: character_hub
+          target: character
+          labelField: name
+        - role: music_hub
+          target: music
+          labelField: title
+        - role: channel_hub
+          target: channel
+          labelField: name
     properties:
       id:
         type: string
@@ -1375,42 +1368,6 @@ definitions:
       url:
         type: string
         format: uri
-      work_id:
-        type:
-          - string
-          - "null"
-        pattern: "^c[a-z0-9]{24,}$"
-        x-relationship:
-          type: many-to-one
-          target: work
-          labelField: title
-      character_id:
-        type:
-          - string
-          - "null"
-        pattern: "^c[a-z0-9]{24,}$"
-        x-relationship:
-          type: many-to-one
-          target: character
-          labelField: name
-      music_id:
-        type:
-          - string
-          - "null"
-        pattern: "^c[a-z0-9]{24,}$"
-        x-relationship:
-          type: many-to-one
-          target: music
-          labelField: title
-      channel_id:
-        type:
-          - string
-          - "null"
-        pattern: "^c[a-z0-9]{24,}$"
-        x-relationship:
-          type: many-to-one
-          target: channel
-          labelField: name
 
   fc_link_detail:
     x-generate:
@@ -1424,16 +1381,6 @@ definitions:
       test: true
     allOf:
       - $ref: "#/definitions/fc_link"
-      - type: object
-        properties:
-          work:
-            $ref: "#/definitions/work"
-          character:
-            $ref: "#/definitions/character"
-          music:
-            $ref: "#/definitions/music"
-          channel:
-            $ref: "#/definitions/channel"
 
   reaction:
     type: object

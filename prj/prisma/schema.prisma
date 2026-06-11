@@ -156,8 +156,6 @@ model work {
   status              Int
   characters          character[]
   scenes              scene[]
-  channels            channel[]
-  fc_links            fc_link[]
   creator_id          String?
   creator             user?       @relation("WorkCreator", fields: [creator_id], references: [id])
   updater_id          String?
@@ -174,10 +172,8 @@ model character {
   work_id             String
   work                work        @relation(fields: [work_id], references: [id], onDelete: Cascade)
   official_image      Boolean
-  channels            channel[]
   scenes              scene[]     @relation("SceneCharacters")
   creators            creator[]   @relation("CreatorCharacters")
-  fc_links            fc_link[]
   creator_id          String?
   creator             user?       @relation("CharacterCreator", fields: [creator_id], references: [id])
   updater_id          String?
@@ -196,7 +192,6 @@ model scene {
   work                work        @relation(fields: [work_id], references: [id], onDelete: Cascade)
   episode             String
   timestamp           String
-  channels            channel[]
   characters          character[] @relation("SceneCharacters")
   music               music[]     @relation("SceneMusics")
   creators            creator[]   @relation("SceneCredits")
@@ -218,7 +213,6 @@ model music {
   scenes              scene[]     @relation("SceneMusics")
   composers           creator[]   @relation("ComposerMusics")
   credits             creator[]   @relation("CreditedMusics")
-  fc_links            fc_link[]
   creator_id          String?
   creator             user?       @relation("MusicCreator", fields: [creator_id], references: [id])
   updater_id          String?
@@ -250,19 +244,11 @@ model creator {
 
 model channel {
   id                  String       @id @default(cuid())
-  parent_id           String
   name                String
   kind                Int
   visibility          Int
-  work_id             String?
-  work                work?        @relation(fields: [work_id], references: [id], onDelete: Cascade)
-  character_id        String?
-  character           character?   @relation(fields: [character_id], references: [id], onDelete: Cascade)
-  scene_id            String?
-  scene               scene?       @relation(fields: [scene_id], references: [id], onDelete: Cascade)
   commentable_id      String       @unique
   commentable         commentable? @relation("ChannelCommentable", fields: [commentable_id], references: [id])
-  fc_links            fc_link[]
   creator_id          String?
   creator             user?        @relation("ChannelCreator", fields: [creator_id], references: [id])
   updater_id          String?
@@ -270,9 +256,6 @@ model channel {
   created_at          DateTime     @default(now()) @db.Timestamptz(0)
   updated_at          DateTime     @updatedAt @db.Timestamptz(0)
 
-  @@index([work_id])
-  @@index([character_id])
-  @@index([scene_id])
   @@index([creator_id])
 }
 
@@ -281,14 +264,6 @@ model fc_link {
   name           String
   url            String
   contract_split_id String?
-  work_id        String?
-  work           work?       @relation(fields: [work_id], references: [id], onDelete: Cascade)
-  character_id   String?
-  character      character?  @relation(fields: [character_id], references: [id], onDelete: Cascade)
-  music_id       String?
-  music          music?      @relation(fields: [music_id], references: [id], onDelete: Cascade)
-  channel_id     String?
-  channel        channel?    @relation(fields: [channel_id], references: [id], onDelete: Cascade)
   creator_id     String?
   creator        user?        @relation("FcLinkCreator", fields: [creator_id], references: [id])
   updater_id     String?
@@ -296,10 +271,6 @@ model fc_link {
   created_at     DateTime    @default(now()) @db.Timestamptz(0)
   updated_at     DateTime    @updatedAt @db.Timestamptz(0)
 
-  @@index([work_id])
-  @@index([character_id])
-  @@index([music_id])
-  @@index([channel_id])
   @@index([creator_id])
 }
 
