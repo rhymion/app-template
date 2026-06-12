@@ -744,6 +744,15 @@ definitions:
       - reaction_kinds_allowed
       - sub_account_limit
       - can_view_paid_posts
+    x-display:
+      table:
+        - tier:
+            primary: true
+            width: 150
+        - sub_account_limit:
+            width: 150
+        - can_view_paid_posts:
+            width: 150
     properties:
       id:
         type: string
@@ -775,6 +784,15 @@ definitions:
       invalidate: false
       api: true
       test: true
+    x-display:
+      table:
+        - tier:
+            primary: true
+            width: 150
+        - sub_account_limit:
+            width: 150
+        - can_view_paid_posts:
+            width: 150
     x-policy:
       create:
         roles:
@@ -1435,6 +1453,18 @@ definitions:
       - contract_split_id
       - status
       - comment_id
+    x-display:
+      table:
+        - created_by:
+            primary: true
+            width: 150
+            labelField: name
+        - gross_amount:
+            width: 150
+        - status:
+            width: 120
+        - updated_at:
+            width: 180
     properties:
       id:
         type: string
