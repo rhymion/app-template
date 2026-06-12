@@ -1318,7 +1318,7 @@ definitions:
     x-generate:
       list: true
       view: true
-      new: true
+      new: false
       edit: true
       delete: true
       invalidate: false
@@ -1376,6 +1376,13 @@ definitions:
         - role: channel_hub
           target: channel
           labelField: name
+    x-display:
+      table:
+        - name:
+            primary: true
+            width: 200
+        - url:
+            width: 280
     properties:
       id:
         type: string
@@ -1391,7 +1398,7 @@ definitions:
     x-generate:
       list: true
       view: true
-      new: true
+      new: false
       edit: true
       delete: true
       invalidate: false
