@@ -11,6 +11,7 @@
     "cancel": "キャンセル",
     "chart": "チャート",
     "close": "閉じる",
+    "createdBy": "作成者",
     "delete": "削除",
     "deleteDialogTitle": "{entity}を削除",
     "deleteMessage": "本当にこの{entity}を削除してもよろしいですか？削除されたデータは復元できません。",
