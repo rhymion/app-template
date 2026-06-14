@@ -910,6 +910,7 @@ model receiving_purchase_order_line {
   done_quantity               Int                      @default(0)
   cancelled_quantity          Int                      @default(0)
   outstanding_quantity        Int                      @default(0)
+  status                      String                   @default("outstanding")
   created_at                  DateTime                 @default(now()) @db.Timestamptz(0)
   updated_at                  DateTime                 @updatedAt @db.Timestamptz(0)
 
@@ -945,6 +946,7 @@ model receiving_asn_line {
   done_quantity        Int           @default(0)
   cancelled_quantity   Int           @default(0)
   outstanding_quantity Int           @default(0)
+  status               String        @default("outstanding")
   created_at           DateTime      @default(now()) @db.Timestamptz(0)
   updated_at           DateTime      @updatedAt @db.Timestamptz(0)
 
@@ -979,7 +981,7 @@ model receiving_receipt_line {
   receiving_receipt    receiving_receipt @relation(fields: [receiving_receipt_id], references: [id], onDelete: Cascade)
   product_id           String
   product              product           @relation(fields: [product_id], references: [id], onDelete: Cascade)
-  quantity             Int
+  receipt_quantity     Int
   done_quantity        Int               @default(0)
   cancelled_quantity   Int               @default(0)
   outstanding_quantity Int               @default(0)
