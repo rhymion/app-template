@@ -13,6 +13,13 @@ x-receiving:
     allowReceiptFromAsn: true
     allowReceiptFromPurchaseOrder: true
     inventoryMutation: confirm_receipt
+  inventory:
+    entity: inventory
+    productField: product_id
+    quantityField: quantity
+  lines:
+    productField: product_id
+    quantityField: quantity
 
 definitions:
   # ============================================================
@@ -1635,6 +1642,7 @@ definitions:
         - quantity:
             width: 100
     x-readonly-fields:
+      - quantity
       - reserved_quantity
     properties:
       id:
