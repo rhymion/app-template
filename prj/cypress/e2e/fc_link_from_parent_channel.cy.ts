@@ -1,22 +1,33 @@
-// Manual supplemental spec — verifies cmd_167 §4 / cmd_172:
+// Manual supplemental spec — verifies cmd_177 P1-P3:
 // fc_link CRUD (create/edit/delete) from its parent (channel) via the parent-embedded BridgeGrid.
+// P1: add button lives on parent EDIT page (detail page is read-only list).
 // Lives in prj/ so prj:sync preserves it across regen/cleanup.
 import { TEST_CREDENTIALS } from '../support/test-credentials';
 
-/** Navigate to the channel view for 'Channel 1' and wait for BridgeGrid fetch. */
+/** Navigate to the channel EDIT page for 'Channel 1' and wait for the FcLinkBridgeGrid fetch. */
+function goToChannelEdit() {
+  cy.intercept('POST', /\/channel\/edit\//).as('bridgeFetch');
+  cy.visit('/en/channel');
+  cy.get('.MuiDataGrid-virtualScroller').scrollTo('bottom', { ensureScrollable: false });
+  cy.contains('.MuiDataGrid-row', 'Channel 1').find('[aria-label="Edit"]').click();
+  cy.url().should('include', '/channel/edit');
+  cy.wait('@bridgeFetch', { timeout: 20000 });
+}
+
+/** Navigate to the channel VIEW page for 'Channel 1' and wait for the FcLinkBridgeGrid fetch. */
 function goToChannelView() {
   cy.intercept('POST', /\/channel\/view\//).as('bridgeFetch');
   cy.visit('/en/channel');
   cy.get('.MuiDataGrid-virtualScroller').scrollTo('bottom', { ensureScrollable: false });
   cy.contains('Channel 1').click();
   cy.url().should('include', '/channel/view');
-  // Wait for the FcLinkBridgeGrid Server Action to complete.
   cy.wait('@bridgeFetch', { timeout: 20000 });
 }
 
-/** Create an fc_link from the embedded grid and wait for the redirect away from /fc_link/new. */
+/** Create an fc_link from the embedded grid (must be on parent edit page) and wait for redirect. */
 function createFcLinkFromParent(name: string) {
-  cy.contains('a', '+ Fc Link').click();
+  // P2: button has target="_blank" — strip it so Cypress navigates in the same tab.
+  cy.contains('a', '+ Fc Link').invoke('removeAttr', 'target').click();
   cy.url().should('include', '/fc_link/new');
   cy.url().should('include', 'parentType=channel');
   cy.fillField('Name', name);
@@ -41,7 +52,8 @@ describe('Fc Link: CRUD from parent (channel) via embedded BridgeGrid', () => {
   it('creates an fc_link bound to a channel via the embedded grid', () => {
     cy.task('db:populateChannel', 1);
 
-    goToChannelView();
+    // P1: add button is on edit page, not view page.
+    goToChannelEdit();
 
     cy.contains('a', '+ Fc Link')
       .should('have.attr', 'href')
@@ -57,7 +69,7 @@ describe('Fc Link: CRUD from parent (channel) via embedded BridgeGrid', () => {
   it('edits an fc_link from the embedded grid without changing parent context', () => {
     cy.task('db:populateChannel', 1);
 
-    goToChannelView();
+    goToChannelEdit();
     createFcLinkFromParent('FcLink To Edit');
 
     goToChannelView();
@@ -80,7 +92,7 @@ describe('Fc Link: CRUD from parent (channel) via embedded BridgeGrid', () => {
   it('deletes an fc_link from the embedded grid', () => {
     cy.task('db:populateChannel', 1);
 
-    goToChannelView();
+    goToChannelEdit();
     createFcLinkFromParent('FcLink To Delete');
 
     goToChannelView();

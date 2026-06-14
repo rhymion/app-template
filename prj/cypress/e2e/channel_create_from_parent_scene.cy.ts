@@ -1,22 +1,33 @@
-// Manual supplemental spec — verifies cmd_167 §4 / cmd_172:
+// Manual supplemental spec — verifies cmd_177 P1-P3:
 // channel CRUD (create/edit/delete) from its parent (scene) via the parent-embedded BridgeGrid.
+// P1: add button lives on parent EDIT page (detail page is read-only list).
 // Lives in prj/ so prj:sync preserves it across regen/cleanup.
 import { TEST_CREDENTIALS } from '../support/test-credentials';
 
-/** Navigate to the scene view for 'Test Label 1' and wait for BridgeGrid fetch. */
+/** Navigate to the scene EDIT page for 'Test Label 1' and wait for the ChannelBridgeGrid fetch. */
+function goToSceneEdit() {
+  cy.intercept('POST', /\/scene\/edit\//).as('bridgeFetch');
+  cy.visit('/en/scene');
+  cy.get('.MuiDataGrid-virtualScroller').scrollTo('bottom', { ensureScrollable: false });
+  cy.contains('.MuiDataGrid-row', 'Test Label 1').find('[aria-label="Edit"]').click();
+  cy.url().should('include', '/scene/edit');
+  cy.wait('@bridgeFetch', { timeout: 20000 });
+}
+
+/** Navigate to the scene VIEW page for 'Test Label 1' and wait for the ChannelBridgeGrid fetch. */
 function goToSceneView() {
   cy.intercept('POST', /\/scene\/view\//).as('bridgeFetch');
   cy.visit('/en/scene');
   cy.get('.MuiDataGrid-virtualScroller').scrollTo('bottom', { ensureScrollable: false });
   cy.contains('Test Label 1').click();
   cy.url().should('include', '/scene/view');
-  // Wait for the ChannelBridgeGrid Server Action to complete.
   cy.wait('@bridgeFetch', { timeout: 20000 });
 }
 
-/** Create a channel from the embedded grid and wait for the redirect away from /channel/new. */
+/** Create a channel from the embedded grid (must be on parent edit page) and wait for redirect. */
 function createChannelFromParent(name: string) {
-  cy.contains('a', '+ Channel').click();
+  // P2: button has target="_blank" — strip it so Cypress navigates in the same tab.
+  cy.contains('a', '+ Channel').invoke('removeAttr', 'target').click();
   cy.url().should('include', '/channel/new');
   cy.url().should('include', 'parentType=scene');
   cy.fillField('Name', name);
@@ -42,7 +53,8 @@ describe('Channel: CRUD from parent (scene) via embedded BridgeGrid', () => {
   it('creates a channel bound to a scene via the embedded grid', () => {
     cy.task('db:populateScene', 1);
 
-    goToSceneView();
+    // P1: add button is on edit page, not view page.
+    goToSceneEdit();
 
     cy.contains('a', '+ Channel')
       .should('have.attr', 'href')
@@ -58,7 +70,7 @@ describe('Channel: CRUD from parent (scene) via embedded BridgeGrid', () => {
   it('edits a channel from the embedded grid without changing parent context', () => {
     cy.task('db:populateScene', 1);
 
-    goToSceneView();
+    goToSceneEdit();
     createChannelFromParent('Channel To Edit');
 
     goToSceneView();
@@ -81,7 +93,7 @@ describe('Channel: CRUD from parent (scene) via embedded BridgeGrid', () => {
   it('deletes a channel from the embedded grid', () => {
     cy.task('db:populateScene', 1);
 
-    goToSceneView();
+    goToSceneEdit();
     createChannelFromParent('Channel To Delete');
 
     goToSceneView();

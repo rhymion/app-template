@@ -1,23 +1,35 @@
-// Manual supplemental spec — verifies cmd_167 §4 / cmd_172:
+// Manual supplemental spec — verifies cmd_177 P1-P3:
 // fc_link CRUD (create/edit/delete) from its parent (character) via the parent-embedded BridgeGrid.
+// P1: add button lives on parent EDIT page (detail page is read-only list).
 // Lives in prj/ so prj:sync preserves it across regen/cleanup.
 import { TEST_CREDENTIALS } from '../support/test-credentials';
 
-/** Navigate to the character view for 'Character 1' and wait for both BridgeGrid fetches. */
+/** Navigate to the character EDIT page for 'Character 1' and wait for both BridgeGrid fetches. */
+function goToCharacterEdit() {
+  cy.intercept('POST', /\/character\/edit\//).as('bridgeFetch');
+  cy.visit('/en/character');
+  cy.get('.MuiDataGrid-virtualScroller').scrollTo('bottom', { ensureScrollable: false });
+  cy.contains('.MuiDataGrid-row', 'Character 1').find('[aria-label="Edit"]').click();
+  cy.url().should('include', '/character/edit');
+  cy.wait('@bridgeFetch', { timeout: 20000 });
+  cy.wait('@bridgeFetch', { timeout: 20000 });
+}
+
+/** Navigate to the character VIEW page for 'Character 1' and wait for both BridgeGrid fetches. */
 function goToCharacterView() {
   cy.intercept('POST', /\/character\/view\//).as('bridgeFetch');
   cy.visit('/en/character');
   cy.get('.MuiDataGrid-virtualScroller').scrollTo('bottom', { ensureScrollable: false });
   cy.contains('Character 1').click();
   cy.url().should('include', '/character/view');
-  // Wait for both BridgeGrid Server Actions (channelPage + fcLinkPage) to complete.
   cy.wait('@bridgeFetch', { timeout: 20000 });
   cy.wait('@bridgeFetch', { timeout: 20000 });
 }
 
-/** Create an fc_link from the embedded grid and wait for the redirect away from /fc_link/new. */
+/** Create an fc_link from the embedded grid (must be on parent edit page) and wait for redirect. */
 function createFcLinkFromParent(name: string) {
-  cy.contains('a', '+ Fc Link').click();
+  // P2: button has target="_blank" — strip it so Cypress navigates in the same tab.
+  cy.contains('a', '+ Fc Link').invoke('removeAttr', 'target').click();
   cy.url().should('include', '/fc_link/new');
   cy.url().should('include', 'parentType=character');
   cy.fillField('Name', name);
@@ -42,7 +54,8 @@ describe('Fc Link: CRUD from parent (character) via embedded BridgeGrid', () => 
   it('creates an fc_link bound to a character via the embedded grid', () => {
     cy.task('db:populateCharacter', 1);
 
-    goToCharacterView();
+    // P1: add button is on edit page, not view page.
+    goToCharacterEdit();
 
     cy.contains('a', '+ Fc Link')
       .should('have.attr', 'href')
@@ -58,13 +71,14 @@ describe('Fc Link: CRUD from parent (character) via embedded BridgeGrid', () => 
   it('edits an fc_link from the embedded grid without changing parent context', () => {
     cy.task('db:populateCharacter', 1);
 
-    goToCharacterView();
+    goToCharacterEdit();
     createFcLinkFromParent('FcLink To Edit');
 
     goToCharacterView();
     cy.contains('h2', 'Fc Link').scrollIntoView();
     cy.contains('FcLink To Edit').should('exist');
 
+    // Fc Link grid is the second DataGrid on character view — use last() for its toolbar.
     cy.contains('.MuiDataGrid-row', 'FcLink To Edit').find('[aria-label="Edit"]').click();
     cy.url().should('include', '/fc_link/edit');
 
@@ -81,7 +95,7 @@ describe('Fc Link: CRUD from parent (character) via embedded BridgeGrid', () => 
   it('deletes an fc_link from the embedded grid', () => {
     cy.task('db:populateCharacter', 1);
 
-    goToCharacterView();
+    goToCharacterEdit();
     createFcLinkFromParent('FcLink To Delete');
 
     goToCharacterView();

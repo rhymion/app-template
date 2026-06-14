@@ -25,6 +25,8 @@
   },
   "Fields": {
     "actions": "Actions",
+    "parentLabel": "Parent Label",
+    "parentType": "Parent Type",
     "avatar": "Avatar",
     "chartType": "Chart Type",
     "comments": "Comments",

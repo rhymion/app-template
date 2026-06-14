@@ -1,23 +1,35 @@
-// Manual supplemental spec — verifies cmd_167 §4 / cmd_172:
+// Manual supplemental spec — verifies cmd_177 P1-P3:
 // channel CRUD (create/edit/delete) from its parent (character) via the parent-embedded BridgeGrid.
+// P1: add button lives on parent EDIT page (detail page is read-only list).
 // Lives in prj/ so prj:sync preserves it across regen/cleanup.
 import { TEST_CREDENTIALS } from '../support/test-credentials';
 
-/** Navigate to the character view for 'Character 1' and wait for both BridgeGrid fetches. */
+/** Navigate to the character EDIT page for 'Character 1' and wait for both BridgeGrid fetches. */
+function goToCharacterEdit() {
+  cy.intercept('POST', /\/character\/edit\//).as('bridgeFetch');
+  cy.visit('/en/character');
+  cy.get('.MuiDataGrid-virtualScroller').scrollTo('bottom', { ensureScrollable: false });
+  cy.contains('.MuiDataGrid-row', 'Character 1').find('[aria-label="Edit"]').click();
+  cy.url().should('include', '/character/edit');
+  cy.wait('@bridgeFetch', { timeout: 20000 });
+  cy.wait('@bridgeFetch', { timeout: 20000 });
+}
+
+/** Navigate to the character VIEW page for 'Character 1' and wait for both BridgeGrid fetches. */
 function goToCharacterView() {
   cy.intercept('POST', /\/character\/view\//).as('bridgeFetch');
   cy.visit('/en/character');
   cy.get('.MuiDataGrid-virtualScroller').scrollTo('bottom', { ensureScrollable: false });
   cy.contains('Character 1').click();
   cy.url().should('include', '/character/view');
-  // Wait for both BridgeGrid Server Actions (channelPage + fcLinkPage) to complete.
   cy.wait('@bridgeFetch', { timeout: 20000 });
   cy.wait('@bridgeFetch', { timeout: 20000 });
 }
 
-/** Create a channel from the embedded grid and wait for the redirect away from /channel/new. */
+/** Create a channel from the embedded grid (must be on parent edit page) and wait for redirect. */
 function createChannelFromParent(name: string) {
-  cy.contains('a', '+ Channel').click();
+  // P2: button has target="_blank" — strip it so Cypress navigates in the same tab.
+  cy.contains('a', '+ Channel').invoke('removeAttr', 'target').click();
   cy.url().should('include', '/channel/new');
   cy.url().should('include', 'parentType=character');
   cy.fillField('Name', name);
@@ -43,7 +55,8 @@ describe('Channel: CRUD from parent (character) via embedded BridgeGrid', () => 
   it('creates a channel bound to a character via the embedded grid', () => {
     cy.task('db:populateCharacter', 1);
 
-    goToCharacterView();
+    // P1: add button is on edit page, not view page.
+    goToCharacterEdit();
 
     cy.contains('a', '+ Channel')
       .should('have.attr', 'href')
@@ -59,7 +72,7 @@ describe('Channel: CRUD from parent (character) via embedded BridgeGrid', () => 
   it('edits a channel from the embedded grid without changing parent context', () => {
     cy.task('db:populateCharacter', 1);
 
-    goToCharacterView();
+    goToCharacterEdit();
     createChannelFromParent('Channel To Edit');
 
     goToCharacterView();
@@ -82,7 +95,7 @@ describe('Channel: CRUD from parent (character) via embedded BridgeGrid', () => 
   it('deletes a channel from the embedded grid', () => {
     cy.task('db:populateCharacter', 1);
 
-    goToCharacterView();
+    goToCharacterEdit();
     createChannelFromParent('Channel To Delete');
 
     goToCharacterView();

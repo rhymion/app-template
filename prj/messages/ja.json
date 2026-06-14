@@ -54,6 +54,8 @@
   },
   "Fields": {
     "actions": "アクション",
+    "parentLabel": "親ラベル",
+    "parentType": "親タイプ",
     "apiKey": "APIキー",
     "approvableId": "Approvable Id",
     "approvalHistory": "承認履歴",

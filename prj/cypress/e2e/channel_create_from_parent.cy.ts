@@ -1,25 +1,37 @@
-// Manual supplemental spec (not generated) — verifies cmd_167 §4:
+// Manual supplemental spec (not generated) — verifies cmd_177 P1-P3:
 // channel CRUD (create/edit/delete) from its parent (work) via the parent-embedded BridgeGrid.
+// P1: add button lives on parent EDIT page (detail page is read-only list).
+// P2: add button opens new tab (target="_blank"); Cypress navigates same tab in test.
+// P3: named button "+ Channel" (not generic "+").
 // Lives in prj/ so prj:sync preserves it across regen/cleanup.
 import { TEST_CREDENTIALS } from '../support/test-credentials';
 
-/** Navigate to the work view for 'Test Title 1' and wait for both BridgeGrid fetches to complete. */
+/** Navigate to the work EDIT page for 'Test Title 1' and wait for bridge grid fetches. */
+function goToWorkEdit() {
+  cy.intercept('POST', /\/work\/edit\//).as('bridgeFetch');
+  cy.visit('/en/work');
+  cy.get('.MuiDataGrid-virtualScroller').scrollTo('bottom', { ensureScrollable: false });
+  cy.contains('.MuiDataGrid-row', 'Test Title 1').find('[aria-label="Edit"]').click();
+  cy.url().should('include', '/work/edit');
+  cy.wait('@bridgeFetch', { timeout: 20000 });
+  cy.wait('@bridgeFetch', { timeout: 20000 });
+}
+
+/** Navigate to the work VIEW page for 'Test Title 1' and wait for bridge grid fetches. */
 function goToWorkView() {
-  // Set up intercept BEFORE navigation so it catches the useEffect Server Action POSTs.
   cy.intercept('POST', /\/work\/view\//).as('bridgeFetch');
   cy.visit('/en/work');
   cy.get('.MuiDataGrid-virtualScroller').scrollTo('bottom', { ensureScrollable: false });
   cy.contains('Test Title 1').click();
   cy.url().should('include', '/work/view');
-  // Wait for both BridgeGrid Server Actions (channelPage + fcLinkPage) to complete
-  // so row assertions don't need their own timeouts.
   cy.wait('@bridgeFetch', { timeout: 20000 });
   cy.wait('@bridgeFetch', { timeout: 20000 });
 }
 
-/** Create a channel from the embedded grid and wait for the redirect away from /channel/new. */
+/** Create a channel from the embedded grid (must be on parent edit page) and wait for redirect. */
 function createChannelFromParent(name: string) {
-  cy.contains('a', '+ Channel').click();
+  // P2: button has target="_blank" — strip it so Cypress navigates in the same tab.
+  cy.contains('a', '+ Channel').invoke('removeAttr', 'target').click();
   cy.url().should('include', '/channel/new');
   cy.url().should('include', 'parentType=work');
   cy.fillField('Name', name);
@@ -45,10 +57,10 @@ describe('Channel: CRUD from parent (work) via embedded BridgeGrid', () => {
   it('creates a channel bound to a work via the embedded grid', () => {
     cy.task('db:populateWork', 1);
 
-    // Open the work detail (view) page, which embeds the Channel + Fc Link grids.
-    goToWorkView();
+    // P1: add button is on edit page, not view page.
+    goToWorkEdit();
 
-    // The embedded grid section + an Add link carrying parent context.
+    // P2: button has target="_blank"; href still carries parent context.
     cy.contains('a', '+ Channel')
       .should('have.attr', 'href')
       .and('match', /\/channel\/new\?parentType=work&parentId=/);
@@ -56,10 +68,8 @@ describe('Channel: CRUD from parent (work) via embedded BridgeGrid', () => {
     // Create a channel from the parent context.
     createChannelFromParent('Channel From Work');
 
-    // Re-open the work view: the new channel appears in its embedded grid,
-    // proving it was bound to this work's bridge row.
+    // Re-open the work view: the new channel appears in its embedded grid.
     goToWorkView();
-    // Scroll to the Channel section and wait up to 20s for the async grid fetch.
     cy.contains('h2', 'Channel').scrollIntoView();
     cy.contains('Channel From Work').should('exist');
   });
@@ -67,25 +77,23 @@ describe('Channel: CRUD from parent (work) via embedded BridgeGrid', () => {
   it('edits a channel from the embedded grid without changing parent context', () => {
     cy.task('db:populateWork', 1);
 
-    // Create a channel via the embedded grid.
-    goToWorkView();
+    // Create a channel via the embedded grid on the edit page.
+    goToWorkEdit();
     createChannelFromParent('Channel To Edit');
 
-    // Navigate back to the work view; wait for the channel row to appear in the grid.
+    // Navigate to the work view to see the channel list.
     goToWorkView();
     cy.contains('h2', 'Channel').scrollIntoView();
     cy.contains('Channel To Edit').should('exist');
 
-    // Open the edit form from the row action menu.
+    // Edit from the view page (view page shows edit icons in same tab).
     cy.contains('.MuiDataGrid-row', 'Channel To Edit').find('[aria-label="Edit"]').click();
     cy.url().should('include', '/channel/edit');
 
-    // Edit the name (AP-3=B: parent context fields are excluded from the edit form).
     cy.clearAndFillField('Name', 'Channel Edited');
     cy.clickButton('Save');
     cy.url().should('not.include', '/channel/edit');
 
-    // Navigate back to the work view: the updated name appears in the embedded grid.
     goToWorkView();
     cy.contains('h2', 'Channel').scrollIntoView();
     cy.contains('Channel Edited').should('exist');
@@ -95,16 +103,15 @@ describe('Channel: CRUD from parent (work) via embedded BridgeGrid', () => {
   it('deletes a channel from the embedded grid', () => {
     cy.task('db:populateWork', 1);
 
-    // Create a channel via the embedded grid.
-    goToWorkView();
+    // Create a channel via the embedded grid on the edit page.
+    goToWorkEdit();
     createChannelFromParent('Channel To Delete');
 
-    // Navigate back to the work view; wait for the channel row to appear.
+    // Navigate to the work view to see and delete the channel.
     goToWorkView();
     cy.contains('h2', 'Channel').scrollIntoView();
     cy.contains('Channel To Delete').should('exist');
 
-    // Select row and trigger delete.
     cy.contains('.MuiDataGrid-row', 'Channel To Delete').find('input[type="checkbox"]').check();
     cy.get('button[aria-label="Delete Selected"]').first().click();
     cy.get('div[role="dialog"]').find('button[aria-label="Delete"]').click();
@@ -112,7 +119,6 @@ describe('Channel: CRUD from parent (work) via embedded BridgeGrid', () => {
     // removeChannel Server Action calls redirect('/channel') — wait for navigation.
     cy.url().should('not.include', '/work/view');
 
-    // Navigate back to the work view: the deleted channel is no longer in the grid.
     goToWorkView();
     cy.contains('h2', 'Channel').scrollIntoView();
     cy.contains('Channel To Delete').should('not.exist');
