@@ -19,7 +19,7 @@ x-receiving:
     quantityField: quantity
   lines:
     productField: product_id
-    quantityField: quantity
+    quantityField: receipt_quantity
 
 definitions:
   # ============================================================
@@ -2349,6 +2349,14 @@ definitions:
         type: integer
         minimum: 0
         default: 0
+      status:
+        type: string
+        enum:
+          - outstanding
+          - partially_received
+          - fully_received
+          - cancelled
+        default: outstanding
 
   receiving_purchase_order_detail:
     x-generate:
@@ -2449,6 +2457,14 @@ definitions:
         type: integer
         minimum: 0
         default: 0
+      status:
+        type: string
+        enum:
+          - outstanding
+          - partially_matched
+          - fully_matched
+          - cancelled
+        default: outstanding
 
   receiving_asn_detail:
     x-generate:
@@ -2529,7 +2545,7 @@ definitions:
       - id
       - receiving_receipt_id
       - product_id
-      - quantity
+      - receipt_quantity
     properties:
       id:
         type: string
@@ -2548,7 +2564,7 @@ definitions:
           type: many-to-one
           target: product
           labelField: name
-      quantity:
+      receipt_quantity:
         type: integer
         minimum: 0
       done_quantity:
