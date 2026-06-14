@@ -726,16 +726,37 @@ model purchase_order {
 }
 
 model purchase_per_item {
-  id                String         @id @default(cuid())
-  purchase_order_id String
-  purchase_order    purchase_order @relation(fields: [purchase_order_id], references: [id], onDelete: Cascade)
-  product_id        String
-  product           product        @relation(fields: [product_id], references: [id], onDelete: Cascade)
-  quantity          Int
-  price             Int?
-  created_at        DateTime       @default(now()) @db.Timestamptz(0)
-  updated_at        DateTime       @updatedAt @db.Timestamptz(0)
+  id                    String                 @id @default(cuid())
+  purchase_order_id     String
+  purchase_order        purchase_order         @relation(fields: [purchase_order_id], references: [id], onDelete: Cascade)
+  product_id            String
+  product               product                @relation(fields: [product_id], references: [id], onDelete: Cascade)
+  quantity              Int
+  price                 Int?
   inventory_allocations inventory_allocation[]
+  created_at            DateTime               @default(now()) @db.Timestamptz(0)
+  updated_at            DateTime               @updatedAt @db.Timestamptz(0)
+}
+
+model inventory_allocation {
+  id                   String            @id @default(cuid())
+  purchase_order_id    String
+  purchase_order       purchase_order    @relation(fields: [purchase_order_id], references: [id], onDelete: Cascade)
+  purchase_per_item_id String
+  purchase_per_item    purchase_per_item @relation(fields: [purchase_per_item_id], references: [id], onDelete: Cascade)
+  inventory_id         String
+  inventory            inventory         @relation(fields: [inventory_id], references: [id], onDelete: Cascade)
+  quantity             Int
+  remaining_quantity   Int
+  status               String
+  created_at           DateTime          @default(now()) @db.Timestamptz(0)
+  updated_at           DateTime          @updatedAt @db.Timestamptz(0)
+  creator_id           String
+  creator              user              @relation("InventoryAllocationCreator", fields: [creator_id], references: [id])
+  updater_id           String
+  updater              user              @relation("InventoryAllocationUpdater", fields: [updater_id], references: [id])
+
+  @@index([creator_id])
 }
 
 model leave_request {

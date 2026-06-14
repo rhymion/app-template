@@ -1673,6 +1673,56 @@ definitions:
           product:
             $ref: "#/definitions/product"
 
+  inventory_allocation:
+    type: object
+    required:
+      - id
+      - purchase_order_id
+      - purchase_per_item_id
+      - inventory_id
+      - quantity
+      - remaining_quantity
+      - status
+    properties:
+      id:
+        type: string
+        pattern: "^c[a-z0-9]{24,}$"
+      purchase_order_id:
+        type: string
+        pattern: "^c[a-z0-9]{24,}$"
+        x-relationship:
+          type: many-to-one
+          target: purchase_order
+          labelField: order_no
+      purchase_per_item_id:
+        type: string
+        pattern: "^c[a-z0-9]{24,}$"
+        x-relationship:
+          type: many-to-one
+          target: purchase_per_item
+          labelField: id
+      inventory_id:
+        type: string
+        pattern: "^c[a-z0-9]{24,}$"
+        x-relationship:
+          type: many-to-one
+          target: inventory
+          labelField: id
+      quantity:
+        type: integer
+        minimum: 0
+      remaining_quantity:
+        type: integer
+        minimum: 0
+      status:
+        type: string
+        enum:
+          - reserved
+          - partially_shipped
+          - shipped
+          - released
+          - cancelled
+
   purchase_order:
     type: object
     required:
@@ -1710,6 +1760,54 @@ definitions:
             width: 150
         - customer:
             width: 200
+    x-reservation:
+      mode: count
+      lines: items
+      pool:
+        entity: inventory
+        quantityField: quantity
+        reservedField: reserved_quantity
+      request:
+        quantityField: quantity
+        criteria:
+          product_id: product_id
+      result:
+        allocationEntity: inventory_allocation
+        parentField: purchase_order_id
+        lineField: purchase_per_item_id
+        poolField: inventory_id
+        quantityField: quantity
+      actions:
+        shipOrder:
+          type: ship
+          allocationEntity: inventory_allocation
+          quantityField: quantity
+          remainingField: remaining_quantity
+          statusField: status
+          openStatuses:
+            - reserved
+            - partially_shipped
+          doneStatus: shipped
+        releaseReservation:
+          type: release
+          allocationEntity: inventory_allocation
+          quantityField: quantity
+          remainingField: remaining_quantity
+          statusField: status
+          openStatuses:
+            - reserved
+            - partially_shipped
+          doneStatus: released
+        cancelReservation:
+          type: cancel
+          allocationEntity: inventory_allocation
+          quantityField: quantity
+          remainingField: remaining_quantity
+          statusField: status
+          openStatuses:
+            - reserved
+            - partially_shipped
+          doneStatus: cancelled
     properties:
       id:
         type: string
