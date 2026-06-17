@@ -1680,7 +1680,7 @@ definitions:
     x-generate:
       list: true
       view: true
-      new: true
+      new: false
       edit: true
       delete: true
       invalidate: false
@@ -2155,11 +2155,10 @@ definitions:
       status:
         type: integer
         minimum: 0
-        maximum: 2
+        maximum: 1
         enum:
           - available
           - maintenance
-          - reserved
 
   room_detail:
     x-generate:
@@ -2209,9 +2208,6 @@ definitions:
         strategy: row_lock
       pool:
         entity: room
-        statusField: status
-        availableStatus: 0
-        reservedStatus: 2
       request:
         criteria:
           room_type_id: room_type_id
@@ -2219,6 +2215,7 @@ definitions:
             start: check_in
             end: check_out
       policy:
+        availabilitySource: overlap
         orderBy:
           - floor: asc
           - room_no: asc
