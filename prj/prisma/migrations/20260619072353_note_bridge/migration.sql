@@ -1,22 +1,38 @@
-/*
-  Warnings:
+-- note bridge: adds the `noteable` through-table and a required `noteable_id`
+-- on the existing parent tables (product, resource, room). Because those tables
+-- may already hold rows in production, the column is added nullable, backfilled
+-- with one fresh `noteable` per row, then promoted to NOT NULL. New tables
+-- (note, reaction) are created empty so their NOT NULL columns are fine as-is.
+--
+-- E2E uses `db:push` against an empty DB, so this backfill path is only exercised
+-- by `migrate deploy` against a populated (production) database.
 
-  - A unique constraint covering the columns `[noteable_id]` on the table `product` will be added. If there are existing duplicate values, this will fail.
-  - A unique constraint covering the columns `[noteable_id]` on the table `resource` will be added. If there are existing duplicate values, this will fail.
-  - A unique constraint covering the columns `[noteable_id]` on the table `room` will be added. If there are existing duplicate values, this will fail.
-  - Added the required column `noteable_id` to the `product` table without a default value. This is not possible if the table is not empty.
-  - Added the required column `noteable_id` to the `resource` table without a default value. This is not possible if the table is not empty.
-  - Added the required column `noteable_id` to the `room` table without a default value. This is not possible if the table is not empty.
+-- ─────────────────────────────────────────────────────────────────────────────
+-- CUID2-compatible helper (random 24-char id, lowercase start). pg_temp so it is
+-- dropped automatically at end of session.
+-- ─────────────────────────────────────────────────────────────────────────────
+CREATE OR REPLACE FUNCTION pg_temp.gen_cuid() RETURNS TEXT AS $$
+DECLARE
+  result TEXT := chr(97 + ((random() * 26)::int % 26));
+  v INT;
+BEGIN
+  FOR i IN 1..23 LOOP
+    v := (random() * 36)::int % 36;
+    result := result || CASE
+      WHEN v < 10 THEN chr(48 + v)
+      ELSE chr(87 + v)
+    END;
+  END LOOP;
+  RETURN result;
+END;
+$$ LANGUAGE plpgsql VOLATILE;
 
-*/
--- AlterTable
-ALTER TABLE "product" ADD COLUMN     "noteable_id" TEXT NOT NULL;
+-- CreateTable (noteable first — product/resource/room/note FK to it)
+CREATE TABLE "noteable" (
+    "id" TEXT NOT NULL,
 
--- AlterTable
-ALTER TABLE "resource" ADD COLUMN     "noteable_id" TEXT NOT NULL;
-
--- AlterTable
-ALTER TABLE "room" ADD COLUMN     "noteable_id" TEXT NOT NULL;
+    CONSTRAINT "noteable_pkey" PRIMARY KEY ("id")
+);
 
 -- CreateTable
 CREATE TABLE "reaction" (
@@ -45,12 +61,54 @@ CREATE TABLE "note" (
     CONSTRAINT "note_pkey" PRIMARY KEY ("id")
 );
 
--- CreateTable
-CREATE TABLE "noteable" (
-    "id" TEXT NOT NULL,
+-- AlterTable: add noteable_id NULLABLE first, backfill, then promote to NOT NULL.
+ALTER TABLE "product" ADD COLUMN "noteable_id" TEXT;
+ALTER TABLE "resource" ADD COLUMN "noteable_id" TEXT;
+ALTER TABLE "room" ADD COLUMN "noteable_id" TEXT;
 
-    CONSTRAINT "noteable_pkey" PRIMARY KEY ("id")
-);
+-- Backfill: one noteable per existing product
+DO $$
+DECLARE
+  rec RECORD;
+  new_id TEXT;
+BEGIN
+  FOR rec IN SELECT id FROM "product" WHERE "noteable_id" IS NULL LOOP
+    new_id := pg_temp.gen_cuid();
+    INSERT INTO "noteable" ("id") VALUES (new_id);
+    UPDATE "product" SET "noteable_id" = new_id WHERE id = rec.id;
+  END LOOP;
+END $$;
+
+-- Backfill: one noteable per existing resource
+DO $$
+DECLARE
+  rec RECORD;
+  new_id TEXT;
+BEGIN
+  FOR rec IN SELECT id FROM "resource" WHERE "noteable_id" IS NULL LOOP
+    new_id := pg_temp.gen_cuid();
+    INSERT INTO "noteable" ("id") VALUES (new_id);
+    UPDATE "resource" SET "noteable_id" = new_id WHERE id = rec.id;
+  END LOOP;
+END $$;
+
+-- Backfill: one noteable per existing room
+DO $$
+DECLARE
+  rec RECORD;
+  new_id TEXT;
+BEGIN
+  FOR rec IN SELECT id FROM "room" WHERE "noteable_id" IS NULL LOOP
+    new_id := pg_temp.gen_cuid();
+    INSERT INTO "noteable" ("id") VALUES (new_id);
+    UPDATE "room" SET "noteable_id" = new_id WHERE id = rec.id;
+  END LOOP;
+END $$;
+
+-- Promote to NOT NULL now that every row is backfilled
+ALTER TABLE "product" ALTER COLUMN "noteable_id" SET NOT NULL;
+ALTER TABLE "resource" ALTER COLUMN "noteable_id" SET NOT NULL;
+ALTER TABLE "room" ALTER COLUMN "noteable_id" SET NOT NULL;
 
 -- CreateIndex
 CREATE INDEX "reaction_user_id_idx" ON "reaction"("user_id");
