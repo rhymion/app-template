@@ -1486,6 +1486,7 @@ definitions:
         type: integer
         minimum: 0
         maximum: 6
+        x-enum-namespace: DayOfWeek
         enum:
           - Sunday
           - Monday
@@ -1563,6 +1564,7 @@ definitions:
         type: integer
         minimum: 0
         maximum: 2
+        x-enum-namespace: ShiftStatus
         enum:
           - Scheduled
           - Approved
@@ -2130,6 +2132,7 @@ definitions:
         type: integer
         minimum: 0
         maximum: 2
+        x-enum-namespace: RoomStatus
         enum:
           - available
           - maintenance

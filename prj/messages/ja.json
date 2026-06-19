@@ -270,5 +270,10 @@
     "errorLastSignInMethod": "解除できません: サインイン方法が無くなります。",
     "errorNotFound": "連携アカウントが見つかりません。",
     "errorUnknown": "問題が発生しました。再度お試しください。"
+  },
+  "RoomStatus": {
+    "available": "利用可能",
+    "maintenance": "メンテナンス",
+    "reserved": "予約済み"
   }
 }
