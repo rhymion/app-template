@@ -162,5 +162,10 @@
     "errorLastSignInMethod": "Cannot detach: you would no longer be able to sign in.",
     "errorNotFound": "Linked account not found.",
     "errorUnknown": "Something went wrong. Please try again."
+  },
+  "RoomStatus": {
+    "available": "Available",
+    "maintenance": "Maintenance",
+    "reserved": "Reserved"
   }
 }

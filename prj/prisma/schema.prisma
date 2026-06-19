@@ -99,6 +99,8 @@ model user {
   updated_users             user[]              @relation("UserUpdater")
   created_resources         resource[]          @relation("ResourceCreator")
   updated_resources         resource[]          @relation("ResourceUpdater")
+  created_notes             note[]              @relation("NoteCreator")
+  updated_notes             note[]              @relation("NoteUpdater")
   created_bookings          booking[]           @relation("BookingCreator")
   updated_bookings          booking[]           @relation("BookingUpdater")
   created_shift_templates   shift_template[]    @relation("ShiftTemplateCreator")
@@ -170,6 +172,7 @@ model organization {
   users       user[]     @relation("UserOrganizations")
   parent1s    parent1[]
   resources   resource[]
+  notes       note[]
 
   @@index([creator_id])
 }
@@ -594,6 +597,23 @@ model procedure {
 
   @@index([creator_id])
   @@index([assignee_id])
+}
+
+model note {
+  id              String       @id @default(cuid())
+  title           String
+  description     String?
+  organization_id String
+  organization    organization @relation(fields: [organization_id], references: [id])
+  created_at      DateTime     @default(now()) @db.Timestamptz(0)
+  updated_at      DateTime     @updatedAt @db.Timestamptz(0)
+  creator_id      String
+  creator         user         @relation("NoteCreator", fields: [creator_id], references: [id])
+  updater_id      String
+  updater         user         @relation("NoteUpdater", fields: [updater_id], references: [id])
+
+  @@index([creator_id])
+  @@index([organization_id])
 }
 
 model resource {
