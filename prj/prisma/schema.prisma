@@ -602,7 +602,7 @@ model procedure {
 model note {
   id              String       @id @default(cuid())
   title           String
-  body            String?
+  description     String?
   organization_id String
   organization    organization @relation(fields: [organization_id], references: [id])
   created_at      DateTime     @default(now()) @db.Timestamptz(0)

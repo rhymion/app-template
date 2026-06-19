@@ -1443,7 +1443,7 @@ definitions:
       title:
         type: string
         minLength: 1
-      body:
+      description:
         type:
           - string
           - "null"
@@ -1459,7 +1459,7 @@ definitions:
     x-generate:
       list: true
       view: true
-      new: true
+      new: false
       edit: true
       delete: true
       invalidate: false
