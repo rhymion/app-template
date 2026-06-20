@@ -22,11 +22,9 @@ export async function seedReservationInventory(quantity: number) {
   });
   if (!productRecord) {
     const attachable = await prisma.attachable.create({ data: {} });
-    const noteable = await prisma.noteable.create({ data: {} });
     productRecord = await prisma.product.create({
       data: {
         attachable_id: attachable.id,
-        noteable_id: noteable.id,
         code: 'RES-PROD-001',
         name: 'Reservation Test Product',
         price: 100,
