@@ -188,6 +188,8 @@ definitions:
         type:
           - string
           - "null"
+        x-ui:
+          width: 8
 
   organization_detail:
     x-generate:
