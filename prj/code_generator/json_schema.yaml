@@ -1838,6 +1838,7 @@ definitions:
         lineField: purchase_per_item_id
         poolField: inventory_id
         quantityField: quantity
+      has_actions: true
     x-display:
       table:
         - order_no:
