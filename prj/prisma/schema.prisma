@@ -777,8 +777,6 @@ model inventory_allocation {
   inventory_id         String
   inventory            inventory         @relation(fields: [inventory_id], references: [id], onDelete: Cascade)
   quantity             Int
-  remaining_quantity   Int
-  status               String
   created_at           DateTime          @default(now()) @db.Timestamptz(0)
   updated_at           DateTime          @updatedAt @db.Timestamptz(0)
   creator_id           String
