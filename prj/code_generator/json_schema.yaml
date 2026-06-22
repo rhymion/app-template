@@ -408,6 +408,10 @@ definitions:
       id:
         type: string
         pattern: "^c[a-z0-9]{24,}$"
+      approved_at:
+        type: string
+        format: date-time
+        nullable: true
 
   approvable_detail:
     x-generate:
@@ -1960,6 +1964,11 @@ definitions:
       - end_date
       - reason
       - approvable_id
+    x-approval:
+      on_approved:
+        set_fields:
+          status: "approved"
+        emit_hook: true
     x-display:
       table:
         - user:
@@ -1997,6 +2006,12 @@ definitions:
           type: one-to-one_bridge
           target: approvable
           labelField: id
+      status:
+        type: string
+        default: "pending"
+        enum:
+          - pending
+          - approved
 
   leave_request_detail:
     x-generate:
