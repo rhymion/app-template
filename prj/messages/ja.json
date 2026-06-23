@@ -149,6 +149,10 @@
     "weekStart": "週開始日",
     "year": "年"
   },
+  "LeaveRequestStatus": {
+    "pending": "保留",
+    "approved": "承認"
+  },
   "ShiftStatus": {
     "scheduled": "予定",
     "approved": "承認済み",

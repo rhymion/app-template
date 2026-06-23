@@ -2008,11 +2008,14 @@ definitions:
           target: approvable
           labelField: id
       status:
-        type: string
-        default: "pending"
+        type: integer
+        minimum: 0
+        maximum: 1
+        default: 0
+        x-enum-namespace: LeaveRequestStatus
         enum:
-          - pending
-          - approved
+          - Pending
+          - Approved
 
   leave_request_detail:
     x-generate:

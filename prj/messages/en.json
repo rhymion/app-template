@@ -59,6 +59,10 @@
     "weekStart": "Week Start",
     "year": "Year"
   },
+  "LeaveRequestStatus": {
+    "pending": "Pending",
+    "approved": "Approved"
+  },
   "ShiftStatus": {
     "scheduled": "Scheduled",
     "approved": "Approved",
