@@ -161,6 +161,7 @@ definitions:
       invalidate: false
       api: true
       test: true
+      search: true
     # Security-sensitive entity: every create/update/delete is recorded in
     # the audit_log table by the generated service layer.
     x-audit: true
@@ -209,6 +210,8 @@ definitions:
       invalidate: false
       api: true
       test: true
+    x-search:
+      org_id_field: id
     x-relationships:
       users:
         type: many-to-many
