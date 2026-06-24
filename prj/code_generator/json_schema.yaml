@@ -2,6 +2,14 @@ $schema: "http://json-schema.org/draft-07/schema#"
 
 # Support multi-tenancy
 format-version: 1.0
+
+# Generator configuration (DP-3: search opt-in vs all-entity default)
+# search.default_scope: 'opt_in' — only entities with x-generate.search: true are searchable
+# search.default_scope: 'all'    — all entities are searchable; exclude with x-generate.search: false
+x-generator:
+  search:
+    default_scope: all
+
 definitions:
   # ============================================================
   # System entities (required by all apps — see §1.1)
