@@ -137,12 +137,6 @@ model user {
   updated_rooms                 room[]              @relation("RoomUpdater")
   created_room_reservations             room_reservation[]         @relation("RoomReservationCreator")
   updated_room_reservations             room_reservation[]         @relation("RoomReservationUpdater")
-  created_receiving_purchase_orders     receiving_purchase_order[] @relation("ReceivingPurchaseOrderCreator")
-  updated_receiving_purchase_orders     receiving_purchase_order[] @relation("ReceivingPurchaseOrderUpdater")
-  created_receiving_asns                receiving_asn[]            @relation("ReceivingAsnCreator")
-  updated_receiving_asns                receiving_asn[]            @relation("ReceivingAsnUpdater")
-  created_receiving_receipts            receiving_receipt[]        @relation("ReceivingReceiptCreator")
-  updated_receiving_receipts            receiving_receipt[]        @relation("ReceivingReceiptUpdater")
 
   @@index([api_key])
   @@index([creator_id])
@@ -705,9 +699,6 @@ model product {
   attachable         attachable          @relation(fields: [attachable_id], references: [id])
   inventories                    inventory[]
   purchase_per_items             purchase_per_item[]
-  receiving_purchase_order_lines receiving_purchase_order_line[]
-  receiving_asn_lines            receiving_asn_line[]
-  receiving_receipt_lines        receiving_receipt_line[]
   created_at                     DateTime                        @default(now()) @db.Timestamptz(0)
   updated_at         DateTime            @updatedAt @db.Timestamptz(0)
   creator_id         String
@@ -784,6 +775,8 @@ model inventory_allocation {
   updater_id           String
   updater              user              @relation("InventoryAllocationUpdater", fields: [updater_id], references: [id])
 
+  @@index([purchase_order_id])
+  @@index([inventory_id])
   @@index([creator_id])
 }
 
@@ -913,116 +906,4 @@ model room_reservation {
   updater      user      @relation("RoomReservationUpdater", fields: [updater_id], references: [id])
 
   @@index([creator_id])
-}
-
-// ============================================================
-// x-receiving: Receiving lifecycle (PO / ASN / Receipt)
-// ============================================================
-
-model receiving_purchase_order {
-  id                             String                           @id @default(cuid())
-  order_no                       String
-  status                         String                           @default("draft")
-  lines                          receiving_purchase_order_line[]
-  receiving_asns                 receiving_asn[]
-  receiving_receipts             receiving_receipt[]
-  created_at                     DateTime                         @default(now()) @db.Timestamptz(0)
-  updated_at                     DateTime                         @updatedAt @db.Timestamptz(0)
-  creator_id                     String
-  creator                        user                             @relation("ReceivingPurchaseOrderCreator", fields: [creator_id], references: [id])
-  updater_id                     String
-  updater                        user                             @relation("ReceivingPurchaseOrderUpdater", fields: [updater_id], references: [id])
-
-  @@index([creator_id])
-}
-
-model receiving_purchase_order_line {
-  id                          String                   @id @default(cuid())
-  receiving_purchase_order_id String
-  receiving_purchase_order    receiving_purchase_order @relation(fields: [receiving_purchase_order_id], references: [id], onDelete: Cascade)
-  product_id                  String
-  product                     product                  @relation(fields: [product_id], references: [id], onDelete: Cascade)
-  ordered_quantity            Int
-  done_quantity               Int                      @default(0)
-  cancelled_quantity          Int                      @default(0)
-  outstanding_quantity        Int                      @default(0)
-  status                      String                   @default("outstanding")
-  created_at                  DateTime                 @default(now()) @db.Timestamptz(0)
-  updated_at                  DateTime                 @updatedAt @db.Timestamptz(0)
-
-  @@index([receiving_purchase_order_id])
-}
-
-model receiving_asn {
-  id                 String                    @id @default(cuid())
-  asn_no             String
-  purchase_order_id  String?
-  purchase_order     receiving_purchase_order? @relation(fields: [purchase_order_id], references: [id])
-  status             String                    @default("draft")
-  lines              receiving_asn_line[]
-  receiving_receipts receiving_receipt[]
-  created_at         DateTime                  @default(now()) @db.Timestamptz(0)
-  updated_at         DateTime                  @updatedAt @db.Timestamptz(0)
-  creator_id         String
-  creator            user                      @relation("ReceivingAsnCreator", fields: [creator_id], references: [id])
-  updater_id         String
-  updater            user                      @relation("ReceivingAsnUpdater", fields: [updater_id], references: [id])
-
-  @@index([creator_id])
-  @@index([purchase_order_id])
-}
-
-model receiving_asn_line {
-  id                   String        @id @default(cuid())
-  receiving_asn_id     String
-  receiving_asn        receiving_asn @relation(fields: [receiving_asn_id], references: [id], onDelete: Cascade)
-  product_id           String
-  product              product       @relation(fields: [product_id], references: [id], onDelete: Cascade)
-  shipped_quantity     Int
-  done_quantity        Int           @default(0)
-  cancelled_quantity   Int           @default(0)
-  outstanding_quantity Int           @default(0)
-  status               String        @default("outstanding")
-  created_at           DateTime      @default(now()) @db.Timestamptz(0)
-  updated_at           DateTime      @updatedAt @db.Timestamptz(0)
-
-  @@index([receiving_asn_id])
-}
-
-model receiving_receipt {
-  id                String                    @id @default(cuid())
-  receipt_no        String
-  purchase_order_id String?
-  purchase_order    receiving_purchase_order? @relation(fields: [purchase_order_id], references: [id])
-  asn_id            String?
-  asn               receiving_asn?            @relation(fields: [asn_id], references: [id])
-  status            String                    @default("draft")
-  confirmed_at      DateTime?                 @db.Timestamptz(0)
-  lines             receiving_receipt_line[]
-  created_at        DateTime                  @default(now()) @db.Timestamptz(0)
-  updated_at        DateTime                  @updatedAt @db.Timestamptz(0)
-  creator_id        String
-  creator           user                      @relation("ReceivingReceiptCreator", fields: [creator_id], references: [id])
-  updater_id        String
-  updater           user                      @relation("ReceivingReceiptUpdater", fields: [updater_id], references: [id])
-
-  @@index([creator_id])
-  @@index([purchase_order_id])
-  @@index([asn_id])
-}
-
-model receiving_receipt_line {
-  id                   String            @id @default(cuid())
-  receiving_receipt_id String
-  receiving_receipt    receiving_receipt @relation(fields: [receiving_receipt_id], references: [id], onDelete: Cascade)
-  product_id           String
-  product              product           @relation(fields: [product_id], references: [id], onDelete: Cascade)
-  receipt_quantity     Int
-  done_quantity        Int               @default(0)
-  cancelled_quantity   Int               @default(0)
-  outstanding_quantity Int               @default(0)
-  created_at           DateTime          @default(now()) @db.Timestamptz(0)
-  updated_at           DateTime          @updatedAt @db.Timestamptz(0)
-
-  @@index([receiving_receipt_id])
 }
