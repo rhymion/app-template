@@ -1,7 +1,15 @@
 $schema: "http://json-schema.org/draft-07/schema#"
 
 # Support multi-tenancy
-format-version: 1.0
+format-version: 2.0
+
+# Generator configuration (DP-3: search opt-in vs all-entity default)
+# search.default_scope: 'opt_in' — only entities with x-generate.search: true are searchable
+# search.default_scope: 'all'    — all entities are searchable; exclude with x-generate.search: false
+x-generator:
+  search:
+    default_scope: all
+
 definitions:
   # ============================================================
   # System entities (required by all apps — see §1.1)
@@ -153,6 +161,7 @@ definitions:
       invalidate: false
       api: true
       test: true
+      search: true
     # Security-sensitive entity: every create/update/delete is recorded in
     # the audit_log table by the generated service layer.
     x-audit: true
@@ -188,6 +197,8 @@ definitions:
         type:
           - string
           - "null"
+        x-ui:
+          width: 8
 
   organization_detail:
     x-generate:
@@ -199,6 +210,8 @@ definitions:
       invalidate: false
       api: true
       test: true
+    x-search:
+      org_id_field: id
     x-relationships:
       users:
         type: many-to-many
@@ -406,6 +419,10 @@ definitions:
       id:
         type: string
         pattern: "^c[a-z0-9]{24,}$"
+      approved_at:
+        type: string
+        format: date-time
+        nullable: true
 
   approvable_detail:
     x-generate:
@@ -919,6 +936,8 @@ definitions:
         type:
           - string
           - "null"
+        x-ui:
+          rows: 4
       price:
         type: integer
         minimum: 0
@@ -1830,6 +1849,7 @@ definitions:
         lineField: purchase_per_item_id
         poolField: inventory_id
         quantityField: quantity
+      has_actions: true
     x-display:
       table:
         - order_no:
@@ -1956,6 +1976,11 @@ definitions:
       - end_date
       - reason
       - approvable_id
+    x-approval:
+      on_approved:
+        set_fields:
+          status: "approved"
+        emit_hook: true
     x-display:
       table:
         - user:
@@ -1993,6 +2018,15 @@ definitions:
           type: one-to-one_bridge
           target: approvable
           labelField: id
+      status:
+        type: integer
+        minimum: 0
+        maximum: 1
+        default: 0
+        x-enum-namespace: LeaveRequestStatus
+        enum:
+          - pending
+          - approved
 
   leave_request_detail:
     x-generate:

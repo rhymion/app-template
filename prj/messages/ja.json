@@ -149,6 +149,10 @@
     "weekStart": "週開始日",
     "year": "年"
   },
+  "LeaveRequestStatus": {
+    "pending": "保留",
+    "approved": "承認"
+  },
   "ShiftStatus": {
     "scheduled": "予定",
     "approved": "承認済み",
@@ -170,9 +174,12 @@
   "Header": {
     "signIn": "ログイン",
     "signOut": "ログアウト",
+    "setting": "設定",
     "openMenu": "メニューを開く",
     "closeMenu": "メニューを閉じる",
-    "language": "言語"
+    "language": "言語",
+    "search": "検索",
+    "searchAriaLabel": "検索"
   },
   "Nav": {
     "approvalFlow": "承認フロー",

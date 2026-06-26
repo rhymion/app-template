@@ -59,6 +59,10 @@
     "weekStart": "Week Start",
     "year": "Year"
   },
+  "LeaveRequestStatus": {
+    "pending": "Pending",
+    "approved": "Approved"
+  },
   "ShiftStatus": {
     "scheduled": "Scheduled",
     "approved": "Approved",
@@ -80,9 +84,12 @@
   "Header": {
     "signIn": "Sign In",
     "signOut": "Sign Out",
+    "setting": "Setting",
     "openMenu": "Open menu",
     "closeMenu": "Close menu",
-    "language": "Language"
+    "language": "Language",
+    "search": "Search",
+    "searchAriaLabel": "Search"
   },
   "Nav": {
     "home": "Home"
