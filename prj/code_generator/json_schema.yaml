@@ -1787,7 +1787,9 @@ definitions:
         type: integer
         minimum: 0
       status:
-        type: string
+        type: integer
+        minimum: 0
+        maximum: 4
         enum:
           - reserved
           - partially_shipped
@@ -2362,7 +2364,9 @@ definitions:
         type: string
         minLength: 1
       status:
-        type: string
+        type: integer
+        minimum: 0
+        maximum: 4
         enum:
           - draft
           - issued
@@ -2411,7 +2415,9 @@ definitions:
         minimum: 0
         default: 0
       status:
-        type: string
+        type: integer
+        minimum: 0
+        maximum: 3
         enum:
           - outstanding
           - partially_received
@@ -2470,7 +2476,9 @@ definitions:
           target: receiving_purchase_order
           labelField: order_no
       status:
-        type: string
+        type: integer
+        minimum: 0
+        maximum: 4
         enum:
           - draft
           - sent
@@ -2519,7 +2527,9 @@ definitions:
         minimum: 0
         default: 0
       status:
-        type: string
+        type: integer
+        minimum: 0
+        maximum: 3
         enum:
           - outstanding
           - partially_matched
@@ -2589,7 +2599,9 @@ definitions:
           target: receiving_asn
           labelField: asn_no
       status:
-        type: string
+        type: integer
+        minimum: 0
+        maximum: 2
         enum:
           - draft
           - confirmed
