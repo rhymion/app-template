@@ -1708,6 +1708,7 @@ definitions:
       quantity:
         type: integer
         minimum: 0
+        default: 0
       reserved_quantity:
         type: integer
         minimum: 0
@@ -1730,7 +1731,7 @@ definitions:
     x-generate:
       list: true
       view: true
-      new: false
+      new: true
       edit: true
       delete: true
       invalidate: false
@@ -2663,6 +2664,10 @@ definitions:
       invalidate: false
       api: true
       test: true
+    x-custom-components:
+      - name: ReceivingConfirmForm
+        target:
+          - view
     allOf:
       - $ref: "#/definitions/receiving_receipt"
       - type: object
