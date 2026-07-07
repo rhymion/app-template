@@ -1,0 +1,6 @@
+{
+  "buildCommand": "bash scripts/sync-prj.sh && npm --prefix app-generator run db:generate && npm --prefix app-generator run build",
+  "installCommand": "npm install && npm --prefix app-generator install",
+  "outputDirectory": "app-generator/.next",
+  "framework": "nextjs"
+}
