@@ -34,7 +34,9 @@ describe('Reservation Allocation (B3/B4)', () => {
           headers: { 'X-API-Key': TEST_API_KEY },
         }).then((invRes) => {
           expect(invRes.status).to.eq(200);
-          expect(invRes.body.quantity).to.eq(7);
+          // O-4 (B-5 Phase2 ledger redesign): reserve only moves reserved_quantity;
+          // quantity is untouched until ship (ship is the only path that decrements it).
+          expect(invRes.body.quantity).to.eq(10);
           expect(invRes.body.reserved_quantity).to.eq(3);
         });
 
@@ -117,8 +119,12 @@ describe('Reservation Allocation (B3/B4)', () => {
           url: `${INV_API}/${seed.inventory.id}`,
           headers: { 'X-API-Key': TEST_API_KEY },
         }).then((invRes) => {
-          expect(invRes.body.quantity).to.be.gte(0);
-          expect(invRes.body.quantity).to.eq(0);
+          // O-4: reserve leaves quantity untouched; the winning request only
+          // moves reserved_quantity. available = quantity - reserved_quantity
+          // must never go negative.
+          expect(invRes.body.quantity).to.eq(1);
+          expect(invRes.body.reserved_quantity).to.eq(1);
+          expect(invRes.body.quantity - invRes.body.reserved_quantity).to.be.gte(0);
         });
       });
     });
@@ -224,6 +230,90 @@ describe('Reservation Allocation (B3/B4)', () => {
             },
           }).then((putRes) => {
             expect(putRes.status).to.eq(200);
+          });
+        });
+      });
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // D7 (B-5 Phase2c, 14.4b_equiv): terminal reject of a reserved
+  // purchase_per_item must revert reserved_quantity via a cancel ledger tx,
+  // leaving physical quantity untouched (O-4).
+  // -------------------------------------------------------------------------
+
+  it('14.4b_equiv: purchase_per_item terminal reject creates a reverting cancel tx (reserved_quantity restored, quantity unchanged)', () => {
+    cy.task<any>('db:setupPurchasePerItemApprovalFlow').then((flowSetup) => {
+      cy.task<any>('db:seedReservationInventory', { quantity: 10 }).then((seed) => {
+        cy.request({
+          method: 'POST',
+          url: API_BASE,
+          headers: { 'X-API-Key': TEST_API_KEY },
+          body: {
+            order_no: 'RES-144B',
+            customer_id: seed.customer.id,
+            items: [{ product_id: seed.product.id, quantity: 4, price: null }],
+          },
+        }).then((res) => {
+          expect(res.status).to.eq(201);
+          const orderId = res.body.id;
+
+          cy.request({
+            url: `${INV_API}/${seed.inventory.id}`,
+            headers: { 'X-API-Key': TEST_API_KEY },
+          }).then((preRes) => {
+            const preQuantity = preRes.body.quantity;
+            const preReserved = preRes.body.reserved_quantity;
+            // O-4: reserve leaves quantity untouched; only reserved_quantity moves.
+            expect(preQuantity).to.eq(10);
+            expect(preReserved).to.eq(4);
+
+            cy.task<any>('db:getPurchasePerItemsForOrder', { purchase_order_id: orderId }).then((items) => {
+              const item = items[0];
+              expect(item.approvable_id).to.not.be.null;
+              expect(item.inventory_transactionable_id).to.not.be.null;
+
+              cy.task<any>('db:getPendingApprovalRequest', { approvable_id: item.approvable_id }).then((ar) => {
+                expect(ar).to.not.be.null;
+
+                Cypress.session.clearAllSavedSessions();
+                cy.clearCookies();
+                cy.login(flowSetup.approverUser.email, 'test-password');
+                cy.request({
+                  method: 'POST',
+                  url: `/api/approval_request/${ar.id}/reject`,
+                }).then((rejectRes) => {
+                  expect(rejectRes.status).to.eq(200);
+                  expect(rejectRes.body.status).to.eq(3); // terminal_rejected
+
+                  cy.task<any>('db:getApprovableById', { approvable_id: item.approvable_id }).then((approvable: any) => {
+                    expect(approvable.approved_at).to.not.be.null;
+                  });
+
+                  cy.task<any>('db:getInventoryTransactionsByBridge', {
+                    inventory_transactionable_id: item.inventory_transactionable_id,
+                  }).then((txs: any[]) => {
+                    expect(txs.length).to.eq(2); // reserve + cancel
+
+                    const cancelTx = txs.find((t) => t.event_type === 'cancel');
+                    expect(cancelTx).to.exist;
+                    expect(cancelTx.reserved_delta).to.eq(-4);
+                    expect(cancelTx.quantity_delta).to.eq(0);
+
+                    const sumReserved = txs.reduce((s, t) => s + t.reserved_delta, 0);
+                    expect(sumReserved).to.eq(0); // reserve(+4) + cancel(-4) nets to zero
+                  });
+
+                  cy.request({
+                    url: `${INV_API}/${seed.inventory.id}`,
+                    headers: { 'X-API-Key': TEST_API_KEY },
+                  }).then((postRes) => {
+                    expect(postRes.body.reserved_quantity).to.eq(preReserved - 4); // reverted to 0
+                    expect(postRes.body.quantity).to.eq(preQuantity); // O-4: cancel never touches quantity
+                  });
+                });
+              });
+            });
           });
         });
       });
