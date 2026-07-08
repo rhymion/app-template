@@ -212,6 +212,7 @@ model approvable {
   creator           user?              @relation("ApprovableCreator", fields: [creator_id], references: [id])
   approval_requests approval_request[]
   leave_request     leave_request?
+  receiving_receipt_line receiving_receipt_line?
   approved_at       DateTime?          @db.Timestamptz(0)
 
   @@index([creator_id])
@@ -768,6 +769,7 @@ model inventory {
   updater_id        String
   updater           user      @relation("InventoryUpdater", fields: [updater_id], references: [id])
   inventory_allocations inventory_allocation[]
+  receiving_receipt_lines receiving_receipt_line[] @relation("ReceiptLineInventory")
 
   @@index([creator_id])
 }
@@ -1057,8 +1059,21 @@ model receiving_receipt_line {
   done_quantity        Int               @default(0)
   cancelled_quantity   Int               @default(0)
   outstanding_quantity Int               @default(0)
+  status               Int               @default(0)
+  inventory_id         String?
+  inventory            inventory?        @relation("ReceiptLineInventory", fields: [inventory_id], references: [id])
+  approvable_id        String?           @unique
+  approvable           approvable?       @relation(fields: [approvable_id], references: [id])
+  parent_id            String?
+  parent               receiving_receipt_line?   @relation("ReceiptLineSplit", fields: [parent_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  children             receiving_receipt_line[]  @relation("ReceiptLineSplit")
+  is_split_result      Boolean           @default(false)
+  inventory_transactionable_id String?
+  inventory_transactionable    inventory_transactionable? @relation(fields: [inventory_transactionable_id], references: [id])
   created_at           DateTime          @default(now()) @db.Timestamptz(0)
   updated_at           DateTime          @updatedAt @db.Timestamptz(0)
 
   @@index([receiving_receipt_id])
+  @@index([inventory_id])
+  @@index([parent_id])
 }
