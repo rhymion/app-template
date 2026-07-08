@@ -69,6 +69,38 @@ export async function seedReservationInventory(quantity: number) {
 }
 
 /**
+ * Directly set an inventory row's on-hand quantity (bypassing reserve/cancel
+ * netting) to simulate physical stock changes outside the reservation flow.
+ */
+export async function setInventoryQuantity(inventory_id: string, quantity: number) {
+  return await prisma.inventory.update({
+    where: { id: inventory_id },
+    data: { quantity },
+  });
+}
+
+/**
+ * Seed a second inventory lot (same product, distinct location) with a given
+ * quantity, for tests that need a re-reservation to spill across two lots.
+ */
+export async function seedSecondInventoryLot(product_id: string, quantity: number, location: string) {
+  const testUser = await getTestUser();
+
+  const inventoryRecord = await prisma.inventory.create({
+    data: {
+      product_id,
+      quantity,
+      reserved_quantity: 0,
+      location,
+      creator_id: testUser.id,
+      updater_id: testUser.id,
+    },
+  });
+
+  return JSON.parse(JSON.stringify(inventoryRecord));
+}
+
+/**
  * Reconstruct the reservation for a given purchase_order_id from the
  * inventory_transaction ledger (B-5 Phase2: inventory_allocation was removed —
  * O-2/O-6/O-8. See afterReject/afterApprove for the same netting pattern).
