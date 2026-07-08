@@ -1412,6 +1412,9 @@ definitions:
         target:
           - view
           - edit
+        props:
+          showImages: true
+          showFiles: false
     allOf:
       - $ref: "#/definitions/resource"
       - type: object
