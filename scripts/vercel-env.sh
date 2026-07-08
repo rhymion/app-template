@@ -5,8 +5,8 @@
 # Usage (direct run): bash scripts/vercel-env.sh inject <production|preview>
 #
 # Two-DB pattern (see docs/vercel-automation-design.md §7):
-#   inject production -> PRISMA_DATABASE_URL_PROD    is injected as PRISMA_DATABASE_URL
-#   inject preview    -> PRISMA_DATABASE_URL_STAGING is injected as PRISMA_DATABASE_URL
+#   inject production -> DATABASE_URL_PROD    is injected as DATABASE_URL
+#   inject preview    -> DATABASE_URL_STAGING is injected as DATABASE_URL
 #   (all preview/staging deploys share one DB — deliberate, keeps DB count at 2)
 set -euo pipefail
 
@@ -56,8 +56,9 @@ fi
 VERCEL_ORG_ID="${VERCEL_ORG_ID:-}"
 GOOGLE_CLIENT_ID="${GOOGLE_CLIENT_ID:-}"
 GOOGLE_CLIENT_SECRET="${GOOGLE_CLIENT_SECRET:-}"
+BLOB_READ_WRITE_TOKEN="${BLOB_READ_WRITE_TOKEN:-}"
 
-export REDIS_URL VERCEL_PROJECT_NAME VERCEL_ORG_ID GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET
+export REDIS_URL VERCEL_PROJECT_NAME VERCEL_ORG_ID GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET BLOB_READ_WRITE_TOKEN
 
 # ── inject_var: upsert one Vercel env var, never echoing the secret value ────
 # Usage: inject_var NAME VALUE TARGET
@@ -79,23 +80,23 @@ inject_var() {
 # Usage: vercel_env_inject <production|preview>
 vercel_env_inject() {
   local target="${1:?Usage: vercel_env_inject <production|preview>}"
-  local prisma_url
+  local db_url
 
   case "$target" in
     production)
       if [[ "$DRY_RUN" == "true" ]]; then
-        prisma_url="${PRISMA_DATABASE_URL_PROD:-<DRY_RUN_PRISMA_DATABASE_URL_PROD>}"
+        db_url="${DATABASE_URL_PROD:-<DRY_RUN_DATABASE_URL_PROD>}"
       else
-        : "${PRISMA_DATABASE_URL_PROD:?PRISMA_DATABASE_URL_PROD is required in .env.production.local for target=production}"
-        prisma_url="$PRISMA_DATABASE_URL_PROD"
+        : "${DATABASE_URL_PROD:?DATABASE_URL_PROD is required in .env.production.local for target=production}"
+        db_url="$DATABASE_URL_PROD"
       fi
       ;;
     preview)
       if [[ "$DRY_RUN" == "true" ]]; then
-        prisma_url="${PRISMA_DATABASE_URL_STAGING:-<DRY_RUN_PRISMA_DATABASE_URL_STAGING>}"
+        db_url="${DATABASE_URL_STAGING:-<DRY_RUN_DATABASE_URL_STAGING>}"
       else
-        : "${PRISMA_DATABASE_URL_STAGING:?PRISMA_DATABASE_URL_STAGING is required in .env.production.local for target=preview}"
-        prisma_url="$PRISMA_DATABASE_URL_STAGING"
+        : "${DATABASE_URL_STAGING:?DATABASE_URL_STAGING is required in .env.production.local for target=preview}"
+        db_url="$DATABASE_URL_STAGING"
       fi
       ;;
     development)
@@ -109,9 +110,10 @@ vercel_env_inject() {
   esac
 
   echo "=== Injecting Vercel env vars: target=${target} ==="
-  inject_var PRISMA_DATABASE_URL "$prisma_url" "$target"
+  inject_var DATABASE_URL "$db_url" "$target"
   inject_var AUTH_SECRET "$AUTH_SECRET" "$target"
   inject_var REDIS_URL "$REDIS_URL" "$target"
+  inject_var BLOB_READ_WRITE_TOKEN "$BLOB_READ_WRITE_TOKEN" "$target"
   inject_var GOOGLE_CLIENT_ID "$GOOGLE_CLIENT_ID" "$target"
   inject_var GOOGLE_CLIENT_SECRET "$GOOGLE_CLIENT_SECRET" "$target"
   inject_var AUTH_TRUST_HOST "true" "$target"
