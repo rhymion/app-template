@@ -25,10 +25,12 @@ describe('API: Leave Request — Approval Event Dispatch', () => {
           });
 
           const arId = data.approvalRequests[0].id;
+          Cypress.session.clearAllSavedSessions();
+          cy.clearCookies();
+          cy.login(setup.approverUser.email, 'test-password');
           cy.request({
             method: 'POST',
             url: `/api/approval_request/${arId}/approve`,
-            headers: { 'X-API-Key': setup.approverUser.api_key },
           }).then((res) => {
             expect(res.status).to.eq(200);
 
@@ -53,10 +55,12 @@ describe('API: Leave Request — Approval Event Dispatch', () => {
         }).then((data) => {
           const ar1 = data.approvalRequests.find((r: any) => r.approval_flow_id === setup.flow1.id);
 
+          Cypress.session.clearAllSavedSessions();
+          cy.clearCookies();
+          cy.login(setup.approverUser1.email, 'test-password');
           cy.request({
             method: 'POST',
             url: `/api/approval_request/${ar1.id}/approve`,
-            headers: { 'X-API-Key': setup.approverUser1.api_key },
           }).then(() => {
             // Only flow1 approved — dispatch must NOT have fired
             cy.request({
@@ -71,17 +75,19 @@ describe('API: Leave Request — Approval Event Dispatch', () => {
       });
     });
 
-    it('16.3 reject does not fire dispatch (approved_at stays null)', () => {
+    it('16.3 reject fires on_rejected dispatch: status updated to rejected(2), approved_at stays null', () => {
       cy.task<any>('db:setupLeaveRequestApprovalFlow').then((setup) => {
         cy.task<any>('db:populateLeaveRequestWithApproval', {
           creatorId: setup.requestorUser.id,
           approvalFlowIds: [setup.flowWithRole.id],
         }).then((data) => {
           const arId = data.approvalRequests[0].id;
+          Cypress.session.clearAllSavedSessions();
+          cy.clearCookies();
+          cy.login(setup.approverUser.email, 'test-password');
           cy.request({
             method: 'POST',
             url: `/api/approval_request/${arId}/reject`,
-            headers: { 'X-API-Key': setup.approverUser.api_key },
           }).then((res) => {
             expect(res.status).to.eq(200);
 
@@ -89,8 +95,65 @@ describe('API: Leave Request — Approval Event Dispatch', () => {
               url: `/api/leave_request/${data.record.id}`,
               headers: { 'X-API-Key': setup.approverUser.api_key },
             }).then((getRes) => {
-              expect(getRes.body.status).to.eq(0);
+              expect(getRes.body.status).to.eq(2);
               expect(getRes.body.approvable.approved_at).to.be.null;
+            });
+          });
+        });
+      });
+    });
+
+    it('16.5 reject with reason persists it to approvable.rejection_reason', () => {
+      cy.task<any>('db:setupLeaveRequestApprovalFlow').then((setup) => {
+        cy.task<any>('db:populateLeaveRequestWithApproval', {
+          creatorId: setup.requestorUser.id,
+          approvalFlowIds: [setup.flowWithRole.id],
+        }).then((data) => {
+          const arId = data.approvalRequests[0].id;
+          Cypress.session.clearAllSavedSessions();
+          cy.clearCookies();
+          cy.login(setup.approverUser.email, 'test-password');
+          cy.request({
+            method: 'POST',
+            url: `/api/approval_request/${arId}/reject`,
+            body: { reason: 'Insufficient staffing coverage on requested dates' },
+          }).then((res) => {
+            expect(res.status).to.eq(200);
+
+            cy.request({
+              url: `/api/leave_request/${data.record.id}`,
+              headers: { 'X-API-Key': setup.approverUser.api_key },
+            }).then((getRes) => {
+              expect(getRes.body.status).to.eq(2);
+              expect(getRes.body.approvable.rejection_reason).to.eq('Insufficient staffing coverage on requested dates');
+            });
+          });
+        });
+      });
+    });
+
+    it('16.6 reject without reason leaves approvable.rejection_reason null (backward compat)', () => {
+      cy.task<any>('db:setupLeaveRequestApprovalFlow').then((setup) => {
+        cy.task<any>('db:populateLeaveRequestWithApproval', {
+          creatorId: setup.requestorUser.id,
+          approvalFlowIds: [setup.flowWithRole.id],
+        }).then((data) => {
+          const arId = data.approvalRequests[0].id;
+          Cypress.session.clearAllSavedSessions();
+          cy.clearCookies();
+          cy.login(setup.approverUser.email, 'test-password');
+          cy.request({
+            method: 'POST',
+            url: `/api/approval_request/${arId}/reject`,
+          }).then((res) => {
+            expect(res.status).to.eq(200);
+
+            cy.request({
+              url: `/api/leave_request/${data.record.id}`,
+              headers: { 'X-API-Key': setup.approverUser.api_key },
+            }).then((getRes) => {
+              expect(getRes.body.status).to.eq(2);
+              expect(getRes.body.approvable.rejection_reason).to.be.null;
             });
           });
         });
@@ -106,10 +169,12 @@ describe('API: Leave Request — Approval Event Dispatch', () => {
           const arId = data.approvalRequests[0].id;
 
           // First approval — fires dispatch, sets approved_at
+          Cypress.session.clearAllSavedSessions();
+          cy.clearCookies();
+          cy.login(setup.approverUser.email, 'test-password');
           cy.request({
             method: 'POST',
             url: `/api/approval_request/${arId}/approve`,
-            headers: { 'X-API-Key': setup.approverUser.api_key },
           }).then(() => {
             cy.request({
               url: `/api/leave_request/${data.record.id}`,
@@ -122,7 +187,6 @@ describe('API: Leave Request — Approval Event Dispatch', () => {
               cy.request({
                 method: 'POST',
                 url: `/api/approval_request/${arId}/approve`,
-                headers: { 'X-API-Key': setup.approverUser.api_key },
               }).then(() => {
                 cy.request({
                   url: `/api/leave_request/${data.record.id}`,
