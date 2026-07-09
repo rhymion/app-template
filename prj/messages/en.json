@@ -25,6 +25,7 @@
   },
   "Fields": {
     "actions": "Actions",
+    "attachments": "Attachments",
     "avatar": "Avatar",
     "chartType": "Chart Type",
     "comments": "Comments",
@@ -33,6 +34,8 @@
     "filterValue": "Filter Value",
     "gender": "Gender",
     "groupByField": "Group By Field",
+    "image": "Image",
+    "images": "Images",
     "itemName": "Item Name",
     "judgement": "Judgement",
     "max": "Max",

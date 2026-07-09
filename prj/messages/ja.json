@@ -53,6 +53,7 @@
   },
   "Fields": {
     "actions": "アクション",
+    "attachments": "添付ファイル",
     "apiKey": "APIキー",
     "approvableId": "Approvable Id",
     "approvalHistory": "承認履歴",
