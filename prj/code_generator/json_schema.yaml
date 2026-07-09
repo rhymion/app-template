@@ -2687,18 +2687,6 @@ definitions:
       receipt_quantity:
         type: integer
         minimum: 0
-      done_quantity:
-        type: integer
-        minimum: 0
-        default: 0
-      cancelled_quantity:
-        type: integer
-        minimum: 0
-        default: 0
-      outstanding_quantity:
-        type: integer
-        minimum: 0
-        default: 0
       status:
         type: integer
         minimum: 0
@@ -2772,3 +2760,30 @@ definitions:
             type: array
             items:
               $ref: "#/definitions/receiving_receipt_line"
+
+  receiving_receipt_line_detail:
+    x-generate:
+      list: true
+      view: true
+      new: false
+      edit: false
+      delete: false
+      invalidate: false
+      api: false
+      test: true
+    x-custom-components:
+      - name: ApprovalSection
+        path: "@/components/_standard/ApprovalSection"
+        target:
+          - view
+          - edit
+    allOf:
+      - $ref: "#/definitions/receiving_receipt_line"
+      - type: object
+        properties:
+          product:
+            $ref: "#/definitions/product"
+          inventory:
+            $ref: "#/definitions/inventory"
+          approvable:
+            $ref: "#/definitions/approvable"
