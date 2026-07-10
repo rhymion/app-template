@@ -15,5 +15,8 @@
     "lint": "npm --prefix app-generator run lint",
     "generate-code": "npm --prefix app-generator run prj:sync && npm --prefix app-generator run generate-code",
     "cleanup": "npm --prefix app-generator run cleanup:all"
+  },
+  "devDependencies": {
+    "neonctl": "2.30.1"
   }
 }
