@@ -172,7 +172,14 @@ for b in json.load(sys.stdin).get('branches', []):
       echo "${key}=${val}" >> "${_ENV_FILE}"
     fi
   done
-  eval "export ${var_pooled}=${pooled_url} ${var_unpooled}=${direct_url}"
+  # Assign via `export NAME=value` (not `eval`) so `&` and other shell
+  # metacharacters in the connection string are treated as a literal value,
+  # not re-parsed as shell syntax (found live: eval turned the export into a
+  # backgrounded subshell at `&channel_binding=require`, leaving the in-memory
+  # var empty even though .env.production.local was written correctly — see
+  # report subtask_299a CF-5).
+  export "${var_pooled}=${pooled_url}"
+  export "${var_unpooled}=${direct_url}"
   echo "  Set ${var_pooled} and ${var_unpooled}"
 }
 
@@ -304,8 +311,6 @@ _ADD_ARGS=(project add "${VERCEL_PROJECT_NAME}")
 run vercel "${_ADD_ARGS[@]}"
 _LINK_ARGS=(link --yes --project "${VERCEL_PROJECT_NAME}")
 [[ -n "$VERCEL_ORG_ID" ]] && _LINK_ARGS+=(--scope "${VERCEL_ORG_ID}")
-run vercel "${_LINK_ARGS[@]}"
-echo "  OK: project linked."
 
 # VERCEL_PROJECT_ID: once VERCEL_ORG_ID is present in the environment, the
 # Vercel CLI requires VERCEL_PROJECT_ID to be present too, or commands like
@@ -313,12 +318,37 @@ echo "  OK: project linked."
 # forgot to specify VERCEL_PROJECT_ID" (confirmed live — `link`/`project add`
 # themselves are fine without it, since they take --project/--scope directly,
 # but the env-var commands used below and in vercel_env_inject are not).
-# `vercel link` just wrote the resolved project ID to .vercel/project.json;
-# read it from there (authoritative — correct even when VERCEL_PROJECT_NAME
-# resolved to a pre-existing project) rather than re-deriving it another way.
-if [[ "$DRY_RUN" == "true" ]]; then
-  VERCEL_PROJECT_ID="${VERCEL_PROJECT_ID:-<DRY_RUN_VERCEL_PROJECT_ID>}"
+if [[ -n "${VERCEL_PROJECT_ID:-}" ]]; then
+  # Idempotent re-run: VERCEL_PROJECT_ID is already known (persisted in
+  # .env.production.local by a prior run, exported here via vercel-env.sh's
+  # `set -a` source). Re-deriving it from .vercel/project.json is not just
+  # unnecessary but actively harmful: with VERCEL_ORG_ID+VERCEL_PROJECT_ID
+  # both already present in the environment, `vercel link` below resolves via
+  # those env vars and DELETES .vercel/project.json instead of writing it
+  # (confirmed live) — breaking the python3 read that used to run
+  # unconditionally right after. Skip that read entirely and reuse the
+  # existing value directly; the .env.production.local write is also skipped
+  # since the persisted value is already correct.
+  run vercel "${_LINK_ARGS[@]}"
+  echo "  OK: project linked."
+  echo "  [SKIP] VERCEL_PROJECT_ID already set: ${VERCEL_PROJECT_ID} (skipping project.json derivation)"
+elif [[ "$DRY_RUN" == "true" ]]; then
+  run vercel "${_LINK_ARGS[@]}"
+  echo "  OK: project linked."
+  VERCEL_PROJECT_ID="<DRY_RUN_VERCEL_PROJECT_ID>"
 else
+  # First run (VERCEL_PROJECT_ID not yet known): unset VERCEL_ORG_ID/
+  # VERCEL_PROJECT_ID for this one `link` call only, so the CLI is forced
+  # through the explicit --scope/--project args above and writes a fresh
+  # .vercel/project.json (rather than silently deleting/skipping it) —
+  # `link`/`project add` need only --project/--scope, never the env vars, so
+  # unsetting them here is safe and does not reintroduce the "you specified
+  # VERCEL_ORG_ID but forgot VERCEL_PROJECT_ID" error from cmd_298.
+  run env -u VERCEL_ORG_ID -u VERCEL_PROJECT_ID vercel "${_LINK_ARGS[@]}"
+  echo "  OK: project linked."
+  # `vercel link` just wrote the resolved project ID to .vercel/project.json;
+  # read it from there (authoritative — correct even when VERCEL_PROJECT_NAME
+  # resolved to a pre-existing project) rather than re-deriving it another way.
   VERCEL_PROJECT_ID=$(python3 -c \
     "import json; print(json.load(open('${ROOT}/.vercel/project.json'))['projectId'])")
   if grep -q "^VERCEL_PROJECT_ID=" "${_ENV_FILE}" 2>/dev/null; then
