@@ -27,6 +27,16 @@ run() {
   fi
 }
 
+# `echo "KEY=val" >> file` silently concatenates onto the last line instead of
+# starting a new one when the file doesn't already end in a newline (found
+# live during this script's development — see report subtask_298a). Call this
+# before any such append to _ENV_FILE.
+_ensure_trailing_newline() {
+  local _f="$1"
+  [[ -s "$_f" ]] || return 0
+  [[ "$(tail -c1 "$_f")" == "" ]] || printf '\n' >> "$_f"
+}
+
 echo ""
 echo "================================================================="
 echo "  Vercel setup: project=${VERCEL_PROJECT_NAME}"
@@ -48,10 +58,38 @@ echo "  OK: submodule present."
 # ── Step A: Neon get-or-create (DC-1: API direct, DC-2: branch-per-env) ─────
 # NEON_PROJECT_ID (persisted in .env.production.local) is the idempotency
 # anchor. See docs/vercel-automation-design.md §13.
+#
+# Connection-string retrieval uses the Neon CLI (neonctl) instead of the raw
+# REST `connection_uri` endpoint: a direct REST pooled-connection fetch failed
+# in a live run, while neonctl succeeded. neonctl is installed as a pinned
+# devDependency (package.json) rather than invoked via per-run `npx <pkg>@ver`
+# fetch or a global install: a global install's behavior can't be guaranteed
+# across environments (global-only entries reach shell PATH; local ones
+# don't), so _neonctl() below calls the local binary
+# (node_modules/.bin/neonctl) directly — deterministic resolution, no
+# registry/network round-trip once `npm install` has run, and the version is
+# pinned in package.json for reproducibility. Project/branch get-or-create
+# stay on REST: neonctl's `projects create --region-id` does not offer
+# aws-ap-northeast-1 (the region this script provisions into; confirmed via
+# `npx neonctl projects create --help`), and both paths are idempotent no-ops
+# once NEON_PROJECT_ID/the branch already exist, so there is nothing to gain
+# from converting them.
 echo ""
 echo "=== Step A: Neon get-or-create ==="
 _NEON_AUTH="Authorization: Bearer ${NEON_API_KEY:-}"
 _NEON_API="https://console.neon.tech/api/v2"
+
+# neonctl reads the Neon API key from the NEON_API_KEY env var (already
+# exported by vercel-env.sh's `set -a` source of .env.production.local) —
+# confirmed via a live call, so it is never passed as a CLI flag (would leak
+# into `ps` output).
+_neonctl() {
+  if [[ ! -x "${ROOT}/node_modules/.bin/neonctl" ]]; then
+    echo "ERROR: neonctl not found in node_modules — run 'npm install' in ${ROOT} first." >&2
+    return 1
+  fi
+  "${ROOT}/node_modules/.bin/neonctl" "$@"
+}
 
 get_or_create_neon_project() {
   if [[ -n "${NEON_PROJECT_ID:-}" ]]; then
@@ -83,6 +121,7 @@ for p in data.get('projects', []):
   if grep -q "^NEON_PROJECT_ID=" "${_ENV_FILE}" 2>/dev/null; then
     sed -i "s|^NEON_PROJECT_ID=.*|NEON_PROJECT_ID=${NEON_PROJECT_ID}|" "${_ENV_FILE}"
   else
+    _ensure_trailing_newline "${_ENV_FILE}"
     echo "NEON_PROJECT_ID=${NEON_PROJECT_ID}" >> "${_ENV_FILE}"
   fi
   export NEON_PROJECT_ID
@@ -109,23 +148,27 @@ for b in json.load(sys.stdin).get('branches', []):
     fi
   fi
 
-  _CONN_POOLED=$(curl -sS -H "$_NEON_AUTH" \
-    "${_NEON_API}/projects/${NEON_PROJECT_ID}/connection_uri?branch_name=${branch_name}&pooled=true")
-  local pooled_url
-  pooled_url=$(printf '%s' "$_CONN_POOLED" | python3 -c \
-    "import sys,json; print(json.load(sys.stdin)['uri'])")
-
-  _CONN_DIRECT=$(curl -sS -H "$_NEON_AUTH" \
-    "${_NEON_API}/projects/${NEON_PROJECT_ID}/connection_uri?branch_name=${branch_name}&pooled=false")
-  local direct_url
-  direct_url=$(printf '%s' "$_CONN_DIRECT" | python3 -c \
-    "import sys,json; print(json.load(sys.stdin)['uri'])")
+  # `-o table` (the default) is the actual raw connection string on stdout for
+  # this command — confirmed live; `-o json` does NOT wrap it in JSON, so the
+  # output is captured as-is, not parsed.
+  local pooled_url direct_url
+  pooled_url=$(_neonctl connection-string "$branch_name" \
+    --project-id "${NEON_PROJECT_ID}" --pooled)
+  direct_url=$(_neonctl connection-string "$branch_name" \
+    --project-id "${NEON_PROJECT_ID}")
 
   for pair in "${var_pooled}=${pooled_url}" "${var_unpooled}=${direct_url}"; do
     key="${pair%%=*}"; val="${pair#*=}"
+    # Neon connection strings contain `&` (e.g. `&channel_binding=require`), which
+    # sed's replacement text treats as "whole match" — escape it so the literal
+    # value is written instead of the match re-embedding itself on every run
+    # (found live: 16x accumulated duplication across repeated executions — see
+    # report subtask_298a CF-1).
+    val_escaped="${val//&/\\&}"
     if grep -q "^${key}=" "${_ENV_FILE}" 2>/dev/null; then
-      sed -i "s|^${key}=.*|${key}=${val}|" "${_ENV_FILE}"
+      sed -i "s|^${key}=.*|${key}=${val_escaped}|" "${_ENV_FILE}"
     else
+      _ensure_trailing_newline "${_ENV_FILE}"
       echo "${key}=${val}" >> "${_ENV_FILE}"
     fi
   done
@@ -143,7 +186,7 @@ else
   : "${NEON_API_KEY:?NEON_API_KEY is required in .env.production.local}"
   : "${NEON_PROJECT_NAME:?NEON_PROJECT_NAME is required in .env.production.local}"
   get_or_create_neon_project
-  get_neon_connection_strings "main" "DATABASE_URL_PROD" "DATABASE_URL_UNPOOLED_PROD"
+  get_neon_connection_strings "production" "DATABASE_URL_PROD" "DATABASE_URL_UNPOOLED_PROD"
   get_neon_connection_strings "staging" "DATABASE_URL_STAGING" "DATABASE_URL_UNPOOLED_STAGING"
 fi
 export DATABASE_URL_PROD DATABASE_URL_STAGING DATABASE_URL_UNPOOLED_PROD DATABASE_URL_UNPOOLED_STAGING
@@ -153,7 +196,9 @@ export DATABASE_URL_PROD DATABASE_URL_STAGING DATABASE_URL_UNPOOLED_PROD DATABAS
 # is identical between the GCP and Vercel deploy paths. See §14.
 echo ""
 echo "=== Step B: Upstash Redis get-or-create ==="
-_UPSTASH_DB_NAME="${VERCEL_PROJECT_NAME:-app-generator-sample}-redis"
+#_UPSTASH_DB_NAME="${VERCEL_PROJECT_NAME:-app-generator-sample}-redis"
+_UPSTASH_DB_NAME="${UPSTASH_DB_NAME:-app-generator-sample-redis}"
+
 
 _upstash_api() {
   local _method="$1" _path="$2" _body="${3:-}"
@@ -237,6 +282,7 @@ for db in dbs:
     if grep -q "^REDIS_URL=" "${_ENV_FILE}" 2>/dev/null; then
       sed -i "s|^REDIS_URL=.*|REDIS_URL=${REDIS_URL}|" "${_ENV_FILE}"
     else
+      _ensure_trailing_newline "${_ENV_FILE}"
       echo "REDIS_URL=${REDIS_URL}" >> "${_ENV_FILE}"
     fi
     echo "  REDIS_URL set"
@@ -248,9 +294,84 @@ for db in dbs:
 fi
 export REDIS_URL
 
+# ── Step 1: Link project ────────────────────────────────────────────────────
+# Runs before Step C (Blob) — Blob store creation/token retrieval below needs
+# the project already linked with VERCEL_PROJECT_ID resolved (see note there).
+echo ""
+echo "[Step 1] Adding and Linking Vercel project..."
+_ADD_ARGS=(project add "${VERCEL_PROJECT_NAME}")
+[[ -n "$VERCEL_ORG_ID" ]] && _ADD_ARGS+=(--scope "${VERCEL_ORG_ID}")
+run vercel "${_ADD_ARGS[@]}"
+_LINK_ARGS=(link --yes --project "${VERCEL_PROJECT_NAME}")
+[[ -n "$VERCEL_ORG_ID" ]] && _LINK_ARGS+=(--scope "${VERCEL_ORG_ID}")
+run vercel "${_LINK_ARGS[@]}"
+echo "  OK: project linked."
+
+# VERCEL_PROJECT_ID: once VERCEL_ORG_ID is present in the environment, the
+# Vercel CLI requires VERCEL_PROJECT_ID to be present too, or commands like
+# `vercel env ls/add/pull` fail with "You specified VERCEL_ORG_ID but you
+# forgot to specify VERCEL_PROJECT_ID" (confirmed live — `link`/`project add`
+# themselves are fine without it, since they take --project/--scope directly,
+# but the env-var commands used below and in vercel_env_inject are not).
+# `vercel link` just wrote the resolved project ID to .vercel/project.json;
+# read it from there (authoritative — correct even when VERCEL_PROJECT_NAME
+# resolved to a pre-existing project) rather than re-deriving it another way.
+if [[ "$DRY_RUN" == "true" ]]; then
+  VERCEL_PROJECT_ID="${VERCEL_PROJECT_ID:-<DRY_RUN_VERCEL_PROJECT_ID>}"
+else
+  VERCEL_PROJECT_ID=$(python3 -c \
+    "import json; print(json.load(open('${ROOT}/.vercel/project.json'))['projectId'])")
+  if grep -q "^VERCEL_PROJECT_ID=" "${_ENV_FILE}" 2>/dev/null; then
+    sed -i "s|^VERCEL_PROJECT_ID=.*|VERCEL_PROJECT_ID=${VERCEL_PROJECT_ID}|" "${_ENV_FILE}"
+  else
+    _ensure_trailing_newline "${_ENV_FILE}"
+    echo "VERCEL_PROJECT_ID=${VERCEL_PROJECT_ID}" >> "${_ENV_FILE}"
+  fi
+fi
+export VERCEL_PROJECT_ID
+
+# ── Helper: pull a live env-var value from Vercel (used for Blob token) ─────
+# `vercel env ls` only shows metadata ("Encrypted") — pulling is the only way
+# to get an actual decrypted value. The pulled file is written by `mktemp`
+# (private, mode 600) and removed immediately after parsing; the value is
+# returned via stdout capture only, never echoed to the terminal/log.
+_vercel_pull_env_var() {
+  local _var_name="$1" _target="$2" _tmp _val
+  _tmp="$(mktemp)"
+  if ! vercel env pull --environment "${_target}" --yes "${_tmp}" >/dev/null 2>&1; then
+    rm -f "${_tmp}"
+    return 1
+  fi
+  _val=$(python3 -c "
+import sys
+name = sys.argv[1]
+with open(sys.argv[2]) as f:
+    for line in f:
+        line = line.rstrip('\n')
+        if line.startswith(name + '='):
+            v = line[len(name) + 1:]
+            if len(v) >= 2 and v[0] == '\"' and v[-1] == '\"':
+                v = v[1:-1]
+            print(v)
+            break
+" "${_var_name}" "${_tmp}")
+  rm -f "${_tmp}"
+  [[ -n "$_val" ]] || return 1
+  printf '%s' "${_val}"
+}
+
 # ── Step C: Vercel Blob get-or-create (DC-3: PD-4 superseded — CLI available) ──
 # VERCEL_BLOB_STORE_ID (persisted in .env.production.local) is the idempotency
 # anchor — `vercel blob get-store` takes a store ID, not a name. See §15.
+#
+# BLOB_READ_WRITE_TOKEN retrieval (PD-5 resolved): `vercel blob get-store` has
+# no --output/--json flag at all (confirmed live) and never returns the RW
+# token regardless of format, so parsing its output was never viable. Working
+# path: `vercel blob create-store --environment <env>` connects the new store
+# to the linked project, which auto-injects BLOB_READ_WRITE_TOKEN into that
+# project env (confirmed live: `vercel env ls production` shows
+# BLOB_READ_WRITE_TOKEN immediately after `create-store --environment
+# production`) — then `_vercel_pull_env_var` above reads the live value back.
 echo ""
 echo "=== Step C: Vercel Blob get-or-create ==="
 if [[ "$DRY_RUN" == "true" ]]; then
@@ -259,40 +380,41 @@ if [[ "$DRY_RUN" == "true" ]]; then
 else
   if [[ -n "${VERCEL_BLOB_STORE_ID:-}" ]]; then
     echo "[SKIP] VERCEL_BLOB_STORE_ID already set: ${VERCEL_BLOB_STORE_ID}"
-    # NOTE (PD-5): exact --output json schema of `get-store` confirmed during
-    # implementation — see report for the actual field name used here.
-    BLOB_READ_WRITE_TOKEN=$(vercel blob get-store "${VERCEL_BLOB_STORE_ID}" \
-      --output json 2>/dev/null | python3 -c \
-      "import sys,json; d=json.load(sys.stdin); print(d.get('readWriteToken',''))")
+    BLOB_READ_WRITE_TOKEN=$(_vercel_pull_env_var BLOB_READ_WRITE_TOKEN production) || BLOB_READ_WRITE_TOKEN=""
+    if [[ -z "$BLOB_READ_WRITE_TOKEN" ]]; then
+      echo "  WARNING: BLOB_READ_WRITE_TOKEN not found in production env for this store." >&2
+      echo "  This happens if the store predates the --environment auto-connect flag" >&2
+      echo "  below (existing stores are not retroactively connectable via CLI — no" >&2
+      echo "  'vercel blob connect' subcommand exists, confirmed via --help)." >&2
+      echo "  MANUAL FALLBACK: in the Vercel dashboard, open Storage ->" >&2
+      echo "  ${VERCEL_BLOB_STORE_ID} -> Connect to Project, select" >&2
+      echo "  ${VERCEL_PROJECT_NAME} (production + preview), then re-run this script." >&2
+    fi
   else
     _STORE_NAME="${VERCEL_PROJECT_NAME:-app-generator-sample}-uploads"
-    _STORE_JSON=$(vercel blob create-store "${_STORE_NAME}" --access public 2>&1)
-    # NOTE (PD-5): exact output format of `vercel blob create-store` confirmed
-    # during implementation — see report for the actual field names used here.
+    _STORE_JSON=$(vercel blob create-store "${_STORE_NAME}" --yes --access public \
+      --environment production --environment preview 2>&1)
     VERCEL_BLOB_STORE_ID=$(printf '%s' "$_STORE_JSON" | python3 -c \
       "import sys,json; d=json.load(sys.stdin); print(d.get('storeId',''))" 2>/dev/null \
       || printf '%s' "$_STORE_JSON" | grep -oP 'store_\w+' | head -1)
     if grep -q "^VERCEL_BLOB_STORE_ID=" "${_ENV_FILE}" 2>/dev/null; then
       sed -i "s|^VERCEL_BLOB_STORE_ID=.*|VERCEL_BLOB_STORE_ID=${VERCEL_BLOB_STORE_ID}|" "${_ENV_FILE}"
     else
+      _ensure_trailing_newline "${_ENV_FILE}"
       echo "VERCEL_BLOB_STORE_ID=${VERCEL_BLOB_STORE_ID}" >> "${_ENV_FILE}"
     fi
     export VERCEL_BLOB_STORE_ID
-    BLOB_READ_WRITE_TOKEN=$(vercel blob get-store "${VERCEL_BLOB_STORE_ID}" \
-      --output json 2>/dev/null | python3 -c \
-      "import sys,json; d=json.load(sys.stdin); print(d.get('readWriteToken',''))")
     echo "  Created Blob store: ${_STORE_NAME} (${VERCEL_BLOB_STORE_ID})"
+    BLOB_READ_WRITE_TOKEN=$(_vercel_pull_env_var BLOB_READ_WRITE_TOKEN production) || BLOB_READ_WRITE_TOKEN=""
+    if [[ -z "$BLOB_READ_WRITE_TOKEN" ]]; then
+      echo "  WARNING: store created but BLOB_READ_WRITE_TOKEN not retrievable via env pull." >&2
+      echo "  MANUAL FALLBACK: check Vercel dashboard Storage -> ${_STORE_NAME} -> confirm" >&2
+      echo "  it is connected to ${VERCEL_PROJECT_NAME}, then set BLOB_READ_WRITE_TOKEN" >&2
+      echo "  manually in .env.production.local." >&2
+    fi
   fi
 fi
 export BLOB_READ_WRITE_TOKEN
-
-# ── Step 1: Link project ────────────────────────────────────────────────────
-echo ""
-echo "[Step 1] Linking Vercel project..."
-_LINK_ARGS=(link --yes --project "${VERCEL_PROJECT_NAME}")
-[[ -n "$VERCEL_ORG_ID" ]] && _LINK_ARGS+=(--scope "${VERCEL_ORG_ID}")
-run vercel "${_LINK_ARGS[@]}"
-echo "  OK: project linked."
 
 # ── Step 2: Inject env vars (production + preview) ──────────────────────────
 echo ""

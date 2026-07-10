@@ -68,10 +68,21 @@ inject_var() {
     echo "  [SKIP] ${name}: [unset] (not configured for ${target})"
     return 0
   fi
+  # This project has no connected Git provider (deliberate — see
+  # docs/vercel-automation-design.md "all preview/staging deploys share one
+  # DB"). Without one, `vercel env add NAME preview --force` (no branch arg)
+  # fails non-interactively with reason=git_branch_required, because the CLI
+  # can't resolve what "all Preview branches" means with no Git history
+  # (confirmed live). Passing an explicit empty git-branch argument resolves
+  # it and applies to all Preview deploys, same as the CLI's own bare-target
+  # form would if a Git provider were connected (confirmed live: `vercel env
+  # ls preview` shows the var scoped to "Preview", not to any single branch).
+  local _target_args=("$target")
+  [[ "$target" == "preview" ]] && _target_args+=("")
   if [[ "$DRY_RUN" == "true" ]]; then
-    echo "[DRY-RUN] printf '%s' <redacted> | vercel env add ${name} ${target} --force"
+    echo "[DRY-RUN] printf '%s' <redacted> | vercel env add ${name} ${_target_args[*]} --force"
   else
-    printf '%s' "$value" | vercel env add "$name" "$target" --force
+    printf '%s' "$value" | vercel env add "$name" "${_target_args[@]}" --force
     echo "  Injected: ${name}: [set] -> ${target}"
   fi
 }
