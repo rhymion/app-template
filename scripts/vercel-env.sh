@@ -13,6 +13,43 @@ set -euo pipefail
 _SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 _ENV_FILE="${_SCRIPT_DIR}/../.env.production.local"
 
+# ── env-file write-quoting helpers (shared by vercel-env.sh/vercel-setup.sh) ──
+# `set -a; source "$_ENV_FILE"; set +a` (below) evaluates every KEY=value line
+# as real shell syntax. An unquoted value containing `&` is parsed by bash as
+# the background-job control operator, silently truncating/unsetting the var
+# on the *next* source of this file (confirmed live with a Neon connection
+# string's trailing `&channel_binding=require` — see report subtask_301a
+# CF-1/CF-5-adjacent finding). Fix: every write to _ENV_FILE wraps its value in
+# double quotes (`KEY="value"`), which makes bash treat `&` (and whitespace,
+# `#`, etc.) as a literal character during source. Double quotes still let `$`
+# and a backtick trigger expansion/command-substitution during source, so the
+# value is backslash-escaped first (`_shell_dquote_escape`) to keep it fully
+# literal — safer than switching to single quotes, which cannot represent a
+# literal `'` in the value at all.
+_shell_dquote_escape() {
+  local s="$1"
+  s="${s//\\/\\\\}"
+  s="${s//\$/\\\$}"
+  s="${s//\`/\\\`}"
+  s="${s//\"/\\\"}"
+  printf '%s' "$s"
+}
+
+# sed's replacement text (the RHS of `s|...|replacement|`) has its own
+# metacharacters: `&` re-inserts the whole match, and `\` starts an escape
+# sequence (`\&`, `\\`, backreferences). This is unrelated to — and doesn't
+# replace — `_shell_dquote_escape` above: that one protects the value once
+# it's *sourced* from _ENV_FILE, this one protects the value while sed is
+# *writing* it into _ENV_FILE in the first place. Apply this second, on top of
+# the already shell-escaped string, whenever sed (not a plain echo/printf
+# append) is used to write the value.
+_sed_replacement_escape() {
+  local s="$1"
+  s="${s//\\/\\\\}"
+  s="${s//&/\\&}"
+  printf '%s' "$s"
+}
+
 if [[ -f "$_ENV_FILE" ]]; then
   set -a
   # shellcheck disable=SC1090
@@ -33,10 +70,11 @@ if [[ -z "${AUTH_SECRET:-}" ]]; then
     AUTH_SECRET="<DRY_RUN_AUTH_SECRET>"
   else
     AUTH_SECRET=$(openssl rand -base64 32)
+    _AUTH_SECRET_ESCAPED="$(_shell_dquote_escape "${AUTH_SECRET}")"
     if grep -q "^AUTH_SECRET=" "${_ENV_FILE}" 2>/dev/null; then
-      sed -i "s|^AUTH_SECRET=.*|AUTH_SECRET=${AUTH_SECRET}|" "${_ENV_FILE}"
+      sed -i "s|^AUTH_SECRET=.*|AUTH_SECRET=\"$(_sed_replacement_escape "${_AUTH_SECRET_ESCAPED}")\"|" "${_ENV_FILE}"
     else
-      echo "AUTH_SECRET=${AUTH_SECRET}" >> "${_ENV_FILE}"
+      echo "AUTH_SECRET=\"${_AUTH_SECRET_ESCAPED}\"" >> "${_ENV_FILE}"
     fi
     echo "[INFO] AUTH_SECRET generated and saved to .env.production.local"
   fi
