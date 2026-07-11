@@ -804,7 +804,7 @@ model purchase_per_item {
   price                 Int?
   approvable_id                 String?                    @unique
   approvable                    approvable?                @relation(fields: [approvable_id], references: [id])
-  inventory_transactionable_id  String?
+  inventory_transactionable_id  String?                    @unique
   inventory_transactionable     inventory_transactionable? @relation(fields: [inventory_transactionable_id], references: [id])
   created_at            DateTime               @default(now()) @db.Timestamptz(0)
   updated_at            DateTime               @updatedAt @db.Timestamptz(0)
@@ -1050,7 +1050,7 @@ model receiving_receipt_line {
   parent               receiving_receipt_line?   @relation("ReceiptLineSplit", fields: [parent_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   children             receiving_receipt_line[]  @relation("ReceiptLineSplit")
   is_split_result      Boolean           @default(false)
-  inventory_transactionable_id String?
+  inventory_transactionable_id String?                     @unique
   inventory_transactionable    inventory_transactionable? @relation(fields: [inventory_transactionable_id], references: [id])
   created_at           DateTime          @default(now()) @db.Timestamptz(0)
   updated_at           DateTime          @updatedAt @db.Timestamptz(0)
