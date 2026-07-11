@@ -128,7 +128,7 @@ vercel_env_inject() {
   inject_var GOOGLE_CLIENT_ID "$GOOGLE_CLIENT_ID" "$target"
   inject_var GOOGLE_CLIENT_SECRET "$GOOGLE_CLIENT_SECRET" "$target"
   inject_var AUTH_TRUST_HOST "true" "$target"
-  inject_var NODE_ENV "production" "$target"
+  # inject_var NODE_ENV "production" "$target"
   echo "=== Injection complete for ${target}. Trigger a redeploy for changes to take effect. ==="
 }
 
