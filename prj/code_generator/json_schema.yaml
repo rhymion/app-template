@@ -2791,3 +2791,31 @@ definitions:
             $ref: "#/definitions/inventory"
           approvable:
             $ref: "#/definitions/approvable"
+
+  purchase_per_item_detail:
+    x-generate:
+      list: true
+      view: true
+      new: false
+      edit: false
+      delete: false
+      invalidate: false
+      api: false
+      test: true
+    x-custom-components:
+      - name: ApprovalSection
+        path: "@/components/_standard/ApprovalSection"
+        target:
+          - view
+    allOf:
+      - $ref: "#/definitions/purchase_per_item"
+      - type: object
+        required:
+          - product
+        properties:
+          purchase_order:
+            $ref: "#/definitions/purchase_order"
+          product:
+            $ref: "#/definitions/product"
+          approvable:
+            $ref: "#/definitions/approvable"
