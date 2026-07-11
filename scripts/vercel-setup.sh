@@ -68,16 +68,28 @@ echo "  OK: submodule present."
 # don't), so _neonctl() below calls the local binary
 # (node_modules/.bin/neonctl) directly — deterministic resolution, no
 # registry/network round-trip once `npm install` has run, and the version is
-# pinned in package.json for reproducibility. Project/branch get-or-create
-# stay on REST: neonctl's `projects create --region-id` does not offer
-# aws-ap-northeast-1 (the region this script provisions into; confirmed via
-# `npx neonctl projects create --help`), and both paths are idempotent no-ops
-# once NEON_PROJECT_ID/the branch already exist, so there is nothing to gain
-# from converting them.
+# pinned in package.json for reproducibility. Project get-or-create also runs
+# on neonctl (cmd_301 — a direct REST POST /projects intermittently failed
+# live; see get_or_create_neon_project below). Branch get-or-create (the
+# staging-branch existence check/creation in get_neon_connection_strings)
+# stays on REST — not implicated in any reported live failure, so left as-is
+# to keep this fix scoped.
 echo ""
 echo "=== Step A: Neon get-or-create ==="
 _NEON_AUTH="Authorization: Bearer ${NEON_API_KEY:-}"
 _NEON_API="https://console.neon.tech/api/v2"
+
+# aws-ap-northeast-1 is NOT an available Neon project-creation region for this
+# account/org — confirmed live during cmd_301 both via `neonctl projects
+# create --help` (not in the listed choices) and via an actual `projects
+# create --region-id aws-ap-northeast-1` API call, which fails with "requested
+# region not found" (available_regions did not include it either). Falls back
+# to aws-ap-southeast-1 (Singapore) per the Lord's ruling on cmd_301
+# (2026-07-10) — geographically closest available region to the intended
+# ap-northeast-1, ahead of the existing happy-path project's aws-us-east-1.
+# Override with NEON_REGION_ID if a different region is later confirmed
+# available.
+NEON_REGION_ID="${NEON_REGION_ID:-aws-ap-southeast-1}"
 
 # neonctl reads the Neon API key from the NEON_API_KEY env var (already
 # exported by vercel-env.sh's `set -a` source of .env.production.local) —
@@ -97,10 +109,15 @@ get_or_create_neon_project() {
     return 0
   fi
 
-  _EXISTING=$(curl -sS -H "$_NEON_AUTH" "${_NEON_API}/projects" | python3 -c "
+  # `projects list -o json` output shape is non-deterministic — confirmed
+  # live via repeated identical calls (same key, same env): sometimes a bare
+  # JSON array of project objects, sometimes `{"projects": [...],
+  # "shared_with_you": [...]}` (the REST API's native shape). Handle both.
+  _EXISTING=$(_neonctl projects list -o json | python3 -c "
 import sys, json
 data = json.load(sys.stdin)
-for p in data.get('projects', []):
+projects = data.get('projects', []) if isinstance(data, dict) else data
+for p in projects:
     if p.get('name') == sys.argv[1]:
         print(json.dumps(p)); break
 " "${NEON_PROJECT_NAME}")
@@ -110,21 +127,72 @@ for p in data.get('projects', []):
     NEON_PROJECT_ID=$(printf '%s' "$_EXISTING" | python3 -c \
       "import sys,json; print(json.load(sys.stdin)['id'])")
   else
-    _NEW=$(curl -sS -X POST -H "$_NEON_AUTH" -H "Content-Type: application/json" \
-      -d "{\"project\":{\"name\":\"${NEON_PROJECT_NAME}\",\"region_id\":\"aws-ap-northeast-1\",\"pg_version\":16}}" \
-      "${_NEON_API}/projects")
+    # No --pg-version flag exists on this neonctl version's `projects create`
+    # (confirmed via --help) — Neon's current default pg_version is used.
+    _NEW=$(_neonctl projects create --name "${NEON_PROJECT_NAME}" \
+      --region-id "${NEON_REGION_ID}" -o json)
     NEON_PROJECT_ID=$(printf '%s' "$_NEW" | python3 -c \
       "import sys,json; print(json.load(sys.stdin)['project']['id'])")
     echo "  Created Neon project: ${NEON_PROJECT_NAME} (${NEON_PROJECT_ID})"
   fi
 
+  _NEON_PROJECT_ID_ESCAPED="$(_shell_dquote_escape "${NEON_PROJECT_ID}")"
   if grep -q "^NEON_PROJECT_ID=" "${_ENV_FILE}" 2>/dev/null; then
-    sed -i "s|^NEON_PROJECT_ID=.*|NEON_PROJECT_ID=${NEON_PROJECT_ID}|" "${_ENV_FILE}"
+    sed -i "s|^NEON_PROJECT_ID=.*|NEON_PROJECT_ID=\"$(_sed_replacement_escape "${_NEON_PROJECT_ID_ESCAPED}")\"|" "${_ENV_FILE}"
   else
     _ensure_trailing_newline "${_ENV_FILE}"
-    echo "NEON_PROJECT_ID=${NEON_PROJECT_ID}" >> "${_ENV_FILE}"
+    echo "NEON_PROJECT_ID=\"${_NEON_PROJECT_ID_ESCAPED}\"" >> "${_ENV_FILE}"
   fi
   export NEON_PROJECT_ID
+}
+
+# ── E2: ensure the default branch is named "production" ────────────────────
+# A brand-new Neon project's default branch is always named `main` — Neon has
+# no create-time flag to name it anything else (confirmed live: `projects
+# create` always yields a `main` default branch). The rest of this script
+# (get_neon_connection_strings "production" ...) assumes a branch literally
+# named `production` exists. Idempotent: a project whose default branch is
+# already named `production` (e.g. the existing happy-path project, set up
+# via the Neon Console) is a no-op.
+ensure_production_branch() {
+  _DEFAULT_NAME=$(_neonctl branches list --project-id "${NEON_PROJECT_ID}" -o json | python3 -c "
+import sys, json
+for b in json.load(sys.stdin):
+    if b.get('default'):
+        print(b['name']); break
+")
+  if [[ "$_DEFAULT_NAME" == "production" ]]; then
+    echo "[SKIP] default branch already named 'production'"
+  elif [[ -z "$_DEFAULT_NAME" ]]; then
+    echo "ERROR: could not determine default branch for project ${NEON_PROJECT_ID}" >&2
+    return 1
+  else
+    _neonctl branches rename "$_DEFAULT_NAME" production --project-id "${NEON_PROJECT_ID}" >/dev/null
+    echo "  Renamed default branch '${_DEFAULT_NAME}' -> 'production'"
+  fi
+}
+
+# ── E3: ensure a branch has an attached compute (endpoint) ──────────────────
+# A branch created via the raw Neon REST API without an `endpoints` payload
+# (see the staging-branch creation below) gets no compute, and
+# `neonctl connection-string` then has nothing to resolve a connection
+# through (confirmed live — Lord's report). This neonctl version has no
+# dedicated `neonctl endpoints` command, so existence is checked via
+# `neonctl api .../endpoints` (authenticated REST passthrough); a read-write
+# compute is added only if none exists (idempotent).
+ensure_branch_compute() {
+  local branch_name="$1"
+  local _branch_id _endpoint_count
+  _branch_id=$(_neonctl branches get "$branch_name" --project-id "${NEON_PROJECT_ID}" -o json | python3 -c \
+    "import sys,json; print(json.load(sys.stdin)['id'])")
+  _endpoint_count=$(_neonctl api "/projects/${NEON_PROJECT_ID}/branches/${_branch_id}/endpoints" -o json | python3 -c \
+    "import sys,json; print(len(json.load(sys.stdin).get('endpoints', [])))")
+  if [[ "$_endpoint_count" -gt 0 ]]; then
+    echo "[SKIP] branch '${branch_name}' already has a compute endpoint"
+  else
+    _neonctl branches add-compute "$_branch_id" --project-id "${NEON_PROJECT_ID}" --type read_write >/dev/null
+    echo "  Added compute endpoint to branch '${branch_name}'"
+  fi
 }
 
 get_neon_connection_strings() {
@@ -148,6 +216,11 @@ for b in json.load(sys.stdin).get('branches', []):
     fi
   fi
 
+  # E3: guarantee a compute is attached before asking for a connection string
+  # (see ensure_branch_compute above) — applies to both branches, since the
+  # Lord's report also called out checking production, not staging alone.
+  ensure_branch_compute "$branch_name"
+
   # `-o table` (the default) is the actual raw connection string on stdout for
   # this command — confirmed live; `-o json` does NOT wrap it in JSON, so the
   # output is captured as-is, not parsed.
@@ -159,17 +232,25 @@ for b in json.load(sys.stdin).get('branches', []):
 
   for pair in "${var_pooled}=${pooled_url}" "${var_unpooled}=${direct_url}"; do
     key="${pair%%=*}"; val="${pair#*=}"
-    # Neon connection strings contain `&` (e.g. `&channel_binding=require`), which
-    # sed's replacement text treats as "whole match" — escape it so the literal
-    # value is written instead of the match re-embedding itself on every run
-    # (found live: 16x accumulated duplication across repeated executions — see
-    # report subtask_298a CF-1).
-    val_escaped="${val//&/\\&}"
+    # Neon connection strings contain `&` (e.g. `&channel_binding=require`),
+    # which is why this value gets double-quoted before being written (see
+    # _shell_dquote_escape in vercel-env.sh — protects against `set -a;
+    # source` at vercel-env.sh L19+ misparsing an unquoted `&` as the
+    # background-job control operator on the *next* run, truncating the var —
+    # subtask_301a). Separately, sed's replacement text also treats a literal
+    # `&` as "whole match" and needs its own escaping so the value is written
+    # verbatim instead of re-embedding the match on every run (found live:
+    # 16x accumulated duplication across repeated executions — report
+    # subtask_298a CF-1). These are two distinct escaping passes for two
+    # distinct consumers (source-time vs. sed-write-time) — both still
+    # required, applied via _sed_replacement_escape on top of the already
+    # shell-escaped value.
+    val_shell_escaped="$(_shell_dquote_escape "${val}")"
     if grep -q "^${key}=" "${_ENV_FILE}" 2>/dev/null; then
-      sed -i "s|^${key}=.*|${key}=${val_escaped}|" "${_ENV_FILE}"
+      sed -i "s|^${key}=.*|${key}=\"$(_sed_replacement_escape "${val_shell_escaped}")\"|" "${_ENV_FILE}"
     else
       _ensure_trailing_newline "${_ENV_FILE}"
-      echo "${key}=${val}" >> "${_ENV_FILE}"
+      echo "${key}=\"${val_shell_escaped}\"" >> "${_ENV_FILE}"
     fi
   done
   # Assign via `export NAME=value` (not `eval`) so `&` and other shell
@@ -193,6 +274,7 @@ else
   : "${NEON_API_KEY:?NEON_API_KEY is required in .env.production.local}"
   : "${NEON_PROJECT_NAME:?NEON_PROJECT_NAME is required in .env.production.local}"
   get_or_create_neon_project
+  ensure_production_branch
   get_neon_connection_strings "production" "DATABASE_URL_PROD" "DATABASE_URL_UNPOOLED_PROD"
   get_neon_connection_strings "staging" "DATABASE_URL_STAGING" "DATABASE_URL_UNPOOLED_STAGING"
 fi
@@ -286,11 +368,12 @@ for db in dbs:
 
   if [[ -n "$_REDIS_PW" && -n "$_REDIS_EP" && -n "$_REDIS_PORT" ]]; then
     REDIS_URL="rediss://:${_REDIS_PW}@${_REDIS_EP}:${_REDIS_PORT}"
+    _REDIS_URL_ESCAPED="$(_shell_dquote_escape "${REDIS_URL}")"
     if grep -q "^REDIS_URL=" "${_ENV_FILE}" 2>/dev/null; then
-      sed -i "s|^REDIS_URL=.*|REDIS_URL=${REDIS_URL}|" "${_ENV_FILE}"
+      sed -i "s|^REDIS_URL=.*|REDIS_URL=\"$(_sed_replacement_escape "${_REDIS_URL_ESCAPED}")\"|" "${_ENV_FILE}"
     else
       _ensure_trailing_newline "${_ENV_FILE}"
-      echo "REDIS_URL=${REDIS_URL}" >> "${_ENV_FILE}"
+      echo "REDIS_URL=\"${_REDIS_URL_ESCAPED}\"" >> "${_ENV_FILE}"
     fi
     echo "  REDIS_URL set"
   elif [[ -z "${REDIS_URL:-}" ]]; then
@@ -351,11 +434,12 @@ else
   # resolved to a pre-existing project) rather than re-deriving it another way.
   VERCEL_PROJECT_ID=$(python3 -c \
     "import json; print(json.load(open('${ROOT}/.vercel/project.json'))['projectId'])")
+  _VERCEL_PROJECT_ID_ESCAPED="$(_shell_dquote_escape "${VERCEL_PROJECT_ID}")"
   if grep -q "^VERCEL_PROJECT_ID=" "${_ENV_FILE}" 2>/dev/null; then
-    sed -i "s|^VERCEL_PROJECT_ID=.*|VERCEL_PROJECT_ID=${VERCEL_PROJECT_ID}|" "${_ENV_FILE}"
+    sed -i "s|^VERCEL_PROJECT_ID=.*|VERCEL_PROJECT_ID=\"$(_sed_replacement_escape "${_VERCEL_PROJECT_ID_ESCAPED}")\"|" "${_ENV_FILE}"
   else
     _ensure_trailing_newline "${_ENV_FILE}"
-    echo "VERCEL_PROJECT_ID=${VERCEL_PROJECT_ID}" >> "${_ENV_FILE}"
+    echo "VERCEL_PROJECT_ID=\"${_VERCEL_PROJECT_ID_ESCAPED}\"" >> "${_ENV_FILE}"
   fi
 fi
 export VERCEL_PROJECT_ID
@@ -427,11 +511,12 @@ else
     VERCEL_BLOB_STORE_ID=$(printf '%s' "$_STORE_JSON" | python3 -c \
       "import sys,json; d=json.load(sys.stdin); print(d.get('storeId',''))" 2>/dev/null \
       || printf '%s' "$_STORE_JSON" | grep -oP 'store_\w+' | head -1)
+    _VERCEL_BLOB_STORE_ID_ESCAPED="$(_shell_dquote_escape "${VERCEL_BLOB_STORE_ID}")"
     if grep -q "^VERCEL_BLOB_STORE_ID=" "${_ENV_FILE}" 2>/dev/null; then
-      sed -i "s|^VERCEL_BLOB_STORE_ID=.*|VERCEL_BLOB_STORE_ID=${VERCEL_BLOB_STORE_ID}|" "${_ENV_FILE}"
+      sed -i "s|^VERCEL_BLOB_STORE_ID=.*|VERCEL_BLOB_STORE_ID=\"$(_sed_replacement_escape "${_VERCEL_BLOB_STORE_ID_ESCAPED}")\"|" "${_ENV_FILE}"
     else
       _ensure_trailing_newline "${_ENV_FILE}"
-      echo "VERCEL_BLOB_STORE_ID=${VERCEL_BLOB_STORE_ID}" >> "${_ENV_FILE}"
+      echo "VERCEL_BLOB_STORE_ID=\"${_VERCEL_BLOB_STORE_ID_ESCAPED}\"" >> "${_ENV_FILE}"
     fi
     export VERCEL_BLOB_STORE_ID
     echo "  Created Blob store: ${_STORE_NAME} (${VERCEL_BLOB_STORE_ID})"
@@ -466,12 +551,39 @@ else
 fi
 echo "  OK: migration complete."
 
-# ── Step 4: First-time migration against staging DB ─────────────────────────
+# ── Step 4: Seed production DB (bootstrap tenant/admin) ─────────────────────
+# `db:seed-tenant` (not `db:seed`) is the production default: it bootstraps
+# the minimum needed to sign in and operate the app — default tenant,
+# Administrator role + full-CRUD permissions, and the admin@example.com user
+# — with every write idempotent (extension via CREATE EXTENSION IF NOT
+# EXISTS, tenant/user via upsert on a unique key, role via findFirst+create
+# guarded by that same findFirst, permissions via upsert on the
+# @@unique([name, role_id]) constraint — confirmed by reading
+# app-generator/scripts/seed-tenant.ts in full). `db:seed` is demo/sample
+# data (a second "worker" user, sample issues, etc. — confirmed by reading
+# app-generator/scripts/seed.ts, which itself assumes db:seed-tenant already
+# ran and looks up admin@example.com via findFirstOrThrow) and is not
+# appropriate to run unattended against production.
+#
+# Same unpooled-connection rationale as Step 3/5: pooled/PgBouncer
+# transaction-mode connections don't support the multi-statement/prepared
+# patterns Prisma's migration and seed clients rely on.
+echo ""
+echo "[Step 4] Seeding production DB (db:seed-tenant)..."
+if [[ "$DRY_RUN" == "true" ]]; then
+  echo "[DRY-RUN] DATABASE_URL=<redacted> npm --prefix ${ROOT}/app-generator run db:seed-tenant"
+else
+  : "${DATABASE_URL_UNPOOLED_PROD:?DATABASE_URL_UNPOOLED_PROD is required in .env.production.local}"
+  DATABASE_URL="${DATABASE_URL_UNPOOLED_PROD}" npm --prefix "${ROOT}/app-generator" run db:seed-tenant
+fi
+echo "  OK: seed complete."
+
+# ── Step 5: First-time migration against staging DB ─────────────────────────
 # Same rationale as Step 3, but for the preview/staging DB (see two-DB pattern
 # in vercel-env.sh). Run once here so the first preview deploy doesn't hit an
 # un-migrated staging database.
 echo ""
-echo "[Step 4] Running migrate:deploy against staging DB..."
+echo "[Step 5] Running migrate:deploy against staging DB..."
 if [[ "$DRY_RUN" == "true" ]]; then
   echo "[DRY-RUN] DATABASE_URL=<redacted> npm --prefix ${ROOT}/app-generator run migrate:deploy"
 else
