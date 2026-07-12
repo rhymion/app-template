@@ -102,3 +102,24 @@ export async function populateReceivingReceiptLineWithApproval(
 
   return JSON.parse(JSON.stringify({ receipt, line, product, approvalRequests }));
 }
+
+/**
+ * Fetch a receiving_receipt_line row by id (cmd_296 split verification: parent
+ * status/approvable_id after split, child field checks).
+ */
+export async function getReceivingReceiptLineById(id: string) {
+  const line = await prisma.receiving_receipt_line.findUnique({ where: { id } });
+  return JSON.parse(JSON.stringify(line));
+}
+
+/**
+ * List receiving_receipt_line rows whose parent_id points at `parentId`
+ * (cmd_296 split verification: child records created by the split action).
+ */
+export async function getReceivingReceiptLineChildren(parentId: string) {
+  const children = await prisma.receiving_receipt_line.findMany({
+    where: { parent_id: parentId },
+    orderBy: { created_at: 'asc' },
+  });
+  return JSON.parse(JSON.stringify(children));
+}
