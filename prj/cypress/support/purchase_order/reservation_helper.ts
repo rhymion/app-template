@@ -216,3 +216,24 @@ export async function getPurchasePerItemsForOrder(purchase_order_id: string) {
   });
   return JSON.parse(JSON.stringify(items));
 }
+
+/**
+ * Fetch a single purchase_per_item row by id (cmd_305 FIX-B follow-up,
+ * subtask_305i — split/reject-reservation permanent spec coverage).
+ */
+export async function getPurchasePerItemById(id: string) {
+  const item = await prisma.purchase_per_item.findUnique({ where: { id } });
+  return JSON.parse(JSON.stringify(item));
+}
+
+/**
+ * List purchase_per_item rows whose parent_id points at `parentId`
+ * (split children), ordered by creation time.
+ */
+export async function getPurchasePerItemChildren(parentId: string) {
+  const children = await prisma.purchase_per_item.findMany({
+    where: { parent_id: parentId },
+    orderBy: { created_at: 'asc' },
+  });
+  return JSON.parse(JSON.stringify(children));
+}
