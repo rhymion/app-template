@@ -1,3 +1,5 @@
+import { TEST_API_KEY } from '../../support/test-credentials';
+
 // cmd_296 Phase1: generic x-splittable split action, exercised against
 // receiving_receipt_line (quantityField=receipt_quantity, perPartRequired=
 // [inventory_id], parentField=parent_id). Covers the quantity invariant
@@ -149,6 +151,61 @@ describe('API: Receiving Receipt Line — Split (cmd_296)', () => {
         failOnStatusCode: false,
       }).then((res) => {
         expect(res.status).to.eq(400);
+      });
+    });
+  });
+
+  it("cmd_307 FIX-β: splitting a receive-type entity never touches reserved_quantity or the 'Concurrent reservation conflict' path — children get an empty bridge only", () => {
+    // receiving_receipt_line has x-ledger-source event_type=receive: its
+    // afterApprove hook ADDS inventory on approval, it never reserves
+    // existing stock. Before FIX-β the split template unconditionally
+    // reused the reserve-type inventory bridge logic (hardcoded
+    // event_type:'reserve'), which would spuriously touch reserved_quantity
+    // and could throw 'Concurrent reservation conflict' for an entity that
+    // has no reservation semantics at all.
+    seedLineWithApproval().then((ctx) => {
+      const { line, inventory } = ctx;
+      cy.request({
+        url: `/api/inventory/${inventory.id}`,
+        headers: { 'X-API-Key': TEST_API_KEY },
+      }).then((preRes) => {
+        const reservedBefore = preRes.body.reserved_quantity;
+        const quantityBefore = preRes.body.quantity;
+
+        cy.request({
+          method: 'POST',
+          url: `/api/receiving_receipt_line/${line.id}/actions/split`,
+          body: {
+            parts: [
+              { receipt_quantity: 2, inventory_id: inventory.id },
+              { receipt_quantity: 3, inventory_id: inventory.id },
+            ],
+          },
+        }).then((res) => {
+          expect(res.status).to.eq(200);
+
+          cy.request({
+            url: `/api/inventory/${inventory.id}`,
+            headers: { 'X-API-Key': TEST_API_KEY },
+          }).then((postRes) => {
+            expect(postRes.body.reserved_quantity).to.eq(reservedBefore); // untouched
+            expect(postRes.body.quantity).to.eq(quantityBefore); // untouched
+          });
+
+          // Children still get their own bridge (for afterApprove to write the
+          // receive ledger row against later) but no inventory_transaction rows.
+          cy.task<any>('db:getReceivingReceiptLineChildren', { parentId: line.id }).then((children) => {
+            expect(children).to.have.length(2);
+            for (const child of children) {
+              expect(child.inventory_transactionable_id).to.not.be.null;
+              cy.task<any>('db:getInventoryTransactionsByBridge', {
+                inventory_transactionable_id: child.inventory_transactionable_id,
+              }).then((txs: any[]) => {
+                expect(txs).to.have.length(0); // no reserve/receive rows written at split time
+              });
+            }
+          });
+        });
       });
     });
   });

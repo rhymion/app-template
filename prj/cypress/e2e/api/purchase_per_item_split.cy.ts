@@ -196,6 +196,15 @@ describe('API: Purchase Per Item — Split (cmd_305 FIX-B)', () => {
   });
 
   it('DP-B1a: insufficient inventory for a split part is a hard error — tx aborts, no children created, parent unaffected', () => {
+    // cmd_307 FIX-α: parent's own reservation is now released BEFORE the
+    // children auto-allocate (same $transaction), so re-splitting entirely
+    // within the parent's own already-reserved lot legitimately succeeds —
+    // that is the bug FIX-α fixes, not insufficiency. To exercise a genuine
+    // insufficient-inventory failure post-FIX-α, the lot's physical quantity
+    // is dropped (via db:setInventoryQuantity, simulating real-world
+    // shrinkage after the reservation was made) to below what the split
+    // needs, so even with the parent's 10 units released there still isn't
+    // enough physical stock to cover both parts.
     cy.task<any>('db:seedReservationInventory', { quantity: 10 }).then((seed) => {
       cy.request({
         method: 'POST',
@@ -204,7 +213,7 @@ describe('API: Purchase Per Item — Split (cmd_305 FIX-B)', () => {
         body: {
           order_no: 'SPLIT-003',
           customer_id: seed.customer.id,
-          items: [{ product_id: seed.product.id, quantity: 10, price: null }], // uses all headroom
+          items: [{ product_id: seed.product.id, quantity: 10, price: null }],
         },
       }).then((poRes) => {
         expect(poRes.status).to.eq(201);
@@ -216,6 +225,79 @@ describe('API: Purchase Per Item — Split (cmd_305 FIX-B)', () => {
         }).then((preRes) => {
           expect(preRes.body.reserved_quantity).to.eq(10);
 
+          // Physical shrinkage after the reservation: only 6 units of real
+          // stock remain, below the 10 the split's parts require in total.
+          cy.task('db:setInventoryQuantity', { inventory_id: seed.inventory.id, quantity: 6 }).then(() => {
+            cy.task<any>('db:getPurchasePerItemsForOrder', { purchase_order_id: orderId }).then((items) => {
+              const parent = items[0];
+
+              Cypress.session.clearAllSavedSessions();
+              cy.clearCookies();
+              cy.login(TEST_CREDENTIALS.email, TEST_CREDENTIALS.password);
+              cy.request({
+                method: 'POST',
+                url: `${SPLIT_API}/${parent.id}/actions/split`,
+                body: {
+                  parts: [{ quantity: 4 }, { quantity: 6 }], // both auto-allocate, only 6 physically available
+                },
+                failOnStatusCode: false,
+              }).then((splitRes) => {
+                expect(splitRes.status).to.eq(400);
+                expect(splitRes.body.error || splitRes.body.message).to.match(/Insufficient inventory/);
+
+                cy.task<any>('db:getPurchasePerItemById', { id: parent.id }).then((parentAfter) => {
+                  expect(parentAfter.status).to.eq(0); // unchanged — not split
+                });
+
+                cy.task<any>('db:getPurchasePerItemChildren', { parentId: parent.id }).then((children) => {
+                  expect(children).to.have.length(0); // tx rolled back, no partial children
+                });
+
+                cy.request({
+                  url: `${INV_API}/${seed.inventory.id}`,
+                  headers: { 'X-API-Key': TEST_API_KEY },
+                }).then((postRes) => {
+                  // tx rollback undoes both the parent-release and any partial
+                  // child claims — reserved_quantity is exactly as before the split attempt.
+                  expect(postRes.body.reserved_quantity).to.eq(10);
+                  expect(postRes.body.quantity).to.eq(6);
+                });
+              });
+            });
+          });
+        });
+      });
+    });
+  });
+
+  it('cmd_307 FIX-α: re-splitting entirely within the parent\'s own already-reserved lot succeeds (parent release happens before child re-reservation)', () => {
+    // Before FIX-α: the parent's reserve rows were released AFTER the
+    // children auto-allocated/claimed, so a re-split into the very same lot
+    // the parent already reserved double-counted reserved_quantity and
+    // tripped a false 'Concurrent reservation conflict'. After FIX-α, the
+    // release happens first (same $transaction, so isolation is preserved),
+    // so this legitimate re-split succeeds.
+    cy.task<any>('db:seedReservationInventory', { quantity: 100 }).then((seed) => {
+      cy.request({
+        method: 'POST',
+        url: PO_API,
+        headers: { 'X-API-Key': TEST_API_KEY },
+        body: {
+          order_no: 'SPLIT-004',
+          customer_id: seed.customer.id,
+          items: [{ product_id: seed.product.id, quantity: 100, price: null }],
+        },
+      }).then((poRes) => {
+        expect(poRes.status).to.eq(201);
+        const orderId = poRes.body.id;
+
+        cy.request({
+          url: `${INV_API}/${seed.inventory.id}`,
+          headers: { 'X-API-Key': TEST_API_KEY },
+        }).then((preRes) => {
+          expect(preRes.body.reserved_quantity).to.eq(100);
+          expect(preRes.body.quantity).to.eq(100);
+
           cy.task<any>('db:getPurchasePerItemsForOrder', { purchase_order_id: orderId }).then((items) => {
             const parent = items[0];
 
@@ -226,27 +308,88 @@ describe('API: Purchase Per Item — Split (cmd_305 FIX-B)', () => {
               method: 'POST',
               url: `${SPLIT_API}/${parent.id}/actions/split`,
               body: {
-                parts: [{ quantity: 4 }, { quantity: 6 }], // both auto-allocate, no headroom anywhere
+                parts: [{ quantity: 50 }, { quantity: 50 }], // both auto-allocate into the same lot the parent held
               },
-              failOnStatusCode: false,
             }).then((splitRes) => {
-              expect(splitRes.status).to.eq(400);
-              expect(splitRes.body.error || splitRes.body.message).to.match(/Insufficient inventory/);
+              // Before FIX-α this returned 409 'Concurrent reservation conflict'.
+              expect(splitRes.status).to.eq(200);
+              expect(splitRes.body.ok).to.eq(true);
 
               cy.task<any>('db:getPurchasePerItemById', { id: parent.id }).then((parentAfter) => {
-                expect(parentAfter.status).to.eq(0); // unchanged — not split
+                expect(parentAfter.status).to.eq(1); // split
               });
 
               cy.task<any>('db:getPurchasePerItemChildren', { parentId: parent.id }).then((children) => {
-                expect(children).to.have.length(0); // tx rolled back, no partial children
+                expect(children).to.have.length(2);
+                const quantities = children.map((c: any) => c.quantity).sort((a: number, b: number) => a - b);
+                expect(quantities).to.deep.eq([50, 50]);
               });
 
               cy.request({
                 url: `${INV_API}/${seed.inventory.id}`,
                 headers: { 'X-API-Key': TEST_API_KEY },
               }).then((postRes) => {
-                expect(postRes.body.reserved_quantity).to.eq(10); // unchanged — no partial claim survived
+                // Parent's 100 released, then both children (50+50) claim the
+                // same lot — net reserved is still 100, not 200.
+                expect(postRes.body.reserved_quantity).to.eq(100);
+                expect(postRes.body.quantity).to.eq(100); // O-4: physical quantity untouched
               });
+            });
+          });
+        });
+      });
+    });
+  });
+
+  it("cmd_307 FIX-γ: an unspecified part's inventory_id sent as '' (UI sentinel) auto-allocates instead of causing a purchase_per_item_inventory_id_fkey violation", () => {
+    // Before FIX-γ: '' is falsy so the reserve-vs-auto-allocate branch took
+    // the auto-allocate path correctly, but the child record's own
+    // `inventory_id: part.inventory_id ?? parent.inventory_id` used `??`,
+    // which does NOT treat '' as nullish — '' was written straight into the
+    // child's inventory_id FK column, violating purchase_per_item_inventory_id_fkey
+    // (no inventory row has id=''). After FIX-γ, '' is normalized to
+    // undefined up front, so the auto-allocated child's inventory_id is null
+    // (it must not inherit the parent's single inventory_id either, since
+    // auto-allocate can span multiple lots).
+    cy.task<any>('db:seedReservationInventory', { quantity: 30 }).then((seed) => {
+      cy.request({
+        method: 'POST',
+        url: PO_API,
+        headers: { 'X-API-Key': TEST_API_KEY },
+        body: {
+          order_no: 'SPLIT-005',
+          customer_id: seed.customer.id,
+          items: [{ product_id: seed.product.id, quantity: 20, price: null }],
+        },
+      }).then((poRes) => {
+        expect(poRes.status).to.eq(201);
+        const orderId = poRes.body.id;
+
+        cy.task<any>('db:getPurchasePerItemsForOrder', { purchase_order_id: orderId }).then((items) => {
+          const parent = items[0];
+
+          Cypress.session.clearAllSavedSessions();
+          cy.clearCookies();
+          cy.login(TEST_CREDENTIALS.email, TEST_CREDENTIALS.password);
+          cy.request({
+            method: 'POST',
+            url: `${SPLIT_API}/${parent.id}/actions/split`,
+            body: {
+              parts: [
+                { quantity: 8, inventory_id: '' }, // UI "no lot selected" sentinel
+                { quantity: 12, inventory_id: '' },
+              ],
+            },
+          }).then((splitRes) => {
+            expect(splitRes.status).to.eq(200);
+            expect(splitRes.body.ok).to.eq(true);
+
+            cy.task<any>('db:getPurchasePerItemChildren', { parentId: parent.id }).then((children) => {
+              expect(children).to.have.length(2);
+              for (const child of children) {
+                expect(child.inventory_id).to.be.null; // never '' and never parent's inventory_id
+                expect(child.inventory_transactionable_id).to.not.be.null;
+              }
             });
           });
         });
