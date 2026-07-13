@@ -80,6 +80,43 @@ export async function setInventoryQuantity(inventory_id: string, quantity: numbe
 }
 
 /**
+ * Seed a second, DISTINCT product + its own inventory lot (item3: cross-
+ * product reservation/receive guard tests need two genuinely different
+ * products, unlike seedSecondInventoryLot which is a second lot of the SAME
+ * product).
+ */
+export async function seedSecondProduct(quantity: number) {
+  const testUser = await getTestUser();
+
+  const attachable = await prisma.attachable.create({ data: {} });
+  const productRecord = await prisma.product.create({
+    data: {
+      attachable_id: attachable.id,
+      code: `RES-PROD-B-${Date.now()}`,
+      name: 'Reservation Test Product B',
+      price: 200,
+      creator_id: testUser.id,
+      updater_id: testUser.id,
+    },
+  });
+
+  const inventoryRecord = await prisma.inventory.create({
+    data: {
+      product_id: productRecord.id,
+      quantity,
+      reserved_quantity: 0,
+      creator_id: testUser.id,
+      updater_id: testUser.id,
+    },
+  });
+
+  return JSON.parse(JSON.stringify({
+    product: productRecord,
+    inventory: inventoryRecord,
+  }));
+}
+
+/**
  * Seed a second inventory lot (same product, distinct location) with a given
  * quantity, for tests that need a re-reservation to spill across two lots.
  */

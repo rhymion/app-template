@@ -21,6 +21,11 @@ describe('API: Receiving Receipt Line — Split (cmd_296)', () => {
           .task<any>('db:populateReceivingReceiptLineWithApproval', {
             creatorId: flowSetup.approverUser.id,
             approvalFlowIds: [flowSetup.flow.id],
+            // item3: align the line's product with invSeed's inventory lot so
+            // existing tests below (which pass `inventory.id` as the split
+            // part's lot) don't themselves trip the new cross-product guard —
+            // pre-fix this mismatch was silently tolerated.
+            productId: invSeed.product.id,
           })
           .then((data) => {
             Cypress.session.clearAllSavedSessions();
@@ -229,6 +234,40 @@ describe('API: Receiving Receipt Line — Split (cmd_296)', () => {
       // Parent must remain unmodified after the rejected request.
       cy.task<any>('db:getReceivingReceiptLineById', { id: line.id }).then((parent) => {
         expect(parent.status).to.eq(0);
+      });
+    });
+  });
+
+  it('item3: hard-fails a split part whose specified inventory_id belongs to a different product than the line (real bug fix)', () => {
+    // Pre-fix, the receive-type (split_reserves_inventory=false) branch of
+    // the split template stored `_childInventoryId` on the child with NO
+    // existence or product check at all — the mismatch would only have
+    // surfaced later, silently, when afterApprove wrote the receive ledger
+    // against the wrong product's inventory cache. Now checked at split time.
+    seedLineWithApproval().then((ctx) => {
+      const { line } = ctx;
+      cy.task<any>('db:seedSecondProduct', { quantity: 10 }).then((otherProduct) => {
+        cy.request({
+          method: 'POST',
+          url: `/api/receiving_receipt_line/${line.id}/actions/split`,
+          body: {
+            parts: [
+              { receipt_quantity: 2, inventory_id: otherProduct.inventory.id }, // wrong product's lot
+              { receipt_quantity: 3, inventory_id: otherProduct.inventory.id },
+            ],
+          },
+          failOnStatusCode: false,
+        }).then((res) => {
+          expect(res.status).to.eq(400);
+          expect(res.body.error || res.body.message).to.match(/different product/i);
+
+          cy.task<any>('db:getReceivingReceiptLineById', { id: line.id }).then((parent) => {
+            expect(parent.status).to.eq(0); // unchanged — not split
+          });
+          cy.task<any>('db:getReceivingReceiptLineChildren', { parentId: line.id }).then((children) => {
+            expect(children).to.have.length(0);
+          });
+        });
       });
     });
   });

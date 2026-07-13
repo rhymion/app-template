@@ -396,4 +396,165 @@ describe('API: Purchase Per Item — Split (cmd_305 FIX-B)', () => {
       });
     });
   });
+
+  it('item3: rejects fewer than 2 parts (400) — quantity invariant validation, generic across x-splittable entities', () => {
+    cy.task<any>('db:seedReservationInventory', { quantity: 10 }).then((seed) => {
+      cy.request({
+        method: 'POST',
+        url: PO_API,
+        headers: { 'X-API-Key': TEST_API_KEY },
+        body: {
+          order_no: 'SPLIT-VAL-001',
+          customer_id: seed.customer.id,
+          items: [{ product_id: seed.product.id, quantity: 10, price: null }],
+        },
+      }).then((poRes) => {
+        cy.task<any>('db:getPurchasePerItemsForOrder', { purchase_order_id: poRes.body.id }).then((items) => {
+          const parent = items[0];
+          Cypress.session.clearAllSavedSessions();
+          cy.clearCookies();
+          cy.login(TEST_CREDENTIALS.email, TEST_CREDENTIALS.password);
+          cy.request({
+            method: 'POST',
+            url: `${SPLIT_API}/${parent.id}/actions/split`,
+            body: { parts: [{ quantity: 10 }] },
+            failOnStatusCode: false,
+          }).then((res) => {
+            expect(res.status).to.eq(400);
+          });
+        });
+      });
+    });
+  });
+
+  it('item3: rejects a non-positive part quantity (400)', () => {
+    cy.task<any>('db:seedReservationInventory', { quantity: 10 }).then((seed) => {
+      cy.request({
+        method: 'POST',
+        url: PO_API,
+        headers: { 'X-API-Key': TEST_API_KEY },
+        body: {
+          order_no: 'SPLIT-VAL-002',
+          customer_id: seed.customer.id,
+          items: [{ product_id: seed.product.id, quantity: 10, price: null }],
+        },
+      }).then((poRes) => {
+        cy.task<any>('db:getPurchasePerItemsForOrder', { purchase_order_id: poRes.body.id }).then((items) => {
+          const parent = items[0];
+          Cypress.session.clearAllSavedSessions();
+          cy.clearCookies();
+          cy.login(TEST_CREDENTIALS.email, TEST_CREDENTIALS.password);
+          cy.request({
+            method: 'POST',
+            url: `${SPLIT_API}/${parent.id}/actions/split`,
+            body: { parts: [{ quantity: 0 }, { quantity: 10 }] },
+            failOnStatusCode: false,
+          }).then((res) => {
+            expect(res.status).to.eq(400);
+          });
+        });
+      });
+    });
+  });
+
+  it('item3: rejects parts that do not sum to the parent quantity (400)', () => {
+    cy.task<any>('db:seedReservationInventory', { quantity: 10 }).then((seed) => {
+      cy.request({
+        method: 'POST',
+        url: PO_API,
+        headers: { 'X-API-Key': TEST_API_KEY },
+        body: {
+          order_no: 'SPLIT-VAL-003',
+          customer_id: seed.customer.id,
+          items: [{ product_id: seed.product.id, quantity: 10, price: null }],
+        },
+      }).then((poRes) => {
+        cy.task<any>('db:getPurchasePerItemsForOrder', { purchase_order_id: poRes.body.id }).then((items) => {
+          const parent = items[0];
+          Cypress.session.clearAllSavedSessions();
+          cy.clearCookies();
+          cy.login(TEST_CREDENTIALS.email, TEST_CREDENTIALS.password);
+          cy.request({
+            method: 'POST',
+            url: `${SPLIT_API}/${parent.id}/actions/split`,
+            body: { parts: [{ quantity: 4 }, { quantity: 4 }] }, // sums to 8, parent is 10
+            failOnStatusCode: false,
+          }).then((res) => {
+            expect(res.status).to.eq(400);
+            cy.task<any>('db:getPurchasePerItemById', { id: parent.id }).then((parentAfter) => {
+              expect(parentAfter.status).to.eq(0); // unchanged — not split
+            });
+          });
+        });
+      });
+    });
+  });
+
+  it('item3: hard-fails a split part whose specified inventory_id belongs to a different product than the line (real bug fix — pre-fix this silently reserved cross-product)', () => {
+    // Pre-fix, app/api/purchase_per_item/[id]/actions/split/route.ts's
+    // specified-lot branch only checked inventory existence
+    // (`tx.inventory.findUnique`), never `_childInv.product_id ===
+    // (part.product_id ?? parent.product_id)` — so a lot belonging to an
+    // unrelated product could be claimed. Two genuinely distinct products
+    // are seeded here (seedReservationInventory vs seedSecondProduct) so the
+    // mismatch is real, not just a different lot of the same product.
+    cy.task<any>('db:seedReservationInventory', { quantity: 10 }).then((seed) => {
+      cy.task<any>('db:seedSecondProduct', { quantity: 10 }).then((otherProduct) => {
+        cy.request({
+          method: 'POST',
+          url: PO_API,
+          headers: { 'X-API-Key': TEST_API_KEY },
+          body: {
+            order_no: 'SPLIT-XPROD-001',
+            customer_id: seed.customer.id,
+            items: [{ product_id: seed.product.id, quantity: 10, price: null }],
+          },
+        }).then((poRes) => {
+          expect(poRes.status).to.eq(201);
+          const orderId = poRes.body.id;
+
+          cy.task<any>('db:getPurchasePerItemsForOrder', { purchase_order_id: orderId }).then((items) => {
+            const parent = items[0];
+            expect(parent.product_id).to.eq(seed.product.id);
+
+            Cypress.session.clearAllSavedSessions();
+            cy.clearCookies();
+            cy.login(TEST_CREDENTIALS.email, TEST_CREDENTIALS.password);
+            cy.request({
+              method: 'POST',
+              url: `${SPLIT_API}/${parent.id}/actions/split`,
+              body: {
+                parts: [
+                  { quantity: 4, inventory_id: otherProduct.inventory.id }, // wrong product's lot
+                  { quantity: 6 },
+                ],
+              },
+              failOnStatusCode: false,
+            }).then((splitRes) => {
+              expect(splitRes.status).to.eq(400);
+              expect(splitRes.body.error || splitRes.body.message).to.match(/different product/i);
+
+              // tx rolled back entirely: parent untouched, no children created
+              cy.task<any>('db:getPurchasePerItemById', { id: parent.id }).then((parentAfter) => {
+                expect(parentAfter.status).to.eq(0);
+              });
+              cy.task<any>('db:getPurchasePerItemChildren', { parentId: parent.id }).then((children) => {
+                expect(children).to.have.length(0);
+              });
+
+              // the other product's lot was never touched — this is the
+              // concrete proof the cross-product reservation did NOT happen.
+              cy.request({
+                url: `${INV_API}/${otherProduct.inventory.id}`,
+                headers: { 'X-API-Key': TEST_API_KEY },
+              }).then((otherInvRes) => {
+                expect(otherInvRes.body.reserved_quantity).to.eq(0);
+                expect(otherInvRes.body.quantity).to.eq(10);
+              });
+            });
+          });
+        });
+      });
+    });
+  });
 });
