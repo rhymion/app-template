@@ -18,6 +18,11 @@ describe('UI: Receiving Receipt Line — Split (cmd_296)', () => {
         cy.task<any>('db:populateReceivingReceiptLineWithApproval', {
           creatorId: flowSetup.approverUser.id,
           approvalFlowIds: [],
+          // item3 cross-product guard: the split parts below select the seeded
+          // reservation inventory, so the parent line's product must match it
+          // (otherwise the guard's product mismatch check 400s and the dialog
+          // never closes — cmd_309 item4 QC cluster C).
+          productId: invSeed.product.id,
         }).then((data) => {
           const { line } = data;
           const inventory = invSeed.inventory;

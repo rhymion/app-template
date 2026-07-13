@@ -56,20 +56,28 @@ export async function setupReceivingReceiptLineApprovalFlow() {
 export async function populateReceivingReceiptLineWithApproval(
   creatorId: string,
   approvalFlowIds: string[],
-  opts?: { inventoryId?: string | null },
+  opts?: { inventoryId?: string | null; productId?: string },
 ) {
   const testUser = await getTestUser();
-  const attachable = await prisma.attachable.create({ data: {} });
-  const product = await prisma.product.create({
-    data: {
-      attachable_id: attachable.id,
-      code: `RRL-PROD-${Date.now()}`,
-      name: 'Receiving Receipt Line Test Product',
-      price: 50,
-      creator_id: testUser.id,
-      updater_id: testUser.id,
-    },
-  });
+  // item3: callers that need the line's product to match a specific
+  // inventory lot's product (e.g. split/approve tests exercising the
+  // cross-product guard) pass productId instead of minting a fresh,
+  // unrelated product.
+  const product = opts?.productId
+    ? await prisma.product.findUniqueOrThrow({ where: { id: opts.productId } })
+    : await (async () => {
+        const attachable = await prisma.attachable.create({ data: {} });
+        return prisma.product.create({
+          data: {
+            attachable_id: attachable.id,
+            code: `RRL-PROD-${Date.now()}`,
+            name: 'Receiving Receipt Line Test Product',
+            price: 50,
+            creator_id: testUser.id,
+            updater_id: testUser.id,
+          },
+        });
+      })();
 
   const receipt = await prisma.receiving_receipt.create({
     data: {
