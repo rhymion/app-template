@@ -123,12 +123,28 @@ export async function seedSecondProduct(quantity: number) {
 export async function seedSecondInventoryLot(product_id: string, quantity: number, location: string) {
   const testUser = await getTestUser();
 
+  // Phase4: inventory.location_id FK — resolve the location name to a
+  // location_id via find-or-create (same pattern as populate*Dependencies helpers).
+  let locationRecord = await prisma.location.findFirst({
+    where: { name: location },
+    orderBy: { created_at: 'asc' },
+  });
+  if (!locationRecord) {
+    locationRecord = await prisma.location.create({
+      data: {
+        name: location,
+        creator_id: testUser.id,
+        updater_id: testUser.id,
+      },
+    });
+  }
+
   const inventoryRecord = await prisma.inventory.create({
     data: {
       product_id,
       quantity,
       reserved_quantity: 0,
-      location,
+      location_id: locationRecord.id,
       creator_id: testUser.id,
       updater_id: testUser.id,
     },
