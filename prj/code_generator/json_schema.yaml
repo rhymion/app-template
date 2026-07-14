@@ -1831,6 +1831,8 @@ definitions:
           - receive
           - release
           - cancel
+          - move     # Phase5 追加: inventory_movement の移動トランザクション
+          - adjust   # Phase5 追加: inventory_adjustment の棚卸調整トランザクション
       quantity_delta:
         type: integer       # O-4: physical inventory movement
       reserved_delta:
@@ -1861,6 +1863,206 @@ definitions:
           labelField: name
     # inventory_transaction_detail is not created (no _detail definition needed;
     # this entity is not exposed as a child of any parent).
+
+  inventory_movement:
+    type: object
+    required:
+      - id
+      - from_inventory_id
+      - to_inventory_id
+      - quantity
+      - approvable_id
+    x-display:
+      table:
+        - quantity:
+            primary: true
+            width: 100
+        - from_inventory:
+            width: 250
+        - to_inventory:
+            width: 250
+    x-approval:
+      on_approved:
+        emit_hook: true   # → ledger_move_stub.ts.jinja2 による 2行生成
+      on_rejected:
+        terminal: true
+        emit_hook: false
+        set_fields:
+          status: "rejected"
+    x-ledger-source:
+      ledgerDomain: inventory_domain
+      event_type: move
+      fromPoolIdField: from_inventory_id   # 出庫側 inventory FK フィールド名
+      toPoolIdField: to_inventory_id       # 入庫側 inventory FK フィールド名
+      quantity_delta_field: quantity
+    properties:
+      id:
+        type: string
+        pattern: "^c[a-z0-9]{24,}$"
+      from_inventory_id:
+        type: string
+        pattern: "^c[a-z0-9]{24,}$"
+        x-relationship:
+          type: many-to-one
+          target: inventory
+          labelField:
+            - product.name
+            - location.name
+            - lot_number
+            - expiration_date
+      to_inventory_id:
+        type: string
+        pattern: "^c[a-z0-9]{24,}$"
+        x-relationship:
+          type: many-to-one
+          target: inventory
+          labelField:
+            - product.name
+            - location.name
+            - lot_number
+            - expiration_date
+      quantity:
+        type: integer
+        minimum: 1
+      status:
+        type: string
+        enum:
+          - pending
+          - rejected
+        default: pending
+      approvable_id:
+        type: string
+        pattern: "^c[a-z0-9]{24,}$"
+        x-relationship:
+          type: one-to-one_bridge
+          target: approvable
+          labelField: id
+      inventory_transactionable_id:
+        type:
+          - string
+          - "null"
+        pattern: "^c[a-z0-9]{24,}$"
+        # Plain FK — bridge created at approval time by ledger_move_stub
+
+  inventory_movement_detail:
+    x-generate:
+      list: true
+      view: true
+      new: true
+      edit: false
+      delete: false
+      invalidate: false
+      api: true
+      test: true
+    x-custom-components:
+      - name: ApprovalSection
+        path: "@/components/_standard/ApprovalSection"
+        target:
+          - view
+    allOf:
+      - $ref: "#/definitions/inventory_movement"
+      - type: object
+        properties:
+          from_inventory:
+            $ref: "#/definitions/inventory"
+          to_inventory:
+            $ref: "#/definitions/inventory"
+          approvable:
+            $ref: "#/definitions/approvable"
+
+  inventory_adjustment:
+    type: object
+    required:
+      - id
+      - inventory_id
+      - quantity_delta
+      - approvable_id
+    x-display:
+      table:
+        - quantity_delta:
+            primary: true
+            width: 100
+        - inventory:
+            width: 250
+    x-approval:
+      on_approved:
+        emit_hook: true   # → ledger_adjust_stub.ts.jinja2 による 1行生成
+      on_rejected:
+        terminal: true
+        emit_hook: false
+        set_fields:
+          status: "rejected"
+    x-ledger-source:
+      ledgerDomain: inventory_domain
+      event_type: adjust
+      poolIdField: inventory_id           # 対象 inventory FK フィールド名
+      quantity_delta_field: quantity_delta
+    properties:
+      id:
+        type: string
+        pattern: "^c[a-z0-9]{24,}$"
+      inventory_id:
+        type: string
+        pattern: "^c[a-z0-9]{24,}$"
+        x-relationship:
+          type: many-to-one
+          target: inventory
+          labelField:
+            - product.name
+            - location.name
+            - lot_number
+            - expiration_date
+      quantity_delta:
+        type: integer
+        # 正: 棚卸増加 (found extra stock) / 負: 棚卸減少 (damaged/lost)
+        # minimum 制約なし — 負値を許容
+      reason:
+        type:
+          - string
+          - "null"
+        # 任意: 調整理由 (コメント欄として利用)
+      status:
+        type: string
+        enum:
+          - pending
+          - rejected
+        default: pending
+      approvable_id:
+        type: string
+        pattern: "^c[a-z0-9]{24,}$"
+        x-relationship:
+          type: one-to-one_bridge
+          target: approvable
+          labelField: id
+      inventory_transactionable_id:
+        type:
+          - string
+          - "null"
+        pattern: "^c[a-z0-9]{24,}$"
+
+  inventory_adjustment_detail:
+    x-generate:
+      list: true
+      view: true
+      new: true
+      edit: false
+      delete: false
+      invalidate: false
+      api: true
+      test: true
+    x-custom-components:
+      - name: ApprovalSection
+        path: "@/components/_standard/ApprovalSection"
+        target:
+          - view
+    allOf:
+      - $ref: "#/definitions/inventory_adjustment"
+      - type: object
+        properties:
+          inventory:
+            $ref: "#/definitions/inventory"
+          approvable:
+            $ref: "#/definitions/approvable"
 
   purchase_order:
     type: object

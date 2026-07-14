@@ -151,6 +151,10 @@ model user {
   updated_receiving_receipts            receiving_receipt[]        @relation("ReceivingReceiptUpdater")
   created_receiving_receipt_lines       receiving_receipt_line[]   @relation("ReceivingReceiptLineCreator")
   updated_receiving_receipt_lines       receiving_receipt_line[]   @relation("ReceivingReceiptLineUpdater")
+  created_inventory_movements           inventory_movement[]       @relation("InventoryMovementCreator")
+  updated_inventory_movements           inventory_movement[]       @relation("InventoryMovementUpdater")
+  created_inventory_adjustments         inventory_adjustment[]     @relation("InventoryAdjustmentCreator")
+  updated_inventory_adjustments         inventory_adjustment[]     @relation("InventoryAdjustmentUpdater")
 
   @@index([api_key])
   @@index([creator_id])
@@ -221,6 +225,8 @@ model approvable {
   leave_request     leave_request?
   purchase_per_item purchase_per_item?
   receiving_receipt_line receiving_receipt_line?
+  inventory_movement   inventory_movement?
+  inventory_adjustment inventory_adjustment?
   approved_at       DateTime?          @db.Timestamptz(0)
   rejection_reason  String?
 
@@ -285,6 +291,8 @@ model inventory_transactionable {
   id                     String                  @id @default(cuid())
   purchase_per_item      purchase_per_item?
   receiving_receipt_line receiving_receipt_line?
+  inventory_movement     inventory_movement?
+  inventory_adjustment   inventory_adjustment?
   inventory_transactions inventory_transaction[]
 }
 
@@ -311,6 +319,52 @@ model inventory_transaction {
 
   @@index([inventory_transactionable_id])
   @@index([created_by_id])
+  @@index([creator_id])
+}
+
+model inventory_movement {
+  id                           String                     @id @default(cuid())
+  from_inventory_id            String
+  from_inventory               inventory                  @relation("InventoryMovementFrom", fields: [from_inventory_id], references: [id])
+  to_inventory_id               String
+  to_inventory                  inventory                  @relation("InventoryMovementTo", fields: [to_inventory_id], references: [id])
+  quantity                     Int
+  status                       String                     @default("pending")
+  approvable_id                String                     @unique
+  approvable                   approvable                 @relation(fields: [approvable_id], references: [id])
+  inventory_transactionable_id String?                    @unique
+  inventory_transactionable    inventory_transactionable? @relation(fields: [inventory_transactionable_id], references: [id])
+  created_at                   DateTime                   @default(now()) @db.Timestamptz(0)
+  updated_at                   DateTime                   @updatedAt @db.Timestamptz(0)
+  creator_id                   String?
+  creator                      user?                      @relation("InventoryMovementCreator", fields: [creator_id], references: [id])
+  updater_id                   String?
+  updater                      user?                      @relation("InventoryMovementUpdater", fields: [updater_id], references: [id])
+
+  @@index([from_inventory_id])
+  @@index([to_inventory_id])
+  @@index([creator_id])
+}
+
+model inventory_adjustment {
+  id                           String                     @id @default(cuid())
+  inventory_id                 String
+  inventory                    inventory                  @relation(fields: [inventory_id], references: [id])
+  quantity_delta               Int
+  reason                       String?
+  status                       String                     @default("pending")
+  approvable_id                String                     @unique
+  approvable                   approvable                 @relation(fields: [approvable_id], references: [id])
+  inventory_transactionable_id String?                    @unique
+  inventory_transactionable    inventory_transactionable? @relation(fields: [inventory_transactionable_id], references: [id])
+  created_at                   DateTime                   @default(now()) @db.Timestamptz(0)
+  updated_at                   DateTime                   @updatedAt @db.Timestamptz(0)
+  creator_id                   String?
+  creator                      user?                      @relation("InventoryAdjustmentCreator", fields: [creator_id], references: [id])
+  updater_id                   String?
+  updater                      user?                      @relation("InventoryAdjustmentUpdater", fields: [updater_id], references: [id])
+
+  @@index([inventory_id])
   @@index([creator_id])
 }
 
@@ -781,6 +835,9 @@ model inventory {
   updater           user      @relation("InventoryUpdater", fields: [updater_id], references: [id])
   receiving_receipt_lines receiving_receipt_line[] @relation("ReceiptLineInventory")
   purchase_per_items purchase_per_item[]
+  movements_from    inventory_movement[]   @relation("InventoryMovementFrom")
+  movements_to      inventory_movement[]   @relation("InventoryMovementTo")
+  adjustments       inventory_adjustment[]
 
   @@index([creator_id])
   @@index([location_id])
