@@ -2311,6 +2311,15 @@ definitions:
           - pending
           - approved
           - rejected
+      assignee_id:
+        type:
+          - string
+          - "null"
+        pattern: "^c[a-z0-9]{24,}$"
+        x-relationship:
+          type: many-to-one
+          target: user
+          labelField: name
 
   leave_request_detail:
     x-generate:
@@ -2338,6 +2347,8 @@ definitions:
             $ref: "#/definitions/user"
           approvable:
             $ref: "#/definitions/approvable"
+          assignee:
+            $ref: "#/definitions/user"
 
   # ============================================================
   # Cell 2: count mode, no lines (supply_request example)
@@ -3036,6 +3047,15 @@ definitions:
           - string
           - "null"
         pattern: "^c[a-z0-9]{24,}$"
+      assignee_id:
+        type:
+          - string
+          - "null"
+        pattern: "^c[a-z0-9]{24,}$"
+        x-relationship:
+          type: many-to-one
+          target: user
+          labelField: name
 
   receiving_receipt_detail:
     x-generate:
@@ -3090,6 +3110,8 @@ definitions:
             $ref: "#/definitions/inventory"
           approvable:
             $ref: "#/definitions/approvable"
+          assignee:
+            $ref: "#/definitions/user"
 
   purchase_per_item_detail:
     x-generate:

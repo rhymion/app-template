@@ -123,6 +123,7 @@ model user {
   leave_requests            leave_request[]     @relation("LeaveRequestUser")
   created_leave_requests    leave_request[]     @relation("LeaveRequestCreator")
   updated_leave_requests    leave_request[]     @relation("LeaveRequestUpdater")
+  assigned_leave_requests   leave_request[]     @relation("LeaveRequestAssignee")
   created_approval_flows    approval_flow[]     @relation("ApprovalFlowCreator")
   updated_approval_flows    approval_flow[]     @relation("ApprovalFlowUpdater")
   created_approval_historys approval_history[]  @relation("ApprovalHistoryCreator")
@@ -151,6 +152,7 @@ model user {
   updated_receiving_receipts            receiving_receipt[]        @relation("ReceivingReceiptUpdater")
   created_receiving_receipt_lines       receiving_receipt_line[]   @relation("ReceivingReceiptLineCreator")
   updated_receiving_receipt_lines       receiving_receipt_line[]   @relation("ReceivingReceiptLineUpdater")
+  assigned_receiving_receipt_lines      receiving_receipt_line[]   @relation("ReceivingReceiptLineAssignee")
   created_inventory_movements           inventory_movement[]       @relation("InventoryMovementCreator")
   updated_inventory_movements           inventory_movement[]       @relation("InventoryMovementUpdater")
   created_inventory_adjustments         inventory_adjustment[]     @relation("InventoryAdjustmentCreator")
@@ -917,8 +919,11 @@ model leave_request {
   creator       user       @relation("LeaveRequestCreator", fields: [creator_id], references: [id])
   updater_id    String
   updater       user       @relation("LeaveRequestUpdater", fields: [updater_id], references: [id])
+  assignee_id   String?
+  assignee      user?      @relation("LeaveRequestAssignee", fields: [assignee_id], references: [id])
 
   @@index([creator_id])
+  @@index([assignee_id])
 }
 
 // ============================================================
@@ -1149,9 +1154,12 @@ model receiving_receipt_line {
   creator              user?             @relation("ReceivingReceiptLineCreator", fields: [creator_id], references: [id])
   updater_id           String?
   updater              user?             @relation("ReceivingReceiptLineUpdater", fields: [updater_id], references: [id])
+  assignee_id          String?
+  assignee             user?             @relation("ReceivingReceiptLineAssignee", fields: [assignee_id], references: [id])
 
   @@index([receiving_receipt_id])
   @@index([inventory_id])
   @@index([parent_id])
   @@index([creator_id])
+  @@index([assignee_id])
 }
