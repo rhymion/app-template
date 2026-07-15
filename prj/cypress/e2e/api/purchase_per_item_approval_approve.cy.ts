@@ -59,7 +59,7 @@ describe('API: Purchase Per Item — Approve / Ship (cmd_309 item3)', () => {
   }
 
   it('single-lot reservation: approve ships — quantity and reserved_quantity both decrement, one ship ledger row', () => {
-    cy.task<any>('db:setupPurchasePerItemApprovalFlow').then((flowSetup) => {
+    cy.task<any>('db:setupPurchasePerItemSingleApprovalFlow').then((flowSetup) => {
       cy.task<any>('db:seedReservationInventory', { quantity: 10 }).then((seed) => {
         reserveAndApprove(4, seed, 'APPROVE-001', flowSetup).then((ctx: any) => {
           const { item } = ctx;
@@ -93,7 +93,7 @@ describe('API: Purchase Per Item — Approve / Ship (cmd_309 item3)', () => {
   });
 
   it('multi-lot reservation (auto-allocate spans two inventory lots): approve ships both lots independently', () => {
-    cy.task<any>('db:setupPurchasePerItemApprovalFlow').then((flowSetup) => {
+    cy.task<any>('db:setupPurchasePerItemSingleApprovalFlow').then((flowSetup) => {
       // First lot only has 5 units — a quantity-12 order must spill onto a
       // second lot (O-8) to be satisfied.
       cy.task<any>('db:seedReservationInventory', { quantity: 5 }).then((seed) => {
@@ -139,7 +139,7 @@ describe('API: Purchase Per Item — Approve / Ship (cmd_309 item3)', () => {
   });
 
   it('split child (own bridge): approve ships the child independently of any sibling', () => {
-    cy.task<any>('db:setupPurchasePerItemApprovalFlow').then((flowSetup) => {
+    cy.task<any>('db:setupPurchasePerItemSingleApprovalFlow').then((flowSetup) => {
       cy.task<any>('db:seedReservationInventory', { quantity: 20 }).then((seed) => {
         cy.request({
           method: 'POST',

@@ -13,9 +13,9 @@ describe('UI: Receiving Receipt Line — Split (cmd_296)', () => {
   });
 
   it('splits via the Split dialog: quantity inputs + inventory Autocomplete lookup, remaining validation, DB reflects split', () => {
-    cy.task<any>('db:setupReceivingReceiptLineApprovalFlow').then((flowSetup) => {
+    cy.task<any>('db:setupReceivingReceiptLineSingleApprovalFlow').then((flowSetup) => {
       cy.task<any>('db:seedReservationInventory', { quantity: 100 }).then((invSeed) => {
-        cy.task<any>('db:populateReceivingReceiptLineWithApproval', {
+        cy.task<any>('db:populateReceivingReceiptLineSingleApproval', {
           creatorId: flowSetup.approverUser.id,
           approvalFlowIds: [],
           // item3 cross-product guard: the split parts below select the seeded

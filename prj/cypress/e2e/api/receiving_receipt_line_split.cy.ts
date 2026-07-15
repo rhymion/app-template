@@ -15,10 +15,10 @@ describe('API: Receiving Receipt Line — Split (cmd_296)', () => {
   });
 
   function seedLineWithApproval(receiptQuantity = 5) {
-    return cy.task<any>('db:setupReceivingReceiptLineApprovalFlow').then((flowSetup) => {
+    return cy.task<any>('db:setupReceivingReceiptLineSingleApprovalFlow').then((flowSetup) => {
       return cy.task<any>('db:seedReservationInventory', { quantity: 100 }).then((invSeed) => {
         return cy
-          .task<any>('db:populateReceivingReceiptLineWithApproval', {
+          .task<any>('db:populateReceivingReceiptLineSingleApproval', {
             creatorId: flowSetup.approverUser.id,
             approvalFlowIds: [flowSetup.flow.id],
             // item3: align the line's product with invSeed's inventory lot so

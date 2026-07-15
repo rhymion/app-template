@@ -19,10 +19,10 @@ describe('API: Receiving Receipt Line — Approve / Receive Ledger (cmd_309 item
   });
 
   function seedLineWithApprovalAndInventory(receiptQuantity = 5) {
-    return cy.task<any>('db:setupReceivingReceiptLineApprovalFlow').then((flowSetup) => {
+    return cy.task<any>('db:setupReceivingReceiptLineSingleApprovalFlow').then((flowSetup) => {
       return cy.task<any>('db:seedReservationInventory', { quantity: 100 }).then((invSeed) => {
         return cy
-          .task<any>('db:populateReceivingReceiptLineWithApproval', {
+          .task<any>('db:populateReceivingReceiptLineSingleApproval', {
             creatorId: flowSetup.approverUser.id,
             approvalFlowIds: [flowSetup.flow.id],
             productId: invSeed.product.id,
@@ -147,9 +147,9 @@ describe('API: Receiving Receipt Line — Approve / Receive Ledger (cmd_309 item
     // $transaction as the approval_request status flip, so everything rolls
     // back: status stays pending, approved_at stays null, no ledger row, no
     // inventory change.
-    cy.task<any>('db:setupReceivingReceiptLineApprovalFlow').then((flowSetup) => {
+    cy.task<any>('db:setupReceivingReceiptLineSingleApprovalFlow').then((flowSetup) => {
       cy.task<any>('db:seedSecondProduct', { quantity: 50 }).then((otherProduct) => {
-        cy.task<any>('db:populateReceivingReceiptLineWithApproval', {
+        cy.task<any>('db:populateReceivingReceiptLineSingleApproval', {
           creatorId: flowSetup.approverUser.id,
           approvalFlowIds: [flowSetup.flow.id],
           inventoryId: otherProduct.inventory.id, // wrong product's lot

@@ -221,11 +221,14 @@ export async function getInventoryAllocation(purchase_order_id: string) {
 }
 
 /**
- * Create an approval_flow for purchase_per_item's terminal-reject-driven
- * reservation cancel path (B-5 Phase2c D7 tests), plus an approver user/role
- * to exercise the reject action.
+ * Single-role approval_flow + approver user, for the hand-written API-level
+ * approval specs (approve/reject/dispatch/reservation). Renamed from
+ * setupPurchasePerItemApprovalFlow to avoid colliding with the generated
+ * (multi-flow) helper of that name under the same cy.task key — the
+ * collision made this narrow one shadow the generated one everywhere,
+ * including the generated UI spec (cmd_322 RC5).
  */
-export async function setupPurchasePerItemApprovalFlow() {
+export async function setupPurchasePerItemSingleApprovalFlow() {
   const { hashPassword } = require('../test-credentials');
   const testUser = await getTestUser();
   const hashedPw = await hashPassword('test-password');

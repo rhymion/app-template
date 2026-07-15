@@ -243,7 +243,7 @@ describe('Reservation Allocation (B3/B4)', () => {
   // -------------------------------------------------------------------------
 
   it('14.4b_equiv: purchase_per_item terminal reject creates a reverting cancel tx (reserved_quantity restored, quantity unchanged)', () => {
-    cy.task<any>('db:setupPurchasePerItemApprovalFlow').then((flowSetup) => {
+    cy.task<any>('db:setupPurchasePerItemSingleApprovalFlow').then((flowSetup) => {
       cy.task<any>('db:seedReservationInventory', { quantity: 10 }).then((seed) => {
         cy.request({
           method: 'POST',

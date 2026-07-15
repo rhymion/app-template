@@ -23,7 +23,7 @@ describe('API: Purchase Per Item — Terminal Reject Reservation Release (cmd_30
   });
 
   function reserveAndReject(quantity: number, invSeed: any, orderNo: string) {
-    return cy.task<any>('db:setupPurchasePerItemApprovalFlow').then((flowSetup) => {
+    return cy.task<any>('db:setupPurchasePerItemSingleApprovalFlow').then((flowSetup) => {
       return cy
         .request({
           method: 'POST',
@@ -135,7 +135,7 @@ describe('API: Purchase Per Item — Terminal Reject Reservation Release (cmd_30
   });
 
   it('split child (own bridge, location=null lot) terminal reject also releases its reservation independently of the parent', () => {
-    cy.task<any>('db:setupPurchasePerItemApprovalFlow').then((flowSetup) => {
+    cy.task<any>('db:setupPurchasePerItemSingleApprovalFlow').then((flowSetup) => {
       cy.task<any>('db:seedReservationInventory', { quantity: 20 }).then((seed) => {
         cy.request({
           method: 'POST',

@@ -17,9 +17,9 @@ describe('API: Receiving Receipt Line — Terminal Reject (D7)', () => {
   });
 
   it('14.4a_equiv: receiving_receipt_line terminal reject has no inventory effect (no-op)', () => {
-    cy.task<any>('db:setupReceivingReceiptLineApprovalFlow').then((flowSetup) => {
+    cy.task<any>('db:setupReceivingReceiptLineSingleApprovalFlow').then((flowSetup) => {
       cy.task<any>('db:seedReservationInventory', { quantity: 10 }).then((seed) => {
-        cy.task<any>('db:populateReceivingReceiptLineWithApproval', {
+        cy.task<any>('db:populateReceivingReceiptLineSingleApproval', {
           creatorId: flowSetup.approverUser.id,
           approvalFlowIds: [flowSetup.flow.id],
           inventoryId: seed.inventory.id,
@@ -60,8 +60,8 @@ describe('API: Receiving Receipt Line — Terminal Reject (D7)', () => {
   });
 
   it('13.5_equiv: terminal reject sets approval_request.status = 3 (terminal_rejected)', () => {
-    cy.task<any>('db:setupReceivingReceiptLineApprovalFlow').then((flowSetup) => {
-      cy.task<any>('db:populateReceivingReceiptLineWithApproval', {
+    cy.task<any>('db:setupReceivingReceiptLineSingleApprovalFlow').then((flowSetup) => {
+      cy.task<any>('db:populateReceivingReceiptLineSingleApproval', {
         creatorId: flowSetup.approverUser.id,
         approvalFlowIds: [flowSetup.flow.id],
       }).then((data) => {
@@ -82,8 +82,8 @@ describe('API: Receiving Receipt Line — Terminal Reject (D7)', () => {
   });
 
   it('13.6_equiv: terminal reject sets approvable.approved_at (idempotency guard)', () => {
-    cy.task<any>('db:setupReceivingReceiptLineApprovalFlow').then((flowSetup) => {
-      cy.task<any>('db:populateReceivingReceiptLineWithApproval', {
+    cy.task<any>('db:setupReceivingReceiptLineSingleApprovalFlow').then((flowSetup) => {
+      cy.task<any>('db:populateReceivingReceiptLineSingleApproval', {
         creatorId: flowSetup.approverUser.id,
         approvalFlowIds: [flowSetup.flow.id],
       }).then((data) => {

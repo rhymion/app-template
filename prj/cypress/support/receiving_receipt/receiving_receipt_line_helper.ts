@@ -10,11 +10,14 @@ async function getTestUser() {
 }
 
 /**
- * Create an approval_flow for receiving_receipt_line's terminal-reject path
- * (B-5 Phase2c D7 tests: 13.5_equiv/13.6_equiv/14.4a_equiv), plus an approver
- * user/role to exercise the reject action.
+ * Single-role approval_flow + approver user, for the hand-written API-level
+ * approval specs (approve/reject/dispatch/split). Renamed from
+ * setupReceivingReceiptLineApprovalFlow to avoid colliding with the
+ * generated (multi-flow) helper of that name under the same cy.task key —
+ * the collision made this narrow one shadow the generated one everywhere,
+ * including the generated UI spec (cmd_322 RC5).
  */
-export async function setupReceivingReceiptLineApprovalFlow() {
+export async function setupReceivingReceiptLineSingleApprovalFlow() {
   const { hashPassword } = require('../test-credentials');
   const testUser = await getTestUser();
   const hashedPw = await hashPassword('test-password');
@@ -47,13 +50,13 @@ export async function setupReceivingReceiptLineApprovalFlow() {
 
 /**
  * Directly seed a receiving_receipt + receiving_receipt_line (status=pending)
- * with a pending approval_request tied to its approvable_id — mirroring the
- * populate{{Entity}}WithApproval pattern used by generated approval-flow
- * helpers (e.g. leave_request), since receiving_receipt_line has no
- * standalone create API (it's only created as a receiving_receipt child, and
- * that path doesn't accept approvable_id).
+ * with a pending approval_request tied to its approvable_id, for the
+ * hand-written API-level approval specs. Renamed from
+ * populateReceivingReceiptLineWithApproval (was registered under the same
+ * cy.task name as the generated helper of that name — same collision class
+ * as setupReceivingReceiptLineApprovalFlow, cmd_322 RC5).
  */
-export async function populateReceivingReceiptLineWithApproval(
+export async function populateReceivingReceiptLineSingleApproval(
   creatorId: string,
   approvalFlowIds: string[],
   opts?: { inventoryId?: string | null; productId?: string },
