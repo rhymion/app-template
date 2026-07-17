@@ -3,12 +3,83 @@ $schema: "http://json-schema.org/draft-07/schema#"
 # Support multi-tenancy
 format-version: 2.0
 
+# x-cloud: GCP Cloud Run opt-in (コメントを解除して使用)
+# x-cloud:
+#   enabled: true
+#   provider: gcp
+#   service: cloud_run
+#   region: asia-northeast1
+
 # Generator configuration (DP-3: search opt-in vs all-entity default)
 # search.default_scope: 'opt_in' — only entities with x-generate.search: true are searchable
 # search.default_scope: 'all'    — all entities are searchable; exclude with x-generate.search: false
+
+# x-generate per-entity flags (cmd_330):
+#   import: true (default) — generate /api/{entity}/import route + ImportModal UI + test
+#   import: false          — suppress own import route/UI/test;
+#                            x-import-key (b) dotted-FK resolution by other entities
+#                            continues to work (e.g. role.name lookup in permission import)
+#   export: true (default) — generate /api/{entity}/export route + ExportCsvButton + N1-N8 test
+#   export: false          — suppress export route, ExportCsvButton, N1-N8 export tests
 x-generator:
   search:
     default_scope: all
+
+# PII and Privacy Annotations
+x-pii:
+  type: string
+  enum:
+    - direct    # Directly identifies a person (name, email)
+    - indirect  # Can identify when combined (image, emailVerified)
+    - sensitive # Special category (GDPR Art.9) or confidential auth data
+    - none      # No PII
+  description: |
+    PII classification for GDPR/APPI compliance.
+    Used by the anonymize_user() function to determine which fields to scrub.
+    Required on all user-facing fields in generated apps.
+
+x-retention:
+  type: string
+  description: |
+    Data retention policy for this field.
+    Examples: "account_lifetime", "7_years", "30_days_after_deletion"
+    Used to generate retention enforcement logic in future phases.
+
+x-mention:
+  type: boolean
+  default: false
+  description: |
+    When true, the field supports @[user_id:uuid] mention syntax.
+    The generator will include mention-parser utilities for this field.
+    On render: @[user_id:xxx] is resolved to user.name (or '[deleted]' after anonymization).
+    On save: @username patterns are converted to @[user_id:xxx] format.
+
+x-gdpr-mode:
+  type: string
+  enum:
+    - internal   # Applies to employee/internal user data only
+    - consumer   # Applies to general consumer data only
+    - both       # Applies to both internal and consumer data
+  default: both
+  description: |
+    Specifies the data subject scope this model/field applies to.
+    internal: employee data only
+    consumer: general consumer data only
+    both: applies to both scopes
+
+x-import-key:
+  type: array
+  items:
+    type: string
+  description: |
+    Natural key fields that uniquely identify a record for import (Phase 2).
+    Also guarantees these columns appear in Phase 1 CSV exports when export:true (the default).
+    Dual purpose: (a) own import key — suppressed by x-generate.import:false;
+    (b) natural-key target for other entities' dotted-FK imports — always active.
+    Single field: [name]
+    Composite: [name, tenant_id]
+    Dotted FK path for Phase 2: [name, role.name] (role_id resolved via role.name)
+    Entities without x-import-key: export-only in Phase 1; import blocked in Phase 2.
 
 # OD-1: top-level ledger/transactionable/pool entity declarations. Each domain
 # groups the three entities that make up one ledger-transaction inventory-like
@@ -34,6 +105,7 @@ definitions:
       - id
       - name
       - email
+    x-import-key: [name]
     x-display:
       table:
         - name:
@@ -84,6 +156,7 @@ definitions:
     required:
       - id
       - name
+    x-import-key: [name]
     properties:
       id:
         type: string
@@ -102,10 +175,14 @@ definitions:
       view: true
       new: false
       edit: true
-      delete: true
-      invalidate: false
+      delete: false
+      invalidate:
+        enabled: true
+        handler: anonymizeUser
+        module: lib/compliance/anonymize_user
       api: true
       test: true
+      search: false
       fields:
         - name
         - image
@@ -198,6 +275,7 @@ definitions:
     required:
       - id
       - name
+    x-import-key: [name]
     properties:
       id:
         type: string
@@ -247,6 +325,7 @@ definitions:
       - read
       - update
       - delete
+    x-import-key: [name, role.name]
     x-display:
       table:
         - name:
@@ -269,6 +348,9 @@ definitions:
         type: boolean
       delete:
         type: boolean
+      import:
+        type: boolean
+        default: false
       role_id:
         type:
           - string
@@ -305,6 +387,7 @@ definitions:
       - id
       - entity_name
       - approver_role_id
+    x-import-key: [entity_name]
     x-display:
       table:
         - entity_name:
