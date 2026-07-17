@@ -168,6 +168,8 @@ definitions:
         type:
           - string
           - "null"
+        x-ui:
+          rows: 4
 
   user_detail:
     x-generate:
@@ -287,6 +289,8 @@ definitions:
         type:
           - string
           - "null"
+        x-ui:
+          rows: 4
 
   organization_detail:
     x-generate:
@@ -340,6 +344,8 @@ definitions:
         type: string
         minLength: 1
         x-entity-select: true
+        x-ui:
+          width: 6
       create:
         type: boolean
       read:
@@ -355,6 +361,8 @@ definitions:
         type:
           - string
           - "null"
+        x-ui:
+          width: 6
         pattern: "^c[a-z0-9]{24,}$"
         x-relationship:
           type: many-to-one
@@ -584,6 +592,7 @@ definitions:
       message:
         type: string
         minLength: 1
+        x-mention: true
       commentable_id:
         type: string
         pattern: "^c[a-z0-9]{24,}$"
@@ -835,6 +844,8 @@ definitions:
         type:
           - string
           - "null"
+        x-ui:
+          rows: 4
       commentable_id:
         type: string
         pattern: "^c[a-z0-9]{24,}$"
@@ -2455,6 +2466,8 @@ definitions:
         type:
           - string
           - "null"
+        x-ui:
+          rows: 4
       quantity:
         type: integer
         minimum: 0
@@ -2505,6 +2518,8 @@ definitions:
         type:
           - string
           - "null"
+        x-ui:
+          rows: 4
       quantity:
         type: integer
         minimum: 1
@@ -2575,6 +2590,8 @@ definitions:
         type:
           - string
           - "null"
+        x-ui:
+          rows: 4
 
   room_type_detail:
     x-generate:
