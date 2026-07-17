@@ -40,6 +40,7 @@ model tenant {
   users      user[]   @relation("UserTenant")
 
   @@index([creator_id])
+  @@index([updater_id])
 }
 
 model user {
@@ -161,6 +162,7 @@ model user {
   @@index([api_key])
   @@index([creator_id])
   @@index([tenant_id])
+  @@index([updater_id])
 }
 
 model role {
@@ -179,6 +181,7 @@ model role {
   approver_approval_flows  approval_flow[] @relation("ApprovalFlowApproverRole")
 
   @@index([creator_id])
+  @@index([updater_id])
 }
 
 model organization {
@@ -197,6 +200,7 @@ model organization {
   notes       note[]
 
   @@index([creator_id])
+  @@index([updater_id])
 }
 
 model permission {
@@ -208,6 +212,7 @@ model permission {
   read       Boolean
   update     Boolean
   delete     Boolean
+  import     Boolean @default(false)
   created_at DateTime @default(now()) @db.Timestamptz(0)
   updated_at DateTime @updatedAt @db.Timestamptz(0)
   creator_id String
@@ -217,6 +222,8 @@ model permission {
 
   @@unique([name, role_id])
   @@index([creator_id])
+  @@index([role_id])
+  @@index([updater_id])
 }
 
 model approvable {
@@ -253,6 +260,9 @@ model approval_flow {
   updater           user               @relation("ApprovalFlowUpdater", fields: [updater_id], references: [id])
 
   @@index([creator_id])
+  @@index([approver_role_id])
+  @@index([requestor_role_id])
+  @@index([updater_id])
 }
 
 model approval_request {
@@ -265,6 +275,8 @@ model approval_request {
   approval_histories approval_history[]
   created_at         DateTime           @default(now()) @db.Timestamptz(0)
   updated_at         DateTime           @updatedAt @db.Timestamptz(0)
+  @@index([approvable_id])
+  @@index([approval_flow_id])
 }
 
 model approval_history {
@@ -281,6 +293,7 @@ model approval_history {
   creator             user             @relation("ApprovalHistoryCreator", fields: [creator_id], references: [id])
 
   @@index([creator_id])
+  @@index([approval_request_id])
 }
 
 model commentable {
@@ -322,6 +335,7 @@ model inventory_transaction {
   @@index([inventory_transactionable_id])
   @@index([created_by_id])
   @@index([creator_id])
+  @@index([updater_id])
 }
 
 model inventory_movement {
@@ -346,6 +360,7 @@ model inventory_movement {
   @@index([from_inventory_id])
   @@index([to_inventory_id])
   @@index([creator_id])
+  @@index([updater_id])
 }
 
 model inventory_adjustment {
@@ -368,6 +383,7 @@ model inventory_adjustment {
 
   @@index([inventory_id])
   @@index([creator_id])
+  @@index([updater_id])
 }
 
 model comment {
@@ -382,6 +398,7 @@ model comment {
   creator        user        @relation("CommentCreator", fields: [creator_id], references: [id])
 
   @@index([creator_id])
+  @@index([commentable_id])
 }
 
 model reaction {
@@ -413,6 +430,7 @@ model note {
 
   @@index([organization_id])
   @@index([creator_id])
+  @@index([updater_id])
 }
 
 model attachable {
@@ -432,6 +450,7 @@ model attachment {
   attachable    attachable @relation(fields: [attachable_id], references: [id], onDelete: Cascade)
   created_at    DateTime   @default(now()) @db.Timestamptz(0)
   updated_at    DateTime   @updatedAt @db.Timestamptz(0)
+  @@index([attachable_id])
 }
 
 model dashboard {
@@ -446,6 +465,7 @@ model dashboard {
   updater    user               @relation("DashboardUpdater", fields: [updater_id], references: [id])
 
   @@index([creator_id])
+  @@index([updater_id])
 }
 
 model dashboard_widget {
@@ -464,6 +484,7 @@ model dashboard_widget {
   order          Int       @default(0)
   created_at     DateTime  @default(now()) @db.Timestamptz(0)
   updated_at     DateTime  @updatedAt @db.Timestamptz(0)
+  @@index([dashboard_id])
 }
 
 // Append-only audit trail for security-relevant events: auth lifecycle
@@ -544,6 +565,7 @@ model Account {
   user              user    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
+  @@index([userId])
 }
 
 model Session {
@@ -552,6 +574,7 @@ model Session {
   userId       String
   expires      DateTime
   user         user     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId])
 }
 
 model VerificationToken {
@@ -578,6 +601,7 @@ model db_table {
   referenced_by  field[]     @relation("ReferenceTable")
 
   @@index([creator_id])
+  @@index([updater_id])
 }
 
 model field {
@@ -594,6 +618,8 @@ model field {
   required     Boolean   @default(true)
   created_at   DateTime  @default(now()) @db.Timestamptz(0)
   updated_at   DateTime  @updatedAt @db.Timestamptz(0)
+  @@index([db_table_id])
+  @@index([reference_id])
 }
 
 model xxxxx_xxxxx {
@@ -610,6 +636,7 @@ model xxxxx_xxxxx {
   yyyyy_yyyyys yyyyy_yyyyy[]
 
   @@index([creator_id])
+  @@index([updater_id])
 }
 
 model yyyyy_yyyyy {
@@ -625,6 +652,7 @@ model yyyyy_yyyyy {
   written_by     String
   created_at     DateTime    @default(now()) @db.Timestamptz(0)
   updated_at     DateTime    @updatedAt @db.Timestamptz(0)
+  @@index([xxxxx_xxxxx_id])
 }
 
 model parent1 {
@@ -648,6 +676,7 @@ model parent1 {
 
   @@index([creator_id])
   @@index([organization_id])
+  @@index([updater_id])
 }
 
 model parent1_child1 {
@@ -664,6 +693,7 @@ model parent1_child1 {
   written_by String
   created_at DateTime @default(now()) @db.Timestamptz(0)
   updated_at DateTime @updatedAt @db.Timestamptz(0)
+  @@index([parent1_id])
 }
 
 model parent1_child2 {
@@ -676,6 +706,7 @@ model parent1_child2 {
   end_date   DateTime  @db.Timestamptz(0)
   created_at DateTime  @default(now()) @db.Timestamptz(0)
   updated_at DateTime  @updatedAt @db.Timestamptz(0)
+  @@index([parent1_id])
 }
 
 model parent1_list {
@@ -685,6 +716,7 @@ model parent1_list {
   updated_at DateTime @updatedAt @db.Timestamptz(0)
   parent1_id String
   parent1    parent1  @relation(fields: [parent1_id], references: [id], onDelete: Cascade)
+  @@index([parent1_id])
 }
 
 model parent_only {
@@ -701,6 +733,7 @@ model parent_only {
   updater     user      @relation("ParentOnlyUpdater", fields: [updater_id], references: [id])
 
   @@index([creator_id])
+  @@index([updater_id])
 }
 
 model procedure {
@@ -723,6 +756,8 @@ model procedure {
 
   @@index([creator_id])
   @@index([assignee_id])
+  @@index([parent_id])
+  @@index([updater_id])
 }
 
 model resource {
@@ -743,6 +778,7 @@ model resource {
 
   @@index([creator_id])
   @@index([organization_id])
+  @@index([updater_id])
 }
 
 model booking {
@@ -760,6 +796,8 @@ model booking {
   updater     user     @relation("BookingUpdater", fields: [updater_id], references: [id])
 
   @@index([creator_id])
+  @@index([resource_id])
+  @@index([updater_id])
 }
 
 model shift_template {
@@ -777,6 +815,8 @@ model shift_template {
   updater     user     @relation("ShiftTemplateUpdater", fields: [updater_id], references: [id])
 
   @@index([creator_id])
+  @@index([updater_id])
+  @@index([user_id])
 }
 
 model shift {
@@ -794,6 +834,8 @@ model shift {
   updater    user     @relation("ShiftUpdater", fields: [updater_id], references: [id])
 
   @@index([creator_id])
+  @@index([updater_id])
+  @@index([user_id])
 }
 
 model product {
@@ -817,6 +859,7 @@ model product {
   updater            user                @relation("ProductUpdater", fields: [updater_id], references: [id])
 
   @@index([creator_id])
+  @@index([updater_id])
 }
 
 model inventory {
@@ -843,6 +886,8 @@ model inventory {
 
   @@index([creator_id])
   @@index([location_id])
+  @@index([product_id])
+  @@index([updater_id])
 }
 
 model location {
@@ -857,6 +902,7 @@ model location {
   updater     user        @relation("LocationUpdater", fields: [updater_id], references: [id])
 
   @@index([creator_id])
+  @@index([updater_id])
 }
 
 model purchase_order {
@@ -873,6 +919,8 @@ model purchase_order {
   updater     user                @relation("PurchaseOrderUpdater", fields: [updater_id], references: [id])
 
   @@index([creator_id])
+  @@index([customer_id])
+  @@index([updater_id])
 }
 
 model purchase_per_item {
@@ -901,6 +949,11 @@ model purchase_per_item {
   updater              user?             @relation("PurchasePerItemUpdater", fields: [updater_id], references: [id])
 
   @@index([creator_id])
+  @@index([inventory_id])
+  @@index([parent_id])
+  @@index([product_id])
+  @@index([purchase_order_id])
+  @@index([updater_id])
 }
 
 model leave_request {
@@ -924,6 +977,8 @@ model leave_request {
 
   @@index([creator_id])
   @@index([assignee_id])
+  @@index([updater_id])
+  @@index([user_id])
 }
 
 // ============================================================
@@ -945,6 +1000,7 @@ model supply_pool {
   updater            user                @relation("SupplyPoolUpdater", fields: [updater_id], references: [id])
 
   @@index([creator_id])
+  @@index([updater_id])
 }
 
 model supply_request {
@@ -961,6 +1017,7 @@ model supply_request {
   updater            user                @relation("SupplyRequestUpdater", fields: [updater_id], references: [id])
 
   @@index([creator_id])
+  @@index([updater_id])
 }
 
 model supply_allocation {
@@ -995,6 +1052,7 @@ model room_type {
   updater           user               @relation("RoomTypeUpdater", fields: [updater_id], references: [id])
 
   @@index([creator_id])
+  @@index([updater_id])
 }
 
 model room {
@@ -1013,6 +1071,8 @@ model room {
   updater           user               @relation("RoomUpdater", fields: [updater_id], references: [id])
 
   @@index([creator_id])
+  @@index([room_type_id])
+  @@index([updater_id])
 }
 
 model room_reservation {
@@ -1032,6 +1092,9 @@ model room_reservation {
   updater      user      @relation("RoomReservationUpdater", fields: [updater_id], references: [id])
 
   @@index([creator_id])
+  @@index([room_id])
+  @@index([room_type_id])
+  @@index([updater_id])
 }
 
 // ============================================================
@@ -1053,6 +1116,7 @@ model receiving_purchase_order {
   updater                        user                             @relation("ReceivingPurchaseOrderUpdater", fields: [updater_id], references: [id])
 
   @@index([creator_id])
+  @@index([updater_id])
 }
 
 model receiving_purchase_order_line {
@@ -1070,6 +1134,7 @@ model receiving_purchase_order_line {
   updated_at                  DateTime                 @updatedAt @db.Timestamptz(0)
 
   @@index([receiving_purchase_order_id])
+  @@index([product_id])
 }
 
 model receiving_asn {
@@ -1089,6 +1154,7 @@ model receiving_asn {
 
   @@index([creator_id])
   @@index([purchase_order_id])
+  @@index([updater_id])
 }
 
 model receiving_asn_line {
@@ -1106,6 +1172,7 @@ model receiving_asn_line {
   updated_at           DateTime      @updatedAt @db.Timestamptz(0)
 
   @@index([receiving_asn_id])
+  @@index([product_id])
 }
 
 model receiving_receipt {
@@ -1128,6 +1195,7 @@ model receiving_receipt {
   @@index([creator_id])
   @@index([purchase_order_id])
   @@index([asn_id])
+  @@index([updater_id])
 }
 
 model receiving_receipt_line {
@@ -1162,4 +1230,6 @@ model receiving_receipt_line {
   @@index([parent_id])
   @@index([creator_id])
   @@index([assignee_id])
+  @@index([product_id])
+  @@index([updater_id])
 }
