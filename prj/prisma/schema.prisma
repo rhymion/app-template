@@ -423,6 +423,8 @@ model note {
   description     String?
   organization_id String
   organization    organization @relation(fields: [organization_id], references: [id])
+  noteable_id     String?
+  noteable        noteable?    @relation(fields: [noteable_id], references: [id])
   created_at      DateTime     @default(now()) @db.Timestamptz(0)
   updated_at      DateTime     @updatedAt @db.Timestamptz(0)
   creator_id      String
@@ -433,6 +435,14 @@ model note {
   @@index([organization_id])
   @@index([creator_id])
   @@index([updater_id])
+  @@index([noteable_id])
+}
+
+model noteable {
+  id        String     @id @default(cuid())
+  procedure procedure?
+  db_table  db_table?
+  notes     note[]
 }
 
 model attachable {
@@ -596,6 +606,8 @@ model db_table {
   description    String?
   commentable_id String      @unique
   commentable    commentable @relation(fields: [commentable_id], references: [id], onDelete: Cascade)
+  noteable_id    String?     @unique
+  noteable       noteable?   @relation(fields: [noteable_id], references: [id])
   created_at     DateTime    @default(now()) @db.Timestamptz(0)
   updated_at     DateTime    @updatedAt @db.Timestamptz(0)
   creator_id     String
@@ -758,6 +770,8 @@ model procedure {
   children    procedure[] @relation("ParentChild")
   preceded_by procedure[] @relation("BeforeAfter")
   followed_by procedure[] @relation("BeforeAfter")
+  noteable_id String?     @unique
+  noteable    noteable?   @relation(fields: [noteable_id], references: [id])
 
   @@index([creator_id])
   @@index([assignee_id])
