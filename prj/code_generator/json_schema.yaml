@@ -120,8 +120,10 @@ definitions:
       name:
         type: string
         minLength: 1
+        x-pii: direct
       email:
         type: string
+        x-pii: direct
       # Nullable so SSO-provisioned users (Google, etc.) can exist without a
       # bcrypt hash. Credentials sign-in still requires a non-null password —
       # auth.ts authorize() rejects accounts with password === null.
@@ -144,6 +146,7 @@ definitions:
           - string
           - "null"
         format: uri
+        x-pii: indirect
       mfa_enabled:
         type: boolean
         default: false
@@ -440,6 +443,7 @@ definitions:
       invalidate: false
       api: true
       test: true
+      import: false
     x-relationships:
       preceded_by:
         type: many-to-many
@@ -811,6 +815,7 @@ definitions:
       invalidate: false
       api: true
       test: true
+      export: false
     x-custom-components:
       - name: DashboardView
         path: "@/components/_standard/DashboardView"
@@ -1053,6 +1058,7 @@ definitions:
           - string
           - "null"
         format: uri
+        x-uri-kind: link
 
   parent1_child1:
     type: object
@@ -1996,6 +2002,7 @@ definitions:
       from_inventory_id:
         type: string
         pattern: "^c[a-z0-9]{24,}$"
+        x-readonly: true
         x-relationship:
           type: many-to-one
           target: inventory
@@ -2367,6 +2374,11 @@ definitions:
             width: 150
         - end_date:
             width: 150
+      chart:
+        span: month
+        row_by: user
+        start_field: start_date
+        end_field: end_date
       dashboard: true
     properties:
       id:
@@ -2656,6 +2668,7 @@ definitions:
       invalidate: false
       api: true
       test: true
+      mobile: true
     allOf:
       - $ref: "#/definitions/room"
       - type: object
