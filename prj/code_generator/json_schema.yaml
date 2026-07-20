@@ -401,7 +401,7 @@ definitions:
       - id
       - entity_name
       - approver_role_id
-    x-import-key: [entity_name]
+    x-import-key: [entity_name, approver_role.name, requestor_role.name]
     x-display:
       table:
         - entity_name:
@@ -446,7 +446,7 @@ definitions:
       invalidate: false
       api: true
       test: true
-      import: false
+      import: true
     x-relationships:
       preceded_by:
         type: many-to-many
@@ -509,7 +509,7 @@ definitions:
         x-relationship:
           type: many-to-one
           target: approval_flow
-          labelField: entity_name
+          labelField: [entity_name, approver_role.name]
       status:
         type: integer
         minimum: 0

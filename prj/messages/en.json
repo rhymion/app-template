@@ -25,10 +25,12 @@
   },
   "Fields": {
     "actions": "Actions",
+    "actionUser": "Action User",
     "attachments": "Attachments",
     "avatar": "Avatar",
     "chartType": "Chart Type",
     "comments": "Comments",
+    "created_at": "Created At",
     "dateOfBirth": "Date of Birth",
     "filterField": "Filter Field",
     "filterValue": "Filter Value",
@@ -47,6 +49,7 @@
     "reference": "Reference",
     "regex": "Regex",
     "required": "Required",
+    "status_draft": "Draft",
     "type": "Type",
     "url": "URL",
     "writtenBy": "Written By"
@@ -95,7 +98,8 @@
     "searchAriaLabel": "Search"
   },
   "Nav": {
-    "home": "Home"
+    "home": "Home",
+    "auditLog": "Audit Log"
   },
   "Auth": {
     "signInTitle": "Sign in to your account",
