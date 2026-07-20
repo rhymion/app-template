@@ -106,6 +106,7 @@ definitions:
       - name
       - email
     x-import-key: [name]
+    x-gdpr-mode: both
     x-display:
       table:
         - name:
@@ -121,9 +122,11 @@ definitions:
         type: string
         minLength: 1
         x-pii: direct
+        x-gdpr-mode: both
       email:
         type: string
         x-pii: direct
+        x-gdpr-mode: both
       # Nullable so SSO-provisioned users (Google, etc.) can exist without a
       # bcrypt hash. Credentials sign-in still requires a non-null password —
       # auth.ts authorize() rejects accounts with password === null.
