@@ -15,23 +15,18 @@ describe('API: Receiving Receipt Line — Split (cmd_296)', () => {
   });
 
   function seedLineWithApproval(receiptQuantity = 5) {
-    return cy.task<any>('db:setupReceivingReceiptLineSingleApprovalFlow').then((flowSetup) => {
+    return cy.task<any>('db:setupReceivingReceiptLineApprovalFlow').then((flowSetup) => {
       return cy.task<any>('db:seedReservationInventory', { quantity: 100 }).then((invSeed) => {
         return cy
-          .task<any>('db:populateReceivingReceiptLineSingleApproval', {
+          .task<any>('db:populateReceivingReceiptLineWithApproval', {
             creatorId: flowSetup.approverUser.id,
             approvalFlowIds: [flowSetup.flow.id],
-            // item3: align the line's product with invSeed's inventory lot so
-            // existing tests below (which pass `inventory.id` as the split
-            // part's lot) don't themselves trip the new cross-product guard —
-            // pre-fix this mismatch was silently tolerated.
-            productId: invSeed.product.id,
           })
           .then((data) => {
             Cypress.session.clearAllSavedSessions();
             cy.clearCookies();
             cy.login(flowSetup.approverUser.email, 'test-password');
-            return cy.wrap({ ...data, flowSetup, inventory: invSeed.inventory, receiptQuantity });
+            return cy.wrap({ line: data.record, approvalRequests: data.approvalRequests, flowSetup, inventory: invSeed.inventory, receiptQuantity });
           });
       });
     });
