@@ -20,7 +20,7 @@ describe('API: Receiving Receipt Line — Split (cmd_296)', () => {
         return cy
           .task<any>('db:populateReceivingReceiptLineWithApproval', {
             creatorId: flowSetup.approverUser.id,
-            approvalFlowIds: [flowSetup.flow.id],
+            approvalFlowIds: [flowSetup.flowWithRole.id],
           })
           .then((data) => {
             Cypress.session.clearAllSavedSessions();

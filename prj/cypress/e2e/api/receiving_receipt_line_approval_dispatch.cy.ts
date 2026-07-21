@@ -21,7 +21,7 @@ describe('API: Receiving Receipt Line — Terminal Reject (D7)', () => {
       cy.task<any>('db:seedReservationInventory', { quantity: 10 }).then((seed) => {
         cy.task<any>('db:populateReceivingReceiptLineWithApproval', {
           creatorId: flowSetup.approverUser.id,
-          approvalFlowIds: [flowSetup.flow.id],
+          approvalFlowIds: [flowSetup.flowWithRole.id],
         }).then((data) => {
           const arId = data.approvalRequests[0].id;
 
@@ -62,7 +62,7 @@ describe('API: Receiving Receipt Line — Terminal Reject (D7)', () => {
     cy.task<any>('db:setupReceivingReceiptLineApprovalFlow').then((flowSetup) => {
       cy.task<any>('db:populateReceivingReceiptLineWithApproval', {
         creatorId: flowSetup.approverUser.id,
-        approvalFlowIds: [flowSetup.flow.id],
+        approvalFlowIds: [flowSetup.flowWithRole.id],
       }).then((data) => {
         const arId = data.approvalRequests[0].id;
 
@@ -84,7 +84,7 @@ describe('API: Receiving Receipt Line — Terminal Reject (D7)', () => {
     cy.task<any>('db:setupReceivingReceiptLineApprovalFlow').then((flowSetup) => {
       cy.task<any>('db:populateReceivingReceiptLineWithApproval', {
         creatorId: flowSetup.approverUser.id,
-        approvalFlowIds: [flowSetup.flow.id],
+        approvalFlowIds: [flowSetup.flowWithRole.id],
       }).then((data) => {
         const arId = data.approvalRequests[0].id;
         const approvableId = data.record.approvable_id;
