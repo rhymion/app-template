@@ -2998,6 +2998,7 @@ definitions:
       - id
       - receipt_no
       - status
+    x-import-key: [receipt_no]
     x-approval-lines:
       - lines
     x-display:
