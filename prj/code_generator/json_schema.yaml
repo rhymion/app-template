@@ -1507,11 +1507,18 @@ definitions:
       - name: AttachmentSection
         path: "@/components/_standard/AttachmentSection"
         target:
-          - view
           - edit
         props:
           showImages: true
           showFiles: false
+      - name: AttachmentSection
+        path: "@/components/_standard/AttachmentSection"
+        target:
+          - view
+        props:
+          showImages: true
+          showFiles: false
+          readOnly: true
     allOf:
       - $ref: "#/definitions/resource"
       - type: object
@@ -1774,8 +1781,13 @@ definitions:
       - name: AttachmentSection
         path: "@/components/_standard/AttachmentSection"
         target:
-          - view
           - edit
+      - name: AttachmentSection
+        path: "@/components/_standard/AttachmentSection"
+        target:
+          - view
+        props:
+          readOnly: true
     allOf:
       - $ref: "#/definitions/product"
       - type: object
