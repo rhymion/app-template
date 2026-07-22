@@ -3140,6 +3140,15 @@ definitions:
             - location.name
             - lot_number
             - expiration_date
+        # DP-B (cmd_424): narrow inventory candidates to the same product as
+        # this line's own product_id, forwarded as formValues.product_id into
+        # inventory's filterAutocompleteOptions() (prj/lib/inventory/
+        # autocomplete_filter.ts). Reaches split_action_section.tsx.jinja2's
+        # SplitActionSection via this field's membership in x-splittable's
+        # perPartRequired below — the FormUpsert path is unreachable here
+        # (receiving_receipt_line_detail has new:false/edit:false).
+        x-autocomplete-context:
+          - product_id
       approvable_id:
         type: string
         pattern: "^c[a-z0-9]{24,}$"

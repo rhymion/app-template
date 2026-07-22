@@ -85,6 +85,55 @@ describe('UI: Receiving Receipt Line — Split (cmd_296)', () => {
       });
     });
   });
+
+  it("cmd_424: inventory Autocomplete only offers inventory for the line's own product, not an unrelated product's inventory", () => {
+    // DP-B (cmd_424): SplitActionSection now forwards the parent line's
+    // product_id as autocomplete context, narrowing inventory_id candidates
+    // to the same product (lib/inventory/autocomplete_filter.ts). Seeds a
+    // second, unrelated product+inventory (db:seedSecondProduct, same helper
+    // the item3 API test above uses) and asserts it never appears in the
+    // picker — a real Prisma WHERE narrowing, not just default no-op stub
+    // behavior (verified against a production `next build`/`next start`).
+    cy.task<any>('db:setupReceivingReceiptLineSingleApprovalFlow').then((flowSetup) => {
+      cy.task<any>('db:seedReservationInventory', { quantity: 100 }).then((invSeed) => {
+        cy.task<any>('db:seedSecondProduct', { quantity: 50 }).then(() => {
+          cy.task<any>('db:populateReceivingReceiptLineSingleApproval', {
+            creatorId: flowSetup.approverUser.id,
+            approvalFlowIds: [],
+            productId: invSeed.product.id,
+          }).then((data) => {
+            const { line } = data;
+
+            Cypress.session.clearAllSavedSessions();
+            cy.clearCookies();
+            cy.clearLocalStorage();
+            cy.visit('/en/');
+            cy.window().then((win) => {
+              win.sessionStorage.clear();
+            });
+            cy.login(TEST_CREDENTIALS.email, TEST_CREDENTIALS.password);
+
+            cy.visit(`/en/receiving_receipt_line/view/${line.id}`);
+            cy.contains('button', 'Split').click();
+            cy.get('[role="dialog"]').should('be.visible');
+
+            // openOnFocus renders the initial (unfiltered-by-query) option set —
+            // assert it's still narrowed by product, not just by search text.
+            cy.get('[role="dialog"] input[role="combobox"]').eq(0).click({ force: true });
+            cy.document().then((doc) => {
+              cy.wrap(doc.body)
+                .find('[role="listbox"] [role="option"], .MuiAutocomplete-popper li')
+                .should(($opts) => {
+                  const texts = $opts.toArray().map((el) => el.textContent ?? '');
+                  expect(texts.length).to.be.greaterThan(0);
+                  expect(texts.some((t) => t.includes('Reservation Test Product B'))).to.eq(false);
+                });
+            });
+          });
+        });
+      });
+    });
+  });
 });
 
 /**
