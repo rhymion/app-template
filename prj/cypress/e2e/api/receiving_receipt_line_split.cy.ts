@@ -21,6 +21,10 @@ describe('API: Receiving Receipt Line — Split (cmd_296)', () => {
           .task<any>('db:populateReceivingReceiptLineWithApproval', {
             creatorId: flowSetup.approverUser.id,
             approvalFlowIds: [flowSetup.flowWithRole.id],
+            // Align the line's own product/inventory with invSeed's lot so the
+            // split parts below (which pass invSeed.inventory.id) don't trip
+            // the split action's cross-product guard.
+            overrides: { receipt_quantity: receiptQuantity, inventory_id: invSeed.inventory.id, product_id: invSeed.product.id },
           })
           .then((data) => {
             Cypress.session.clearAllSavedSessions();

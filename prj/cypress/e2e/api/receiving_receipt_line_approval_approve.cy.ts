@@ -25,6 +25,10 @@ describe('API: Receiving Receipt Line — Approve / Receive Ledger (cmd_309 item
           .task<any>('db:populateReceivingReceiptLineWithApproval', {
             creatorId: flowSetup.approverUser.id,
             approvalFlowIds: [flowSetup.flowWithRole.id],
+            // Align the line's own product/inventory with invSeed's lot so the
+            // approve/split assertions below (which query invSeed.inventory)
+            // observe the same record the ledger write actually touches.
+            overrides: { receipt_quantity: receiptQuantity, inventory_id: invSeed.inventory.id, product_id: invSeed.product.id },
           })
           .then((data) => {
             return cy.wrap({ line: data.record, approvalRequests: data.approvalRequests, flowSetup, inventory: invSeed.inventory, receiptQuantity });
@@ -150,6 +154,7 @@ describe('API: Receiving Receipt Line — Approve / Receive Ledger (cmd_309 item
         cy.task<any>('db:populateReceivingReceiptLineWithApproval', {
           creatorId: flowSetup.approverUser.id,
           approvalFlowIds: [flowSetup.flowWithRole.id],
+          overrides: { inventory_id: otherProduct.inventory.id },
         }).then((data) => {
           const { record: line, approvalRequests } = data;
           expect(line.product_id).to.not.eq(otherProduct.product.id); // genuine mismatch, confirmed
