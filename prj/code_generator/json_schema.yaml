@@ -1,26 +1,5 @@
 $schema: "http://json-schema.org/draft-07/schema#"
-
-# Support multi-tenancy
 format-version: 2.0
-
-# x-cloud: GCP Cloud Run opt-in (コメントを解除して使用)
-# x-cloud:
-#   enabled: true
-#   provider: gcp
-#   service: cloud_run
-#   region: asia-northeast1
-
-# Generator configuration (DP-3: search opt-in vs all-entity default)
-# search.default_scope: 'opt_in' — only entities with x-generate.search: true are searchable
-# search.default_scope: 'all'    — all entities are searchable; exclude with x-generate.search: false
-
-# x-generate per-entity flags (cmd_330):
-#   import: true (default) — generate /api/{entity}/import route + ImportModal UI + test
-#   import: false          — suppress own import route/UI/test;
-#                            x-import-key (b) dotted-FK resolution by other entities
-#                            continues to work (e.g. role.name lookup in permission import)
-#   export: true (default) — generate /api/{entity}/export route + ExportCsvButton + N1-N8 test
-#   export: false          — suppress export route, ExportCsvButton, N1-N8 export tests
 x-generator:
   search:
     default_scope: all
@@ -94,90 +73,7 @@ x-ledger-entities:
     transactionable: inventory_transactionable
 
 definitions:
-  # ============================================================
-  # System entities (required by all apps — see §1.1)
-  # Keep these definitions intact when creating a new app.
-  # ============================================================
-
   user:
-    type: object
-    required:
-      - id
-      - name
-      - email
-    x-import-key: [name]
-    x-gdpr-mode: both
-    x-display:
-      table:
-        - name:
-            primary: true
-            width: 150
-        - additional_info:
-            width: 250
-    properties:
-      id:
-        type: string
-        pattern: "^c[a-z0-9]{24,}$"
-      name:
-        type: string
-        minLength: 1
-        x-pii: direct
-        x-gdpr-mode: both
-      email:
-        type: string
-        x-pii: direct
-        x-gdpr-mode: both
-      # Nullable so SSO-provisioned users (Google, etc.) can exist without a
-      # bcrypt hash. Credentials sign-in still requires a non-null password —
-      # auth.ts authorize() rejects accounts with password === null.
-      password:
-        type:
-          - string
-          - "null"
-        x-custom-component:
-          target:
-            - upsert
-      api_key:
-        type:
-          - string
-          - "null"
-        x-custom-component:
-          target:
-            - upsert
-      image:
-        type:
-          - string
-          - "null"
-        format: uri
-        x-pii: indirect
-      mfa_enabled:
-        type: boolean
-        default: false
-        x-custom-component:
-          target:
-            - upsert
-
-  role:
-    type: object
-    required:
-      - id
-      - name
-    x-import-key: [name]
-    properties:
-      id:
-        type: string
-        pattern: "^c[a-z0-9]{24,}$"
-      name:
-        type: string
-        minLength: 1
-      description:
-        type:
-          - string
-          - "null"
-        x-ui:
-          rows: 4
-
-  user_detail:
     x-generate:
       list: true
       view: true
@@ -195,26 +91,57 @@ definitions:
         - name
         - image
         - roles
+    x-relationships:
+      roles:
+        type: many-to-many
+        target: role
     x-custom-components:
       - name: MfaToggle
         path: "@/components/_standard/MfaToggle"
         target:
           - view
-    x-relationships:
+    x-import-key: [name]
+    x-display:
+      table:
+        - name:
+            primary: true
+            width: 150
+        - additional_info:
+            width: 250
+    x-gdpr-mode: both
+    fields:
+      name:
+        minLength: 1
+        x-pii: direct
+        x-gdpr-mode: both
+      email:
+        x-pii: direct
+        x-gdpr-mode: both
+      password:
+        x-custom-component:
+          target:
+            - upsert
+      api_key:
+        x-custom-component:
+          target:
+            - upsert
+      image:
+        format: uri
+        x-pii: indirect
+      mfa_enabled:
+        default: false
+        x-custom-component:
+          target:
+            - upsert
+
+    required:
+      - roles
+    properties:
       roles:
-        type: many-to-many
-        target: role
-    allOf:
-      - $ref: "#/definitions/user"
-      - type: object
-        required:
-          - roles
-        properties:
-          roles:
-            type: array
-            x-outputType: list
-            items:
-              $ref: "#/definitions/role"
+        type: array
+        x-outputType: list
+        items:
+          $ref: "#/definitions/role"
 
   setting:
     x-generate:
@@ -248,7 +175,7 @@ definitions:
             items:
               $ref: "#/definitions/role"
 
-  role_detail:
+  role:
     x-generate:
       list: true
       view: true
@@ -266,39 +193,24 @@ definitions:
       users:
         type: many-to-many
         target: user
-    allOf:
-      - $ref: "#/definitions/role"
-      - type: object
-        required:
-          - users
-        properties:
-          users:
-            type: array
-            x-outputType: list
-            items:
-              $ref: "#/definitions/user"
-
-  organization:
-    type: object
-    required:
-      - id
-      - name
     x-import-key: [name]
-    properties:
-      id:
-        type: string
-        pattern: "^c[a-z0-9]{24,}$"
+    fields:
       name:
-        type: string
         minLength: 1
       description:
-        type:
-          - string
-          - "null"
         x-ui:
           rows: 4
 
-  organization_detail:
+    required:
+      - users
+    properties:
+      users:
+        type: array
+        x-outputType: list
+        items:
+          $ref: "#/definitions/user"
+
+  organization:
     x-generate:
       list: true
       view: true
@@ -308,74 +220,30 @@ definitions:
       invalidate: false
       api: true
       test: true
-    x-search:
-      org_id_field: id
     x-relationships:
       users:
         type: many-to-many
         target: user
-    allOf:
-      - $ref: "#/definitions/organization"
-      - type: object
-        required:
-          - users
-        properties:
-          users:
-            type: array
-            x-outputType: list
-            items:
-              $ref: "#/definitions/user"
+    x-search:
+      org_id_field: id
+    x-import-key: [name]
+    fields:
+      name:
+        minLength: 1
+      description:
+        x-ui:
+          rows: 4
+
+    required:
+      - users
+    properties:
+      users:
+        type: array
+        x-outputType: list
+        items:
+          $ref: "#/definitions/user"
 
   permission:
-    type: object
-    required:
-      - id
-      - name
-      - create
-      - read
-      - update
-      - delete
-    x-import-key: [name, role.name]
-    x-display:
-      table:
-        - name:
-            width: 200
-        - role:
-            width: 200
-    properties:
-      id:
-        type: string
-        pattern: "^c[a-z0-9]{24,}$"
-      name:
-        type: string
-        minLength: 1
-        x-entity-select: true
-        x-ui:
-          width: 6
-      create:
-        type: boolean
-      read:
-        type: boolean
-      update:
-        type: boolean
-      delete:
-        type: boolean
-      import:
-        type: boolean
-        default: false
-      role_id:
-        type:
-          - string
-          - "null"
-        x-ui:
-          width: 6
-        pattern: "^c[a-z0-9]{24,}$"
-        x-relationship:
-          type: many-to-one
-          target: role
-          labelField: name
-
-  permission_detail:
     x-generate:
       list: true
       view: true
@@ -388,55 +256,34 @@ definitions:
     # Security-sensitive entity: every create/update/delete is recorded in
     # the audit_log table by the generated service layer.
     x-audit: true
-    allOf:
-      - $ref: "#/definitions/permission"
-      - type: object
-        properties:
-          role:
-            $ref: "#/definitions/role"
-
-  approval_flow:
-    type: object
-    required:
-      - id
-      - entity_name
-      - approver_role_id
-    x-import-key: [entity_name, approver_role.name]
+    x-import-key: [name, role.name]
     x-display:
       table:
-        - entity_name:
-            primary: true
+        - name:
             width: 200
-        - requestor_role:
-            width: 150
-        - approver_role:
-            width: 150
-    properties:
-      id:
-        type: string
-        pattern: "^c[a-z0-9]{24,}$"
-      entity_name:
-        type: string
+        - role:
+            width: 200
+    fields:
+      name:
         minLength: 1
         x-entity-select: true
-      requestor_role_id:
-        type: 
-          - string
-          - "null"
-        pattern: "^c[a-z0-9]{24,}$"
-        x-relationship:
-          type: many-to-one
-          target: role
-          labelField: name
-      approver_role_id:
-        type: string
-        pattern: "^c[a-z0-9]{24,}$"
-        x-relationship:
-          type: many-to-one
-          target: role
-          labelField: name
+        x-ui:
+          width: 6
+      create: {}
+      read: {}
+      update: {}
+      delete: {}
+      import:
+        default: false
+      role_id:
+        x-ui:
+          width: 6
+        x-relationship: {}
+    properties:
+      role:
+        $ref: "#/definitions/role"
 
-  approval_flow_detail:
+  approval_flow:
     x-generate:
       list: true
       view: true
@@ -458,60 +305,58 @@ definitions:
         target: approval_flow
         labelField: entity_name
         secondaryLabelField: approver_role.name
-    allOf:
-      - $ref: "#/definitions/approval_flow"
-      - type: object
-        required:
-          - approver_role
-          - preceding_transitions
-        properties:
-          requestor_role:
-            $ref: "#/definitions/role"
-          approver_role:
-            $ref: "#/definitions/role"
-          preceded_by:
-            type: array
-            x-outputType: list
-            items:
-              $ref: "#/definitions/approval_flow"
-          followed_by:
-            type: array
-            x-outputType: list
-            items:
-              $ref: "#/definitions/approval_flow"
+    x-import-key: [entity_name, approver_role.name]
+    x-display:
+      table:
+        - entity_name:
+            primary: true
+            width: 200
+        - requestor_role:
+            width: 150
+        - approver_role:
+            width: 150
+    fields:
+      entity_name:
+        minLength: 1
+        x-entity-select: true
+      requestor_role_id:
+        x-relationship: {}
+      approver_role_id:
+        x-relationship: {}
+    required:
+      - approver_role
+      - preceding_transitions
+    properties:
+      requestor_role:
+        $ref: "#/definitions/role"
+      approver_role:
+        $ref: "#/definitions/role"
+      preceded_by:
+        type: array
+        x-outputType: list
+        items:
+          $ref: "#/definitions/approval_flow"
+      followed_by:
+        type: array
+        x-outputType: list
+        items:
+          $ref: "#/definitions/approval_flow"
 
   approval_request:
-    type: object
-    required:
-      - id
-      - approvable_id
-      - approval_flow_id
     x-display:
       table:
         - approval_flow:
             width: 200
         - status:
             width: 100
-    properties:
-      id:
-        type: string
-        pattern: "^c[a-z0-9]{24,}$"
+    fields:
       approvable_id:
-        type: string
-        pattern: "^c[a-z0-9]{24,}$"
         x-relationship:
-          type: many-to-one
-          target: approvable
           labelField: id
       approval_flow_id:
-        type: string
-        pattern: "^c[a-z0-9]{24,}$"
         x-relationship:
-          type: many-to-one
-          target: approval_flow
           labelField: [entity_name, approver_role.name]
       status:
-        type: integer
         minimum: 0
         maximum: 3
         enum:
@@ -521,19 +366,6 @@ definitions:
           - TerminalRejected
 
   approvable:
-    type: object
-    required:
-      - id
-    properties:
-      id:
-        type: string
-        pattern: "^c[a-z0-9]{24,}$"
-      rejection_reason:
-        type:
-          - string
-          - "null"
-
-  approvable_detail:
     x-generate:
       list: false
       view: false
@@ -543,28 +375,18 @@ definitions:
       invalidate: false
       api: false
       test: false
-    allOf:
-      - $ref: "#/definitions/approvable"
-      - type: object
-        required:
-          - approval_requests
-        properties:
-          approval_requests:
-            type: array
-            x-outputType: list
-            items:
-              $ref: "#/definitions/approval_request"
+    fields:
+      rejection_reason: {}
+    required:
+      - approval_requests
+    properties:
+      approval_requests:
+        type: array
+        x-outputType: list
+        items:
+          $ref: "#/definitions/approval_request"
 
   commentable:
-    type: object
-    required:
-      - id
-    properties:
-      id:
-        type: string
-        pattern: "^c[a-z0-9]{24,}$"
-
-  commentable_detail:
     x-generate:
       list: false
       view: false
@@ -574,53 +396,28 @@ definitions:
       invalidate: false
       api: false
       test: false
-    allOf:
-      - $ref: "#/definitions/commentable"
-      - type: object
-        required:
-          - comments
-        properties:
-          comments:
-            type: array
-            x-outputType: comments
-            items:
-              $ref: "#/definitions/comment"
+    required:
+      - comments
+    properties:
+      comments:
+        type: array
+        x-outputType: comments
+        items:
+          $ref: "#/definitions/comment"
 
   comment:
-    type: object
-    required:
-      - id
-      - message
-      - commentable_id
-    properties:
-      id:
-        type: string
-        pattern: "^c[a-z0-9]{24,}$"
+    fields:
       message:
-        type: string
         minLength: 1
         x-mention: true
-      commentable_id:
-        type: string
-        pattern: "^c[a-z0-9]{24,}$"
-
+      commentable_id: {}
   reaction:
-    type: object
-    required:
-      - id
-      - type
-      - user_id
-      - comment_id
     x-internal:
       page: false
       embed: false
       api: custom
-    properties:
-      id:
-        type: string
-        pattern: "^c[a-z0-9]{24,}$"
+    fields:
       type:
-        type: integer
         minimum: 0
         maximum: 4
         enum:
@@ -630,30 +427,11 @@ definitions:
           - Surprised
           - Sad
       user_id:
-        type: string
-        pattern: "^c[a-z0-9]{24,}$"
-        x-relationship:
-          type: many-to-one
-          target: user
-          labelField: name
+        x-relationship: {}
       comment_id:
-        type: string
-        pattern: "^c[a-z0-9]{24,}$"
         x-relationship:
-          type: many-to-one
-          target: comment
           labelField: id
-
   attachable:
-    type: object
-    required:
-      - id
-    properties:
-      id:
-        type: string
-        pattern: "^c[a-z0-9]{24,}$"
-
-  attachable_detail:
     x-generate:
       list: false
       view: false
@@ -663,36 +441,22 @@ definitions:
       invalidate: false
       api: false
       test: false
-    allOf:
-      - $ref: "#/definitions/attachable"
-      - type: object
-        required:
-          - attachments
-        properties:
-          attachments:
-            type: array
-            x-outputType: list
-            items:
-              $ref: "#/definitions/attachment"
-          resource:
-            $ref: "#/definitions/resource"
-          product:
-            $ref: "#/definitions/product"
+    required:
+      - attachments
+    properties:
+      attachments:
+        type: array
+        x-outputType: list
+        items:
+          $ref: "#/definitions/attachment"
+      resource:
+        $ref: "#/definitions/resource"
+      product:
+        $ref: "#/definitions/product"
 
   attachment:
-    type: object
-    required:
-      - id
-      - type
-      - name
-      - path
-      - attachable_id
-    properties:
-      id:
-        type: string
-        pattern: "^c[a-z0-9]{24,}$"
+    fields:
       type:
-        type: integer
         minimum: 0
         maximum: 3
         enum:
@@ -700,65 +464,23 @@ definitions:
           - file
           - video
           - audio
+        _required: true
       order:
-        type: integer
         default: 0
       name:
-        type: string
         minLength: 1
       path:
-        type: string
         format: uri
-      attachable_id:
-        type: string
-        pattern: "^c[a-z0-9]{24,}$"
-
-  dashboard:
-    type: object
-    required:
-      - id
-      - name
-    x-display:
-      table:
-        - name:
-            primary: true
-            width: 200
-    properties:
-      id:
-        type: string
-        pattern: "^c[a-z0-9]{24,}$"
-      name:
-        type: string
-        minLength: 1
-
+      attachable_id: {}
   dashboard_widget:
-    type: object
-    required:
-      - id
-      - dashboard_id
-      - name
-      - entity_name
-      - chart_type
-      - group_by_field
-    properties:
-      id:
-        type: string
-        pattern: "^c[a-z0-9]{24,}$"
+    fields:
       dashboard_id:
-        type: string
-        pattern: "^c[a-z0-9]{24,}$"
-        x-relationship:
-          type: many-to-one
-          target: dashboard
-          labelField: name
+        x-relationship: {}
       name:
-        type: string
         minLength: 1
       entity_name:
-        type: string
         minLength: 1
       chart_type:
-        type: integer
         minimum: 0
         maximum: 3
         enum:
@@ -768,23 +490,14 @@ definitions:
           - line
         default: 1
       stack_mode:
-        type:
-          - integer
-          - "null"
         minimum: 0
         maximum: 2
         enum:
           - grouped
           - stacked
           - standardized
-      series_field:
-        type:
-          - string
-          - "null"
+      series_field: {}
       group_by_bucket:
-        type:
-          - integer
-          - "null"
         minimum: 0
         maximum: 4
         enum:
@@ -794,21 +507,12 @@ definitions:
           - quarter
           - year
       group_by_field:
-        type: string
         minLength: 1
-      filter_field:
-        type:
-          - string
-          - "null"
-      filter_value:
-        type:
-          - string
-          - "null"
+      filter_field: {}
+      filter_value: {}
       order:
-        type: integer
         default: 0
-
-  dashboard_detail:
+  dashboard:
     x-generate:
       list: true
       view: true
@@ -824,95 +528,44 @@ definitions:
         path: "@/components/_standard/DashboardView"
         target:
           - view
-    allOf:
-      - $ref: "#/definitions/dashboard"
-      - type: object
-        required:
-          - widgets
-        properties:
-          widgets:
-            type: array
-            items:
-              $ref: "#/definitions/dashboard_widget"
-
-  db_table:
-    type: object
-    required:
-      - id
-      - name
-      - commentable_id
-    properties:
-      id:
-        type: string
-        pattern: "^c[a-z0-9]{24,}$"
+    x-display:
+      table:
+        - name:
+            primary: true
+            width: 200
+    fields:
       name:
-        type: string
         minLength: 1
-      description:
-        type:
-          - string
-          - "null"
-        x-ui:
-          rows: 4
-      commentable_id:
-        type: string
-        pattern: "^c[a-z0-9]{24,}$"
-        x-relationship:
-          type: one-to-one_bridge
-          target: commentable
-          labelField: id
+    required:
+      - widgets
+    properties:
+      widgets:
+        type: array
+        items:
+          $ref: "#/definitions/dashboard_widget"
 
   field:
-    type: object
-    required:
-      - id
-      - name
-      - type
-      - db_table_id
-      - max_length
-      - required
-    properties:
-      id:
-        type: string
-        pattern: "^c[a-z0-9]{24,}$"
+    fields:
       name:
-        type: string
         minLength: 1
       type:
-        type: string
         enum:
           - string
           - number
           - boolean
           - date
       db_table_id:
-        type: string
         pattern: "^c[a-z0-9]{24,}$"
       reference_id:
-        type:
-          - string
-          - "null"
         pattern: "^c[a-z0-9]{24,}$"
-        x-relationship:
-          type: many-to-one
-          target: db_table
-          labelField: name
+        x-relationship: {}
       max_length:
-        type: integer
         minimum: 1
-      max:
-        type:
-          - integer
-          - "null"
-      regex:
-        type:
-          - string
-          - "null"
+      max: {}
+      regex: {}
       required:
-        type: boolean
         default: true
-
-  db_table_detail:
+  db_table:
     x-generate:
       list: true
       view: true
@@ -922,86 +575,47 @@ definitions:
       invalidate: false
       api: true
       test: true
-    allOf:
-      - $ref: "#/definitions/db_table"
-      - type: object
-        required:
-          - fields
-        properties:
-          fields:
-            type: array
-            items:
-              $ref: "#/definitions/field"
-          commentable:
-            $ref: "#/definitions/commentable"
-
-  xxxxx_xxxxx:
-    type: object
-    required:
-      - id
-      - name
-    properties:
-      id:
-        type: string
-        pattern: "^c[a-z0-9]{24,}$"
+    fields:
       name:
-        type: string
         minLength: 1
       description:
-        type:
-          - string
-          - "null"
-      team:
-        type:
-          - string
-          - "null"
+        x-ui:
+          rows: 4
+      commentable_id:
+        pattern: "^c[a-z0-9]{24,}$"
+        x-relationship:
+          type: one-to-one_bridge
+          labelField: id
+    required:
+      - fields
+    properties:
+      fields:
+        type: array
+        items:
+          $ref: "#/definitions/field"
+      commentable:
+        $ref: "#/definitions/commentable"
 
   yyyyy_yyyyy:
-    type: object
-    required:
-      - id
-      - name
-      - type
-      - xxxxx_xxxxx_id
-      - required
-      - written_by
-    properties:
-      id:
-        type: string
-        pattern: "^c[a-z0-9]{24,}$"
+    fields:
       name:
-        type: string
         minLength: 1
       type:
-        type: string
         enum:
           - string
           - number
           - boolean
           - date
       xxxxx_xxxxx_id:
-        type: string
         pattern: "^c[a-z0-9]{24,}$"
       max_length:
-        type:
-          - integer
-          - "null"
         minimum: 1
-      max:
-        type:
-          - integer
-          - "null"
-      regex:
-        type:
-          - string
-          - "null"
+      max: {}
+      regex: {}
       required:
-        type: boolean
         default: true
-      written_by:
-        type: string
-
-  xxxxx_xxxxx_detail:
+      written_by: {}
+  xxxxx_xxxxx:
     x-generate:
       list: true
       view: true
@@ -1011,154 +625,62 @@ definitions:
       invalidate: false
       api: true
       test: true
-    allOf:
-      - $ref: "#/definitions/xxxxx_xxxxx"
-      - type: object
-        required:
-          - yyyyy_yyyyys
-        properties:
-          yyyyy_yyyyys:
-            type: array
-            items:
-              $ref: "#/definitions/yyyyy_yyyyy"
-
-  parent1:
-    type: object
-    required:
-      - id
-      - name
-      - organization_id
-      - price
-      - due_date
-    properties:
-      id:
-        type: string
-        pattern: "^c[a-z0-9]{24,}$"
+    fields:
       name:
-        type: string
         minLength: 1
-        maxLength: 100
-      organization_id:
-        type: string
-        pattern: "^c[a-z0-9]{24,}$"
-        x-relationship:
-          type: many-to-one
-          target: organization
-          labelField: name
-      description:
-        type:
-          - string
-          - "null"
-      price:
-        type: integer
-        minimum: 0
-        maximum: 1000000
-      due_date:
-        type: string
-        format: date-time
-      image_url:
-        type:
-          - string
-          - "null"
-        format: uri
-        x-uri-kind: link
+      description: {}
+      team: {}
+    required:
+      - yyyyy_yyyyys
+    properties:
+      yyyyy_yyyyys:
+        type: array
+        items:
+          $ref: "#/definitions/yyyyy_yyyyy"
 
   parent1_child1:
-    type: object
-    required:
-      - id
-      - order
-      - name
-      - type
-      - parent1_id
-      - required
-      - written_by
-    properties:
-      id:
-        type: string
-        pattern: "^c[a-z0-9]{24,}$"
-      order:
-        type: integer
+    fields:
+      order: {}
       name:
-        type: string
         minLength: 1
         maxLength: 50
       type:
-        type: string
         enum:
           - string
           - number
           - boolean
           - date
       parent1_id:
-        type: string
         pattern: "^c[a-z0-9]{24,}$"
       max_length:
-        type:
-          - integer
-          - "null"
         minimum: 1
       max:
-        type:
-          - integer
-          - "null"
         enum:
           - "100"
           - "255"
           - "65535"
       regex:
-        type:
-          - string
-          - "null"
         format: regex
       required:
-        type: boolean
         default: true
       written_by:
-        type: string
         maxLength: 100
-
   parent1_child2:
-    type: object
-    required:
-      - id
-      - name
-      - required
-      - end_date
-    properties:
-      id:
-        type: string
-        pattern: "^c[a-z0-9]{24,}$"
+    fields:
       name:
-        type: string
         minLength: 1
       required:
-        type: boolean
         default: true
       start_date:
-        type:
-          - string
-          - "null"
         format: date
       end_date:
-        type: string
         format: date
-
   parent1_list:
-    type: object
-    required:
-      - id
-      - name
-    properties:
-      id:
-        type: string
-        pattern: "^c[a-z0-9]{24,}$"
+    fields:
       name:
-        type: string
         minLength: 1
         maxLength: 100
-
-  parent1_detail:
+  parent1:
     x-generate:
       list: true
       view: true
@@ -1167,59 +689,44 @@ definitions:
       delete: true
       invalidate: false
       api: true
-    allOf:
-      - $ref: "#/definitions/parent1"
-      - type: object
-        required:
-          - organization
-          - parent1_child1s
-          - parent1_child2s
-          - parent1_lists
-        properties:
-          organization:
-            $ref: "#/definitions/organization"
-          parent1_child1s:
-            type: array
-            items:
-              $ref: "#/definitions/parent1_child1"
-          parent1_child2s:
-            type: array
-            items:
-              $ref: "#/definitions/parent1_child2"
-          parent1_lists:
-            type: array
-            x-outputType: list
-            items:
-              $ref: "#/definitions/parent1_list"
+    fields:
+      name:
+        minLength: 1
+        maxLength: 100
+      organization_id:
+        pattern: "^c[a-z0-9]{24,}$"
+        x-relationship: {}
+      description: {}
+      price:
+        minimum: 0
+        maximum: 1000000
+      due_date: {}
+      image_url:
+        format: uri
+        x-uri-kind: link
+    required:
+      - organization
+      - parent1_child1s
+      - parent1_child2s
+      - parent1_lists
+    properties:
+      organization:
+        $ref: "#/definitions/organization"
+      parent1_child1s:
+        type: array
+        items:
+          $ref: "#/definitions/parent1_child1"
+      parent1_child2s:
+        type: array
+        items:
+          $ref: "#/definitions/parent1_child2"
+      parent1_lists:
+        type: array
+        x-outputType: list
+        items:
+          $ref: "#/definitions/parent1_list"
 
   parent_only:
-    type: object
-    required:
-      - id
-      - name
-    properties:
-      id:
-        type: string
-        pattern: "^c[a-z0-9]{24,}$"
-      name:
-        type: string
-        minLength: 1
-      description:
-        type:
-          - string
-          - "null"
-      login_time:
-        type:
-          - string
-          - "null"
-        format: date-time
-      logout_time:
-        type:
-          - string
-          - "null"
-        format: date-time
-
-  parent_only_detail:
     x-generate:
       list: true
       view: true
@@ -1229,9 +736,12 @@ definitions:
       invalidate: false
       api: true
       test: true
-    allOf:
-      - $ref: "#/definitions/parent_only"
-
+    fields:
+      name:
+        minLength: 1
+      description: {}
+      login_time: {}
+      logout_time: {}
   setting1:
     x-generate:
       list: true
@@ -1373,41 +883,6 @@ definitions:
       - $ref: "#/definitions/xxxxx_xxxxx"
 
   procedure:
-    type: object
-    required:
-      - id
-      - name
-    properties:
-      id:
-        type: string
-        pattern: "^c[a-z0-9]{24,}$"
-      name:
-        type: string
-        minLength: 1
-      description:
-        type:
-          - string
-          - "null"
-      parent_id:
-        type:
-          - string
-          - "null"
-        pattern: "^c[a-z0-9]{24,}$"
-        x-relationship:
-          type: many-to-one
-          target: procedure
-          labelField: name
-      assignee_id:
-        type:
-          - string
-          - "null"
-        pattern: "^c[a-z0-9]{24,}$"
-        x-relationship:
-          type: many-to-one
-          target: user
-          labelField: name
-
-  procedure_detail:
     x-generate:
       list: true
       view: true
@@ -1424,76 +899,42 @@ definitions:
       followed_by:
         type: many-to-many
         target: procedure
-    allOf:
-      - $ref: "#/definitions/procedure"
-      - type: object
-        required:
-          - children
-          - preceded_by
-          - followed_by
-        properties:
-          assignee:
-            $ref: "#/definitions/user"
-          parent:
-            $ref: "#/definitions/procedure"
-          children:
-            type: array
-            x-outputType: list
-            items:
-              $ref: "#/definitions/procedure"
-          preceded_by:
-            type: array
-            x-outputType: list
-            items:
-              $ref: "#/definitions/procedure"
-          followed_by:
-            type: array
-            x-outputType: list
-            items:
-              $ref: "#/definitions/procedure"
+    fields:
+      name:
+        minLength: 1
+      description: {}
+      parent_id:
+        pattern: "^c[a-z0-9]{24,}$"
+        x-relationship: {}
+      assignee_id:
+        pattern: "^c[a-z0-9]{24,}$"
+        x-relationship: {}
+    required:
+      - children
+      - preceded_by
+      - followed_by
+    properties:
+      assignee:
+        $ref: "#/definitions/user"
+      parent:
+        $ref: "#/definitions/procedure"
+      children:
+        type: array
+        x-outputType: list
+        items:
+          $ref: "#/definitions/procedure"
+      preceded_by:
+        type: array
+        x-outputType: list
+        items:
+          $ref: "#/definitions/procedure"
+      followed_by:
+        type: array
+        x-outputType: list
+        items:
+          $ref: "#/definitions/procedure"
 
   resource:
-    type: object
-    required:
-      - id
-      - name
-      - organization_id
-      - attachable_id
-    x-display:
-      table:
-        - name:
-            primary: true
-            width: 200
-        - organization:
-            width: 200
-      dashboard: true
-    properties:
-      id:
-        type: string
-        pattern: "^c[a-z0-9]{24,}$"
-      name:
-        type: string
-        minLength: 1
-      description:
-        type:
-          - string
-          - "null"
-      organization_id:
-        type: string
-        pattern: "^c[a-z0-9]{24,}$"
-        x-relationship:
-          type: many-to-one
-          target: organization
-          labelField: name
-      attachable_id:
-        type: string
-        pattern: "^c[a-z0-9]{24,}$"
-        x-relationship:
-          type: one-to-one_bridge
-          target: attachable
-          labelField: id
-
-  resource_detail:
     x-generate:
       list: true
       view: true
@@ -1519,25 +960,44 @@ definitions:
           showImages: true
           showFiles: false
           readOnly: true
-    allOf:
-      - $ref: "#/definitions/resource"
-      - type: object
-        required:
-          - organization
-        properties:
-          organization:
-            $ref: "#/definitions/organization"
-          attachable:
-            $ref: "#/definitions/attachable"
+    x-display:
+      table:
+        - name:
+            primary: true
+            width: 200
+        - organization:
+            width: 200
+      dashboard: true
+    fields:
+      name:
+        minLength: 1
+      description: {}
+      organization_id:
+        pattern: "^c[a-z0-9]{24,}$"
+        x-relationship: {}
+      attachable_id:
+        pattern: "^c[a-z0-9]{24,}$"
+        x-relationship:
+          type: one-to-one_bridge
+          labelField: id
+    required:
+      - organization
+    properties:
+      organization:
+        $ref: "#/definitions/organization"
+      attachable:
+        $ref: "#/definitions/attachable"
 
   booking:
-    type: object
-    required:
-      - id
-      - name
-      - resource_id
-      - start_time
-      - end_time
+    x-generate:
+      list: true
+      view: true
+      new: true
+      edit: true
+      delete: true
+      invalidate: false
+      api: true
+      test: true
     x-display:
       table:
         - name:
@@ -1553,96 +1013,21 @@ definitions:
         span: week
         row_by: resource
       dashboard: true
-    properties:
-      id:
-        type: string
-        pattern: "^c[a-z0-9]{24,}$"
+    fields:
       name:
-        type: string
         minLength: 1
       resource_id:
-        type: string
         pattern: "^c[a-z0-9]{24,}$"
-        x-relationship:
-          type: many-to-one
-          target: resource
-          labelField: name
-      start_time:
-        type: string
-        format: date-time
-      end_time:
-        type: string
-        format: date-time
-
-  booking_detail:
-    x-generate:
-      list: true
-      view: true
-      new: true
-      edit: true
-      delete: true
-      invalidate: false
-      api: true
-      test: true
-    allOf:
-      - $ref: "#/definitions/booking"
-      - type: object
-        required:
-          - resource
-        properties:
-          resource:
-            $ref: "#/definitions/resource"
+        x-relationship: {}
+      start_time: {}
+      end_time: {}
+    required:
+      - resource
+    properties:
+      resource:
+        $ref: "#/definitions/resource"
 
   shift_template:
-    type: object
-    required:
-      - id
-      - user_id
-      - day_of_week
-      - start_time
-      - end_time
-    x-display:
-      table:
-        - user:
-            primary: true
-            width: 200
-        - day_of_week:
-            width: 100
-        - start_time:
-            width: 150
-        - end_time:
-            width: 150
-    properties:
-      id:
-        type: string
-        pattern: "^c[a-z0-9]{24,}$"
-      user_id:
-        type: string
-        pattern: "^c[a-z0-9]{24,}$"
-        x-relationship:
-          type: many-to-one
-          target: user
-          labelField: name
-      day_of_week:
-        type: integer
-        minimum: 0
-        maximum: 6
-        enum:
-          - Sunday
-          - Monday
-          - Tuesday
-          - Wednesday
-          - Thursday
-          - Friday
-          - Saturday
-      start_time:
-        type: string
-        format: time
-      end_time:
-        type: string
-        format: time
-
-  shift_template_detail:
     x-generate:
       list: true
       view: true
@@ -1654,23 +1039,52 @@ definitions:
       test: true
     x-custom-components:
       - name: CopyShiftsButton
-    allOf:
-      - $ref: "#/definitions/shift_template"
-      - type: object
-        required:
-          - user
-        properties:
-          user:
-            $ref: "#/definitions/user"
+    x-display:
+      table:
+        - user:
+            primary: true
+            width: 200
+        - day_of_week:
+            width: 100
+        - start_time:
+            width: 150
+        - end_time:
+            width: 150
+    fields:
+      user_id:
+        pattern: "^c[a-z0-9]{24,}$"
+        x-relationship: {}
+      day_of_week:
+        minimum: 0
+        maximum: 6
+        enum:
+          - Sunday
+          - Monday
+          - Tuesday
+          - Wednesday
+          - Thursday
+          - Friday
+          - Saturday
+      start_time:
+        format: time
+      end_time:
+        format: time
+    required:
+      - user
+    properties:
+      user:
+        $ref: "#/definitions/user"
 
   shift:
-    type: object
-    required:
-      - id
-      - user_id
-      - start_time
-      - end_time
-      - status
+    x-generate:
+      list: true
+      view: true
+      new: true
+      edit: true
+      delete: true
+      invalidate: false
+      api: true
+      test: true
     x-display:
       table:
         - user:
@@ -1683,25 +1097,13 @@ definitions:
       chart:
         span: week
         row_by: user
-    properties:
-      id:
-        type: string
-        pattern: "^c[a-z0-9]{24,}$"
+    fields:
       user_id:
-        type: string
         pattern: "^c[a-z0-9]{24,}$"
-        x-relationship:
-          type: many-to-one
-          target: user
-          labelField: name
-      start_time:
-        type: string
-        format: date-time
-      end_time:
-        type: string
-        format: date-time
+        x-relationship: {}
+      start_time: {}
+      end_time: {}
       status:
-        type: integer
         minimum: 0
         maximum: 2
         enum:
@@ -1709,65 +1111,13 @@ definitions:
           - Approved
           - Cancelled
 
-  shift_detail:
-    x-generate:
-      list: true
-      view: true
-      new: true
-      edit: true
-      delete: true
-      invalidate: false
-      api: true
-      test: true
-    allOf:
-      - $ref: "#/definitions/shift"
-      - type: object
-        required:
-          - user
-        properties:
-          user:
-            $ref: "#/definitions/user"
+    required:
+      - user
+    properties:
+      user:
+        $ref: "#/definitions/user"
 
   product:
-    type: object
-    required:
-      - id
-      - code
-      - name
-      - price
-      - attachable_id
-    x-display:
-      table:
-        - code:
-            primary: true
-            width: 150
-        - name:
-            width: 200
-        - price:
-            width: 100
-      dashboard: true
-    properties:
-      id:
-        type: string
-        pattern: "^c[a-z0-9]{24,}$"
-      code:
-        type: string
-        minLength: 1
-      name:
-        type: string
-        minLength: 1
-      price:
-        type: integer
-        minimum: 0
-      attachable_id:
-        type: string
-        pattern: "^c[a-z0-9]{24,}$"
-        x-relationship:
-          type: one-to-one_bridge
-          target: attachable
-          labelField: id
-
-  product_detail:
     x-generate:
       list: true
       view: true
@@ -1788,19 +1138,42 @@ definitions:
           - view
         props:
           readOnly: true
-    allOf:
-      - $ref: "#/definitions/product"
-      - type: object
-        properties:
-          attachable:
-            $ref: "#/definitions/attachable"
+    x-display:
+      table:
+        - code:
+            primary: true
+            width: 150
+        - name:
+            width: 200
+        - price:
+            width: 100
+      dashboard: true
+    fields:
+      code:
+        minLength: 1
+      name:
+        minLength: 1
+      price:
+        minimum: 0
+      attachable_id:
+        pattern: "^c[a-z0-9]{24,}$"
+        x-relationship:
+          type: one-to-one_bridge
+          labelField: id
+    properties:
+      attachable:
+        $ref: "#/definitions/attachable"
 
   inventory:
-    type: object
-    required:
-      - id
-      - product_id
-      - quantity
+    x-generate:
+      list: true
+      view: true
+      new: true
+      edit: true
+      delete: true
+      invalidate: false
+      api: true
+      test: true
     x-display:
       table:
         - product:
@@ -1813,81 +1186,30 @@ definitions:
     x-readonly-fields:
       - quantity
       - reserved_quantity
-    properties:
-      id:
-        type: string
-        pattern: "^c[a-z0-9]{24,}$"
+    fields:
       product_id:
-        type: string
         pattern: "^c[a-z0-9]{24,}$"
         x-relationship:
-          type: many-to-one
-          target: product
-          labelField: name
           searchField: name
       quantity:
-        type: integer
         minimum: 0
         default: 0
       reserved_quantity:
-        type: integer
         minimum: 0
         default: 0
       location_id:
-        type:
-          - string
-          - "null"
         x-relationship:
-          type: many-to-one
-          target: location
-          labelField: name
           searchField: name
-      lot_number:
-        type:
-          - string
-          - "null"
+      lot_number: {}
       expiration_date:
-        type:
-          - string
-          - "null"
         format: date
-
-  inventory_detail:
-    x-generate:
-      list: true
-      view: true
-      new: true
-      edit: true
-      delete: true
-      invalidate: false
-      api: true
-      test: true
-    allOf:
-      - $ref: "#/definitions/inventory"
-      - type: object
-        required:
-          - product
-        properties:
-          product:
-            $ref: "#/definitions/product"
+    required:
+      - product
+    properties:
+      product:
+        $ref: "#/definitions/product"
 
   location:
-    type: object
-    required:
-      - id
-      - name
-    x-display:
-      table:
-        - name:
-            primary: true
-    properties:
-      id:
-        type: string
-        pattern: "^c[a-z0-9]{24,}$"
-      name:
-        type: string
-
-  location_detail:
     x-generate:
       list: true
       view: true
@@ -1897,49 +1219,23 @@ definitions:
       invalidate: false
       api: true
       test: false
-    allOf:
-      - $ref: "#/definitions/location"
-
-  inventory_transactionable:
-    type: object
-    # Polymorphic bridge through-table (same minimal pattern as commentable/approvable).
-    # No x-generate block → excluded from the entity loop (extract_entities skips
-    # definitions with no x-generate), so no pages/CRUD are generated for it.
-    required:
-      - id
-    properties:
-      id:
-        type: string
-        pattern: "^c[a-z0-9]{24,}$"
-
+    x-display:
+      table:
+        - name:
+            primary: true
+    fields:
+      name: {}
+  inventory_transactionable: {}
   inventory_transaction:
-    type: object
     x-generate:
       new: false
       edit: false
       delete: false
       invalidate: false     # O-1: entity level read-only (list/view only, no UI mutation)
-    required:
-      - id
-      - inventory_transactionable_id
-      - event_type
-      - quantity_delta
-      - reserved_delta
-      - product_id
-      - location
-      - created_by_id
-    properties:
-      id:
-        type: string
-        pattern: "^c[a-z0-9]{24,}$"
+    fields:
       inventory_transactionable_id:
-        # Plain FK, no x-relationship: inventory_transactionable is an internal
-        # bridge (no x-generate, no generated types module — same as
-        # commentable/approvable), so it cannot be a many-to-one relation target.
-        type: string
         pattern: "^c[a-z0-9]{24,}$"
       event_type:
-        type: string
         enum:
           - reserve
           - ship
@@ -1948,45 +1244,32 @@ definitions:
           - cancel
           - move     # Phase5 追加: inventory_movement の移動トランザクション
           - adjust   # Phase5 追加: inventory_adjustment の棚卸調整トランザクション
-      quantity_delta:
-        type: integer       # O-4: physical inventory movement
-      reserved_delta:
-        type: integer       # O-4: reserved-slot movement
-      product_id:
-        type: string        # O-6: denormalized
-      location:
-        type: string         # O-6: denormalized
-      lot_number:
-        type:
-          - string
-          - "null"
+      quantity_delta: {}
+      reserved_delta: {}
+      product_id: {}
+      location: {}
+      lot_number: {}
       expiration_date:
-        type:
-          - string
-          - "null"
-        format: date        # O-6; aligned to existing inventory.expiration_date naming (B5-Q1)
-      approved_via:
-        type:
-          - string
-          - "null"
+        format: date
+      approved_via: {}
       created_by_id:
-        type: string
         pattern: "^c[a-z0-9]{24,}$"
-        x-relationship:
-          type: many-to-one
-          target: user
-          labelField: name
-    # inventory_transaction_detail is not created (no _detail definition needed;
-    # this entity is not exposed as a child of any parent).
-
+        x-relationship: {}
   inventory_movement:
-    type: object
-    required:
-      - id
-      - from_inventory_id
-      - to_inventory_id
-      - quantity
-      - approvable_id
+    x-generate:
+      list: true
+      view: true
+      new: true
+      edit: false
+      delete: false
+      invalidate: false
+      api: true
+      test: true
+    x-custom-components:
+      - name: ApprovalSection
+        path: "@/components/_standard/ApprovalSection"
+        target:
+          - view
     x-display:
       table:
         - quantity:
@@ -2010,57 +1293,47 @@ definitions:
       fromPoolIdField: from_inventory_id   # 出庫側 inventory FK フィールド名
       toPoolIdField: to_inventory_id       # 入庫側 inventory FK フィールド名
       quantity_delta_field: quantity
-    properties:
-      id:
-        type: string
-        pattern: "^c[a-z0-9]{24,}$"
+    fields:
       from_inventory_id:
-        type: string
         pattern: "^c[a-z0-9]{24,}$"
         x-readonly: true
         x-relationship:
-          type: many-to-one
-          target: inventory
           labelField:
             - product.name
             - location.name
             - lot_number
             - expiration_date
       to_inventory_id:
-        type: string
         pattern: "^c[a-z0-9]{24,}$"
         x-relationship:
-          type: many-to-one
-          target: inventory
           labelField:
             - product.name
             - location.name
             - lot_number
             - expiration_date
       quantity:
-        type: integer
         minimum: 1
       status:
-        type: string
         enum:
           - pending
           - rejected
         default: pending
       approvable_id:
-        type: string
         pattern: "^c[a-z0-9]{24,}$"
         x-relationship:
           type: one-to-one_bridge
-          target: approvable
           labelField: id
       inventory_transactionable_id:
-        type:
-          - string
-          - "null"
         pattern: "^c[a-z0-9]{24,}$"
-        # Plain FK — bridge created at approval time by ledger_move_stub
+    properties:
+      from_inventory:
+        $ref: "#/definitions/inventory"
+      to_inventory:
+        $ref: "#/definitions/inventory"
+      approvable:
+        $ref: "#/definitions/approvable"
 
-  inventory_movement_detail:
+  inventory_adjustment:
     x-generate:
       list: true
       view: true
@@ -2075,24 +1348,6 @@ definitions:
         path: "@/components/_standard/ApprovalSection"
         target:
           - view
-    allOf:
-      - $ref: "#/definitions/inventory_movement"
-      - type: object
-        properties:
-          from_inventory:
-            $ref: "#/definitions/inventory"
-          to_inventory:
-            $ref: "#/definitions/inventory"
-          approvable:
-            $ref: "#/definitions/approvable"
-
-  inventory_adjustment:
-    type: object
-    required:
-      - id
-      - inventory_id
-      - quantity_delta
-      - approvable_id
     x-display:
       table:
         - quantity_delta:
@@ -2113,79 +1368,45 @@ definitions:
       event_type: adjust
       poolIdField: inventory_id           # 対象 inventory FK フィールド名
       quantity_delta_field: quantity_delta
-    properties:
-      id:
-        type: string
-        pattern: "^c[a-z0-9]{24,}$"
+    fields:
       inventory_id:
-        type: string
         pattern: "^c[a-z0-9]{24,}$"
         x-relationship:
-          type: many-to-one
-          target: inventory
           labelField:
             - product.name
             - location.name
             - lot_number
             - expiration_date
-      quantity_delta:
-        type: integer
-        # 正: 棚卸増加 (found extra stock) / 負: 棚卸減少 (damaged/lost)
-        # minimum 制約なし — 負値を許容
-      reason:
-        type:
-          - string
-          - "null"
-        # 任意: 調整理由 (コメント欄として利用)
+      quantity_delta: {}
+      reason: {}
       status:
-        type: string
         enum:
           - pending
           - rejected
         default: pending
       approvable_id:
-        type: string
         pattern: "^c[a-z0-9]{24,}$"
         x-relationship:
           type: one-to-one_bridge
-          target: approvable
           labelField: id
       inventory_transactionable_id:
-        type:
-          - string
-          - "null"
         pattern: "^c[a-z0-9]{24,}$"
+    properties:
+      inventory:
+        $ref: "#/definitions/inventory"
+      approvable:
+        $ref: "#/definitions/approvable"
 
-  inventory_adjustment_detail:
+  purchase_order:
     x-generate:
       list: true
       view: true
       new: true
-      edit: false
-      delete: false
+      edit: true
+      delete: true
       invalidate: false
       api: true
       test: true
-    x-custom-components:
-      - name: ApprovalSection
-        path: "@/components/_standard/ApprovalSection"
-        target:
-          - view
-    allOf:
-      - $ref: "#/definitions/inventory_adjustment"
-      - type: object
-        properties:
-          inventory:
-            $ref: "#/definitions/inventory"
-          approvable:
-            $ref: "#/definitions/approvable"
-
-  purchase_order:
-    type: object
-    required:
-      - id
-      - order_no
-      - customer_id
     x-display:
       table:
         - order_no:
@@ -2193,6 +1414,8 @@ definitions:
             width: 150
         - customer:
             width: 200
+    x-approval-lines:
+      - items
     x-reservation:
       mode: count
       transaction:
@@ -2217,232 +1440,24 @@ definitions:
       # No "actions" block: under strategy: ledger_transaction, ship/cancel are
       # driven by the standard approve/reject flow on purchase_per_item.approvable_id
       # (see purchase_per_item's x-approval below), not by bespoke action routes.
-    x-approval-lines:
-      - items
-    properties:
-      id:
-        type: string
-        pattern: "^c[a-z0-9]{24,}$"
+    fields:
       order_no:
-        type: string
         minLength: 1
       customer_id:
-        type: string
         pattern: "^c[a-z0-9]{24,}$"
-        x-relationship:
-          type: many-to-one
-          target: user
-          labelField: name
-
-  purchase_per_item:
-    type: object
+        x-relationship: {}
     required:
-      - id
-      - purchase_order_id
-      - product_id
-      - quantity
-      - status
-      - approvable_id
-    x-display:
-      table:
-        - product:
-            primary: true
-            width: 200
-        - purchase_order:
-            width: 150
-        - inventory:
-            width: 250
-        - quantity:
-            width: 100
-        - status:
-            width: 120
-    x-approval:
-      on_approved:
-        emit_hook: true
-      on_rejected:
-        terminal: true
-        emit_hook: true
-    x-splittable:
-      quantityField: quantity
-      parentField: parent_id
-      ledgerDomain: inventory_domain
-      poolIdField: inventory_id
-      perPartRequired:
-        - inventory_id
+      - customer
+      - items
     properties:
-      id:
-        type: string
-        pattern: "^c[a-z0-9]{24,}$"
-      purchase_order_id:
-        type: string
-        pattern: "^c[a-z0-9]{24,}$"
-        x-relationship:
-          type: many-to-one
-          target: purchase_order
-          labelField: order_no
-      product_id:
-        type: string
-        pattern: "^c[a-z0-9]{24,}$"
-        x-relationship:
-          type: many-to-one
-          target: product
-          labelField: name
-      quantity:
-        type: integer
-        minimum: 1
-      status:
-        type: integer
-        minimum: 0
-        maximum: 2
-        enum:
-          - pending
-          - split
-          - rejected
-        default: pending
-      price:
-        type:
-          - integer
-          - "null"
-        minimum: 0
-      parent_id:
-        type:
-          - string
-          - "null"
-        pattern: "^c[a-z0-9]{24,}$"
-      approvable_id:
-        type: string
-        pattern: "^c[a-z0-9]{24,}$"
-        x-relationship:
-          type: one-to-one_bridge
-          target: approvable
-          labelField: id
-      inventory_transactionable_id:
-        # Plain FK, no x-relationship: inventory_transactionable is an internal
-        # bridge (no x-generate, no generated types module).
-        type:
-          - string
-          - "null"
-        pattern: "^c[a-z0-9]{24,}$"
-      inventory_id:
-        type:
-          - string
-          - "null"
-        pattern: "^c[a-z0-9]{24,}$"
-        x-relationship:
-          type: many-to-one
-          target: inventory
-          labelField:
-            - product.name
-            - location.name
-            - lot_number
-            - expiration_date
-
-  purchase_order_detail:
-    x-generate:
-      list: true
-      view: true
-      new: true
-      edit: true
-      delete: true
-      invalidate: false
-      api: true
-      test: true
-    allOf:
-      - $ref: "#/definitions/purchase_order"
-      - type: object
-        required:
-          - customer
-          - items
-        properties:
-          customer:
-            $ref: "#/definitions/user"
-          items:
-            type: array
-            items:
-              $ref: "#/definitions/purchase_per_item"
+      customer:
+        $ref: "#/definitions/user"
+      items:
+        type: array
+        items:
+          $ref: "#/definitions/purchase_per_item"
 
   leave_request:
-    type: object
-    required:
-      - id
-      - user_id
-      - start_date
-      - end_date
-      - reason
-      - approvable_id
-    x-approval:
-      on_approved:
-        set_fields:
-          status: "approved"
-        emit_hook: true
-      on_rejected:
-        terminal: false
-        set_fields:
-          status: "rejected"
-        emit_hook: false
-    x-display:
-      table:
-        - user:
-            primary: true
-            width: 200
-        - start_date:
-            width: 150
-        - end_date:
-            width: 150
-      chart:
-        span: month
-        row_by: user
-        start_field: start_date
-        end_field: end_date
-      dashboard: true
-    properties:
-      id:
-        type: string
-        pattern: "^c[a-z0-9]{24,}$"
-      user_id:
-        type: string
-        pattern: "^c[a-z0-9]{24,}$"
-        x-relationship:
-          type: many-to-one
-          target: user
-          labelField: name
-      start_date:
-        type: string
-        format: date
-      end_date:
-        type: string
-        format: date
-      reason:
-        type: string
-        minLength: 1
-      approvable_id:
-        type: string
-        pattern: "^c[a-z0-9]{24,}$"
-        x-relationship:
-          type: one-to-one_bridge
-          target: approvable
-          labelField: id
-      status:
-        type: integer
-        minimum: 0
-        maximum: 2
-        default: 0
-        x-enum-namespace: LeaveRequestStatus
-        enum:
-          - pending
-          - approved
-          - rejected
-      assignee_id:
-        type:
-          - string
-          - "null"
-        pattern: "^c[a-z0-9]{24,}$"
-        x-relationship:
-          type: many-to-one
-          target: user
-          labelField: name
-
-  leave_request_detail:
     x-generate:
       list: true
       view: true
@@ -2458,18 +1473,67 @@ definitions:
         target:
           - view
           - edit
-    allOf:
-      - $ref: "#/definitions/leave_request"
-      - type: object
-        required:
-          - user
-        properties:
-          user:
-            $ref: "#/definitions/user"
-          approvable:
-            $ref: "#/definitions/approvable"
-          assignee:
-            $ref: "#/definitions/user"
+    x-display:
+      table:
+        - user:
+            primary: true
+            width: 200
+        - start_date:
+            width: 150
+        - end_date:
+            width: 150
+      chart:
+        span: month
+        row_by: user
+        start_field: start_date
+        end_field: end_date
+      dashboard: true
+    x-approval:
+      on_approved:
+        set_fields:
+          status: "approved"
+        emit_hook: true
+      on_rejected:
+        terminal: false
+        set_fields:
+          status: "rejected"
+        emit_hook: false
+    fields:
+      user_id:
+        pattern: "^c[a-z0-9]{24,}$"
+        x-relationship: {}
+      start_date:
+        format: date
+      end_date:
+        format: date
+      reason:
+        minLength: 1
+      approvable_id:
+        pattern: "^c[a-z0-9]{24,}$"
+        x-relationship:
+          type: one-to-one_bridge
+          labelField: id
+      status:
+        minimum: 0
+        maximum: 2
+        default: 0
+        x-enum-namespace: LeaveRequestStatus
+        enum:
+          - pending
+          - approved
+          - rejected
+      assignee_id:
+        pattern: "^c[a-z0-9]{24,}$"
+        x-relationship: {}
+    required:
+      - user
+    properties:
+      user:
+        $ref: "#/definitions/user"
+      approvable:
+        $ref: "#/definitions/approvable"
+      assignee:
+        $ref: "#/definitions/user"
 
   # ============================================================
   # Cell 2: count mode, no lines (supply_request example)
@@ -2477,33 +1541,6 @@ definitions:
   # ============================================================
 
   supply_pool:
-    type: object
-    required:
-      - id
-      - name
-      - quantity
-    properties:
-      id:
-        type: string
-        pattern: "^c[a-z0-9]{24,}$"
-      name:
-        type: string
-        minLength: 1
-      description:
-        type:
-          - string
-          - "null"
-        x-ui:
-          rows: 4
-      quantity:
-        type: integer
-        minimum: 0
-      reserved_quantity:
-        type: integer
-        minimum: 0
-        default: 0
-
-  supply_pool_detail:
     x-generate:
       list: true
       view: true
@@ -2513,15 +1550,27 @@ definitions:
       invalidate: false
       api: true
       test: true
-    allOf:
-      - $ref: "#/definitions/supply_pool"
-
+    fields:
+      name:
+        minLength: 1
+      description:
+        x-ui:
+          rows: 4
+      quantity:
+        minimum: 0
+      reserved_quantity:
+        minimum: 0
+        default: 0
   supply_request:
-    type: object
-    required:
-      - id
-      - name
-      - quantity
+    x-generate:
+      list: true
+      view: true
+      new: true
+      edit: true
+      delete: true
+      invalidate: false
+      api: true
+      test: true
     x-reservation:
       mode: count
       pool:
@@ -2534,24 +1583,25 @@ definitions:
         allocationEntity: supply_allocation
         parentField: supply_request_id
         allocationAudit: false
-    properties:
-      id:
-        type: string
-        pattern: "^c[a-z0-9]{24,}$"
+    fields:
       name:
-        type: string
         minLength: 1
       description:
-        type:
-          - string
-          - "null"
         x-ui:
           rows: 4
       quantity:
-        type: integer
         minimum: 1
-
-  supply_request_detail:
+  supply_allocation:
+    fields:
+      supply_request_id:
+        pattern: "^c[a-z0-9]{24,}$"
+        x-relationship: {}
+      supply_pool_id:
+        pattern: "^c[a-z0-9]{24,}$"
+        x-relationship: {}
+      quantity:
+        minimum: 1
+  room_type:
     x-generate:
       list: true
       view: true
@@ -2561,119 +1611,16 @@ definitions:
       invalidate: false
       api: true
       test: true
-    allOf:
-      - $ref: "#/definitions/supply_request"
-
-  supply_allocation:
-    type: object
-    required:
-      - id
-      - supply_request_id
-      - supply_pool_id
-      - quantity
-    properties:
-      id:
-        type: string
-        pattern: "^c[a-z0-9]{24,}$"
-      supply_request_id:
-        type: string
-        pattern: "^c[a-z0-9]{24,}$"
-        x-relationship:
-          type: many-to-one
-          target: supply_request
-          labelField: name
-      supply_pool_id:
-        type: string
-        pattern: "^c[a-z0-9]{24,}$"
-        x-relationship:
-          type: many-to-one
-          target: supply_pool
-          labelField: name
-      quantity:
-        type: integer
-        minimum: 1
-
-  # ============================================================
-  # Cell 3: item mode, no lines (room_reservation example)
-  # Allocates one specific room row; result.allocatedField = room_id.
-  # ============================================================
-
-  room_type:
-    type: object
-    required:
-      - id
-      - name
-    properties:
-      id:
-        type: string
-        pattern: "^c[a-z0-9]{24,}$"
+    fields:
       name:
-        type: string
         minLength: 1
       capacity:
-        type: integer
         minimum: 1
       description:
-        type:
-          - string
-          - "null"
         x-ui:
           rows: 4
 
-  room_type_detail:
-    x-generate:
-      list: true
-      view: true
-      new: true
-      edit: true
-      delete: true
-      invalidate: false
-      api: true
-      test: true
-    allOf:
-      - $ref: "#/definitions/room_type"
-
   room:
-    type: object
-    required:
-      - id
-      - room_no
-      - room_type_id
-      - status
-    x-display:
-      table:
-        - room_no:
-            primary: true
-            width: 200
-        - room_type:
-            width: 200
-    properties:
-      id:
-        type: string
-        pattern: "^c[a-z0-9]{24,}$"
-      room_no:
-        type: string
-        minLength: 1
-      room_type_id:
-        type: string
-        pattern: "^c[a-z0-9]{24,}$"
-        x-relationship:
-          type: many-to-one
-          target: room_type
-          labelField: name
-      floor:
-        type:
-          - integer
-          - "null"
-      status:
-        type: integer
-        minimum: 0
-        maximum: 1
-        enum:
-          - available
-          - maintenance
-
-  room_detail:
     x-generate:
       list: true
       view: true
@@ -2684,23 +1631,43 @@ definitions:
       api: true
       test: true
       mobile: true
-    allOf:
-      - $ref: "#/definitions/room"
-      - type: object
-        required:
-          - room_type
-        properties:
-          room_type:
-            $ref: "#/definitions/room_type"
+    x-display:
+      table:
+        - room_no:
+            primary: true
+            width: 200
+        - room_type:
+            width: 200
+    fields:
+      room_no:
+        minLength: 1
+      room_type_id:
+        pattern: "^c[a-z0-9]{24,}$"
+        x-relationship: {}
+      floor: {}
+      status:
+        minimum: 0
+        maximum: 1
+        enum:
+          - available
+          - maintenance
+
+    required:
+      - room_type
+    properties:
+      room_type:
+        $ref: "#/definitions/room_type"
 
   room_reservation:
-    type: object
-    required:
-      - id
-      - guest_name
-      - room_type_id
-      - check_in
-      - check_out
+    x-generate:
+      list: true
+      view: true
+      new: true
+      edit: true
+      delete: true
+      invalidate: false
+      api: true
+      test: true
     x-display:
       table:
         - room_type:
@@ -2734,37 +1701,60 @@ definitions:
           - id: asc
       result:
         allocatedField: room_id
-    properties:
-      id:
-        type: string
-        pattern: "^c[a-z0-9]{24,}$"
+    fields:
       guest_name:
-        type: string
         minLength: 1
       room_type_id:
-        type: string
         pattern: "^c[a-z0-9]{24,}$"
-        x-relationship:
-          type: many-to-one
-          target: room_type
-          labelField: name
+        x-relationship: {}
       room_id:
-        type:
-          - string
-          - "null"
         pattern: "^c[a-z0-9]{24,}$"
         x-relationship:
-          type: many-to-one
-          target: room
           labelField: room_no
       check_in:
-        type: string
         format: date
       check_out:
-        type: string
         format: date
+    properties:
+      room_type:
+        $ref: "#/definitions/room_type"
+      room:
+        $ref: "#/definitions/room"
 
-  room_reservation_detail:
+  # ============================================================
+  # Receiving lifecycle (PO / ASN / Receipt).
+  # ============================================================
+
+  receiving_purchase_order_line:
+    fields:
+      receiving_purchase_order_id:
+        pattern: "^c[a-z0-9]{24,}$"
+        x-relationship:
+          labelField: order_no
+      product_id:
+        pattern: "^c[a-z0-9]{24,}$"
+        x-relationship: {}
+      ordered_quantity:
+        minimum: 0
+      done_quantity:
+        minimum: 0
+        default: 0
+      cancelled_quantity:
+        minimum: 0
+        default: 0
+      outstanding_quantity:
+        minimum: 0
+        default: 0
+      status:
+        minimum: 0
+        maximum: 3
+        enum:
+          - outstanding
+          - partially_received
+          - fully_received
+          - cancelled
+        default: outstanding
+  receiving_purchase_order:
     x-generate:
       list: true
       view: true
@@ -2774,25 +1764,6 @@ definitions:
       invalidate: false
       api: true
       test: true
-    allOf:
-      - $ref: "#/definitions/room_reservation"
-      - type: object
-        properties:
-          room_type:
-            $ref: "#/definitions/room_type"
-          room:
-            $ref: "#/definitions/room"
-
-  # ============================================================
-  # Receiving lifecycle (PO / ASN / Receipt).
-  # ============================================================
-
-  receiving_purchase_order:
-    type: object
-    required:
-      - id
-      - order_no
-      - status
     x-display:
       table:
         - order_no:
@@ -2800,15 +1771,10 @@ definitions:
             width: 200
         - status:
             width: 150
-    properties:
-      id:
-        type: string
-        pattern: "^c[a-z0-9]{24,}$"
+    fields:
       order_no:
-        type: string
         minLength: 1
       status:
-        type: integer
         minimum: 0
         maximum: 4
         enum:
@@ -2818,58 +1784,44 @@ definitions:
           - received
           - cancelled
 
-  receiving_purchase_order_line:
-    type: object
     required:
-      - id
-      - receiving_purchase_order_id
-      - product_id
-      - ordered_quantity
+      - lines
     properties:
-      id:
-        type: string
-        pattern: "^c[a-z0-9]{24,}$"
-      receiving_purchase_order_id:
-        type: string
+      lines:
+        type: array
+        items:
+          $ref: "#/definitions/receiving_purchase_order_line"
+
+  receiving_asn_line:
+    fields:
+      receiving_asn_id:
         pattern: "^c[a-z0-9]{24,}$"
         x-relationship:
-          type: many-to-one
-          target: receiving_purchase_order
-          labelField: order_no
+          labelField: asn_no
       product_id:
-        type: string
         pattern: "^c[a-z0-9]{24,}$"
-        x-relationship:
-          type: many-to-one
-          target: product
-          labelField: name
-      ordered_quantity:
-        type: integer
+        x-relationship: {}
+      shipped_quantity:
         minimum: 0
       done_quantity:
-        type: integer
         minimum: 0
         default: 0
       cancelled_quantity:
-        type: integer
         minimum: 0
         default: 0
       outstanding_quantity:
-        type: integer
         minimum: 0
         default: 0
       status:
-        type: integer
         minimum: 0
         maximum: 3
         enum:
           - outstanding
-          - partially_received
-          - fully_received
+          - partially_matched
+          - fully_matched
           - cancelled
         default: outstanding
-
-  receiving_purchase_order_detail:
+  receiving_asn:
     x-generate:
       list: true
       view: true
@@ -2879,23 +1831,6 @@ definitions:
       invalidate: false
       api: true
       test: true
-    allOf:
-      - $ref: "#/definitions/receiving_purchase_order"
-      - type: object
-        required:
-          - lines
-        properties:
-          lines:
-            type: array
-            items:
-              $ref: "#/definitions/receiving_purchase_order_line"
-
-  receiving_asn:
-    type: object
-    required:
-      - id
-      - asn_no
-      - status
     x-display:
       table:
         - asn_no:
@@ -2903,24 +1838,14 @@ definitions:
             width: 200
         - status:
             width: 150
-    properties:
-      id:
-        type: string
-        pattern: "^c[a-z0-9]{24,}$"
+    fields:
       asn_no:
-        type: string
         minLength: 1
       purchase_order_id:
-        type:
-          - string
-          - "null"
         pattern: "^c[a-z0-9]{24,}$"
         x-relationship:
-          type: many-to-one
-          target: receiving_purchase_order
           labelField: order_no
       status:
-        type: integer
         minimum: 0
         maximum: 4
         enum:
@@ -2930,58 +1855,17 @@ definitions:
           - matched
           - cancelled
 
-  receiving_asn_line:
-    type: object
     required:
-      - id
-      - receiving_asn_id
-      - product_id
-      - shipped_quantity
+      - lines
     properties:
-      id:
-        type: string
-        pattern: "^c[a-z0-9]{24,}$"
-      receiving_asn_id:
-        type: string
-        pattern: "^c[a-z0-9]{24,}$"
-        x-relationship:
-          type: many-to-one
-          target: receiving_asn
-          labelField: asn_no
-      product_id:
-        type: string
-        pattern: "^c[a-z0-9]{24,}$"
-        x-relationship:
-          type: many-to-one
-          target: product
-          labelField: name
-      shipped_quantity:
-        type: integer
-        minimum: 0
-      done_quantity:
-        type: integer
-        minimum: 0
-        default: 0
-      cancelled_quantity:
-        type: integer
-        minimum: 0
-        default: 0
-      outstanding_quantity:
-        type: integer
-        minimum: 0
-        default: 0
-      status:
-        type: integer
-        minimum: 0
-        maximum: 3
-        enum:
-          - outstanding
-          - partially_matched
-          - fully_matched
-          - cancelled
-        default: outstanding
+      purchase_order:
+        $ref: "#/definitions/receiving_purchase_order"
+      lines:
+        type: array
+        items:
+          $ref: "#/definitions/receiving_asn_line"
 
-  receiving_asn_detail:
+  receiving_receipt:
     x-generate:
       list: true
       view: true
@@ -2991,28 +1875,7 @@ definitions:
       invalidate: false
       api: true
       test: true
-    allOf:
-      - $ref: "#/definitions/receiving_asn"
-      - type: object
-        required:
-          - lines
-        properties:
-          purchase_order:
-            $ref: "#/definitions/receiving_purchase_order"
-          lines:
-            type: array
-            items:
-              $ref: "#/definitions/receiving_asn_line"
-
-  receiving_receipt:
-    type: object
-    required:
-      - id
-      - receipt_no
-      - status
     x-import-key: [receipt_no]
-    x-approval-lines:
-      - lines
     x-display:
       table:
         - receipt_no:
@@ -3020,55 +1883,55 @@ definitions:
             width: 200
         - status:
             width: 150
-    properties:
-      id:
-        type: string
-        pattern: "^c[a-z0-9]{24,}$"
+    x-approval-lines:
+      - lines
+    fields:
       receipt_no:
-        type: string
         minLength: 1
       purchase_order_id:
-        type:
-          - string
-          - "null"
         pattern: "^c[a-z0-9]{24,}$"
         x-relationship:
-          type: many-to-one
-          target: receiving_purchase_order
           labelField: order_no
       asn_id:
-        type:
-          - string
-          - "null"
         pattern: "^c[a-z0-9]{24,}$"
         x-relationship:
-          type: many-to-one
-          target: receiving_asn
           labelField: asn_no
       status:
-        type: integer
         minimum: 0
         maximum: 2
         enum:
           - draft
           - confirmed
           - cancelled
-      confirmed_at:
-        type:
-          - string
-          - "null"
-        format: date-time
+      confirmed_at: {}
+    required:
+      - lines
+    properties:
+      purchase_order:
+        $ref: "#/definitions/receiving_purchase_order"
+      asn:
+        $ref: "#/definitions/receiving_asn"
+      lines:
+        type: array
+        items:
+          $ref: "#/definitions/receiving_receipt_line"
 
   receiving_receipt_line:
-    type: object
-    required:
-      - id
-      - receiving_receipt_id
-      - product_id
-      - receipt_quantity
-      - status
-      - inventory_id
-      - approvable_id
+    x-generate:
+      list: true
+      view: true
+      new: false
+      edit: false
+      delete: false
+      invalidate: false
+      api: false
+      test: true
+    x-custom-components:
+      - name: ApprovalSection
+        path: "@/components/_standard/ApprovalSection"
+        target:
+          - view
+          - edit
     x-display:
       table:
         - product:
@@ -3090,6 +1953,11 @@ definitions:
         emit_hook: false
         set_fields:
           status: "rejected"
+    x-ledger-source:
+      ledgerDomain: inventory_domain
+      event_type: receive
+      quantity_delta_field: receipt_quantity
+      poolIdField: inventory_id
     x-splittable:
       quantityField: receipt_quantity
       perPartRequired:
@@ -3104,34 +1972,17 @@ definitions:
       parentField: parent_id
       ledgerDomain: inventory_domain
       poolIdField: inventory_id
-    x-ledger-source:
-      ledgerDomain: inventory_domain
-      event_type: receive
-      quantity_delta_field: receipt_quantity
-      poolIdField: inventory_id
-    properties:
-      id:
-        type: string
-        pattern: "^c[a-z0-9]{24,}$"
+    fields:
       receiving_receipt_id:
-        type: string
         pattern: "^c[a-z0-9]{24,}$"
         x-relationship:
-          type: many-to-one
-          target: receiving_receipt
           labelField: receipt_no
       product_id:
-        type: string
         pattern: "^c[a-z0-9]{24,}$"
-        x-relationship:
-          type: many-to-one
-          target: product
-          labelField: name
+        x-relationship: {}
       receipt_quantity:
-        type: integer
         minimum: 0
       status:
-        type: integer
         minimum: 0
         maximum: 2
         enum:
@@ -3140,13 +1991,8 @@ definitions:
           - rejected
         default: pending
       inventory_id:
-        type:
-          - string
-          - "null"
         pattern: "^c[a-z0-9]{24,}$"
         x-relationship:
-          type: many-to-one
-          target: inventory
           labelField:
             - product.name
             - location.name
@@ -3162,119 +2008,116 @@ definitions:
         x-autocomplete-context:
           - product_id
       approvable_id:
-        type: string
         pattern: "^c[a-z0-9]{24,}$"
         x-relationship:
           type: one-to-one_bridge
-          target: approvable
           labelField: id
       parent_id:
-        type:
-          - string
-          - "null"
         pattern: "^c[a-z0-9]{24,}$"
       is_split_result:
-        type: boolean
         default: false
       inventory_transactionable_id:
-        # Plain FK, no x-relationship: inventory_transactionable is an internal
-        # bridge (no x-generate, no generated types module — same as
-        # commentable/approvable), so it cannot be a many-to-one relation target.
-        # Consumed by ledger_write_stub.ts.jinja2 for idempotent ledger writes.
-        type:
-          - string
-          - "null"
         pattern: "^c[a-z0-9]{24,}$"
       assignee_id:
-        type:
-          - string
-          - "null"
+        pattern: "^c[a-z0-9]{24,}$"
+        x-relationship: {}
+    properties:
+      receiving_receipt:
+        $ref: "#/definitions/receiving_receipt"
+      product:
+        $ref: "#/definitions/product"
+      inventory:
+        $ref: "#/definitions/inventory"
+      approvable:
+        $ref: "#/definitions/approvable"
+      assignee:
+        $ref: "#/definitions/user"
+
+  purchase_per_item:
+    x-generate:
+      list: true
+      view: true
+      new: false
+      edit: false
+      delete: false
+      invalidate: false
+      api: false
+      test: true
+    x-custom-components:
+      - name: ApprovalSection
+        path: "@/components/_standard/ApprovalSection"
+        target:
+          - view
+    x-display:
+      table:
+        - product:
+            primary: true
+            width: 200
+        - purchase_order:
+            width: 150
+        - inventory:
+            width: 250
+        - quantity:
+            width: 100
+        - status:
+            width: 120
+    x-approval:
+      on_approved:
+        emit_hook: true
+      on_rejected:
+        terminal: true
+        emit_hook: true
+    x-splittable:
+      quantityField: quantity
+      parentField: parent_id
+      ledgerDomain: inventory_domain
+      poolIdField: inventory_id
+      perPartRequired:
+        - inventory_id
+    fields:
+      purchase_order_id:
         pattern: "^c[a-z0-9]{24,}$"
         x-relationship:
-          type: many-to-one
-          target: user
-          labelField: name
+          labelField: order_no
+      product_id:
+        pattern: "^c[a-z0-9]{24,}$"
+        x-relationship: {}
+      quantity:
+        minimum: 1
+      status:
+        minimum: 0
+        maximum: 2
+        enum:
+          - pending
+          - split
+          - rejected
+        default: pending
+      price:
+        minimum: 0
+      parent_id:
+        pattern: "^c[a-z0-9]{24,}$"
+      approvable_id:
+        pattern: "^c[a-z0-9]{24,}$"
+        x-relationship:
+          type: one-to-one_bridge
+          labelField: id
+      inventory_transactionable_id:
+        pattern: "^c[a-z0-9]{24,}$"
+      inventory_id:
+        pattern: "^c[a-z0-9]{24,}$"
+        x-relationship:
+          labelField:
+            - product.name
+            - location.name
+            - lot_number
+            - expiration_date
 
-  receiving_receipt_detail:
-    x-generate:
-      list: true
-      view: true
-      new: true
-      edit: true
-      delete: true
-      invalidate: false
-      api: true
-      test: true
-    allOf:
-      - $ref: "#/definitions/receiving_receipt"
-      - type: object
-        required:
-          - lines
-        properties:
-          purchase_order:
-            $ref: "#/definitions/receiving_purchase_order"
-          asn:
-            $ref: "#/definitions/receiving_asn"
-          lines:
-            type: array
-            items:
-              $ref: "#/definitions/receiving_receipt_line"
-
-  receiving_receipt_line_detail:
-    x-generate:
-      list: true
-      view: true
-      new: false
-      edit: false
-      delete: false
-      invalidate: false
-      api: false
-      test: true
-    x-custom-components:
-      - name: ApprovalSection
-        path: "@/components/_standard/ApprovalSection"
-        target:
-          - view
-          - edit
-    allOf:
-      - $ref: "#/definitions/receiving_receipt_line"
-      - type: object
-        properties:
-          receiving_receipt:
-            $ref: "#/definitions/receiving_receipt"
-          product:
-            $ref: "#/definitions/product"
-          inventory:
-            $ref: "#/definitions/inventory"
-          approvable:
-            $ref: "#/definitions/approvable"
-          assignee:
-            $ref: "#/definitions/user"
-
-  purchase_per_item_detail:
-    x-generate:
-      list: true
-      view: true
-      new: false
-      edit: false
-      delete: false
-      invalidate: false
-      api: false
-      test: true
-    x-custom-components:
-      - name: ApprovalSection
-        path: "@/components/_standard/ApprovalSection"
-        target:
-          - view
-    allOf:
-      - $ref: "#/definitions/purchase_per_item"
-      - type: object
-        required:
-          - product
-        properties:
-          purchase_order:
-            $ref: "#/definitions/purchase_order"
-          product:
-            $ref: "#/definitions/product"
-          approvable:
-            $ref: "#/definitions/approvable"
+    required:
+      - product
+    properties:
+      purchase_order:
+        $ref: "#/definitions/purchase_order"
+      product:
+        $ref: "#/definitions/product"
+      approvable:
+        $ref: "#/definitions/approvable"
