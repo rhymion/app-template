@@ -1,6 +1,6 @@
 // cmd_318: Trigger #2 permanent fix (notifyApprovalRequestCreated wired into
 // service_after_create_stub.ts.jinja2) + Trigger #1 regression coverage.
-import { TEST_API_KEY } from '../../../../app-generator/cypress/support/test-credentials';
+import { TEST_API_KEY } from '../../support/test-credentials';
 
 const LEAVE_REQUEST_API_BASE = '/api/leave_request';
 
