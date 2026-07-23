@@ -444,6 +444,51 @@ else
 fi
 export VERCEL_PROJECT_ID
 
+# ── Step 1.5: Ensure Vercel project Root Directory ──────────────────────────
+# Root Directory has no vercel.json field — confirmed against the current
+# Vercel REST API reference (Update an existing project /
+# Find a project by id or name, docs.vercel.com/docs/rest-api/reference/
+# endpoints/projects): it is exclusively a Vercel Projects API property, read
+# via `GET /v9/projects/{idOrName}` and written via `PATCH
+# /v9/projects/{idOrName}` with body `{"rootDirectory": "..."}` (Bearer token
+# auth, same VERCEL_TOKEN used by the `vercel` CLI itself — see
+# docs/vercel-automation-design.md §V-7 "env var only, never --token flag").
+# A team-scoped token additionally needs `?teamId=` (or `?slug=`) on both
+# calls, mirroring the `--scope` handling already used for the CLI above.
+# Read-then-write keeps this idempotent: a project whose Root Directory is
+# already correct is a no-op.
+echo ""
+echo "[Step 1.5] Ensuring Vercel project Root Directory..."
+_VERCEL_ROOT_DIRECTORY="${VERCEL_ROOT_DIRECTORY:-app-generator}"
+_VERCEL_PROJECTS_API="https://api.vercel.com/v9/projects/${VERCEL_PROJECT_ID}"
+_VERCEL_TEAM_QS=""
+[[ -n "$VERCEL_ORG_ID" ]] && _VERCEL_TEAM_QS="?teamId=${VERCEL_ORG_ID}"
+
+if [[ "$DRY_RUN" == "true" ]]; then
+  echo "[DRY-RUN] curl -H 'Authorization: Bearer <redacted>' \"${_VERCEL_PROJECTS_API}${_VERCEL_TEAM_QS}\" (read rootDirectory)"
+  echo "[DRY-RUN] Would PATCH rootDirectory to '${_VERCEL_ROOT_DIRECTORY}' if not already set"
+else
+  : "${VERCEL_TOKEN:?VERCEL_TOKEN is required in .env.production.local}"
+  _CURRENT_ROOT_DIRECTORY=$(curl -sS -H "Authorization: Bearer ${VERCEL_TOKEN}" \
+    "${_VERCEL_PROJECTS_API}${_VERCEL_TEAM_QS}" | python3 -c \
+    "import sys,json; print(json.load(sys.stdin).get('rootDirectory') or '')")
+  if [[ "$_CURRENT_ROOT_DIRECTORY" == "$_VERCEL_ROOT_DIRECTORY" ]]; then
+    echo "[SKIP] rootDirectory already set to '${_VERCEL_ROOT_DIRECTORY}'"
+  else
+    _ROOT_DIR_PATCH_OUT=$(curl -sS -X PATCH -H "Authorization: Bearer ${VERCEL_TOKEN}" \
+      -H "Content-Type: application/json" \
+      -d "{\"rootDirectory\":\"${_VERCEL_ROOT_DIRECTORY}\"}" \
+      "${_VERCEL_PROJECTS_API}${_VERCEL_TEAM_QS}")
+    _PATCHED_ROOT_DIRECTORY=$(printf '%s' "$_ROOT_DIR_PATCH_OUT" | python3 -c \
+      "import sys,json; print(json.load(sys.stdin).get('rootDirectory') or '')")
+    if [[ "$_PATCHED_ROOT_DIRECTORY" != "$_VERCEL_ROOT_DIRECTORY" ]]; then
+      echo "ERROR: failed to set rootDirectory via Vercel API (response: ${_ROOT_DIR_PATCH_OUT})" >&2
+      exit 1
+    fi
+    echo "  Set rootDirectory: '${_VERCEL_ROOT_DIRECTORY}'"
+  fi
+fi
+
 # ── Helper: pull a live env-var value from Vercel (used for Blob token) ─────
 # `vercel env ls` only shows metadata ("Encrypted") — pulling is the only way
 # to get an actual decrypted value. The pulled file is written by `mktemp`
