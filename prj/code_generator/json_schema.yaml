@@ -111,7 +111,6 @@ definitions:
     x-gdpr-mode: both
     fields:
       name:
-        minLength: 1
         x-pii: direct
         x-gdpr-mode: both
       email:
@@ -195,8 +194,7 @@ definitions:
         target: user
     x-import-key: [name]
     fields:
-      name:
-        minLength: 1
+      name: {}
       description:
         x-ui:
           rows: 4
@@ -228,8 +226,7 @@ definitions:
       org_id_field: id
     x-import-key: [name]
     fields:
-      name:
-        minLength: 1
+      name: {}
       description:
         x-ui:
           rows: 4
@@ -265,7 +262,6 @@ definitions:
             width: 200
     fields:
       name:
-        minLength: 1
         x-entity-select: true
         x-ui:
           width: 6
@@ -317,7 +313,6 @@ definitions:
             width: 150
     fields:
       entity_name:
-        minLength: 1
         x-entity-select: true
       requestor_role_id:
         x-relationship: {}
@@ -376,9 +371,6 @@ definitions:
       api: false
       test: false
     fields:
-      rejection_reason: {}
-    required:
-      - approval_requests
     properties:
       approval_requests:
         type: array
@@ -396,8 +388,6 @@ definitions:
       invalidate: false
       api: false
       test: false
-    required:
-      - comments
     properties:
       comments:
         type: array
@@ -408,9 +398,7 @@ definitions:
   comment:
     fields:
       message:
-        minLength: 1
         x-mention: true
-      commentable_id: {}
   reaction:
     x-internal:
       page: false
@@ -441,8 +429,6 @@ definitions:
       invalidate: false
       api: false
       test: false
-    required:
-      - attachments
     properties:
       attachments:
         type: array
@@ -467,19 +453,15 @@ definitions:
         _required: true
       order:
         default: 0
-      name:
-        minLength: 1
+      name: {}
       path:
         format: uri
-      attachable_id: {}
   dashboard_widget:
     fields:
       dashboard_id:
         x-relationship: {}
-      name:
-        minLength: 1
-      entity_name:
-        minLength: 1
+      name: {}
+      entity_name: {}
       chart_type:
         minimum: 0
         maximum: 3
@@ -496,7 +478,6 @@ definitions:
           - grouped
           - stacked
           - standardized
-      series_field: {}
       group_by_bucket:
         minimum: 0
         maximum: 4
@@ -506,10 +487,7 @@ definitions:
           - month
           - quarter
           - year
-      group_by_field:
-        minLength: 1
-      filter_field: {}
-      filter_value: {}
+      group_by_field: {}
       order:
         default: 0
   dashboard:
@@ -534,8 +512,7 @@ definitions:
             primary: true
             width: 200
     fields:
-      name:
-        minLength: 1
+      name: {}
     required:
       - widgets
     properties:
@@ -546,8 +523,7 @@ definitions:
 
   field:
     fields:
-      name:
-        minLength: 1
+      name: {}
       type:
         enum:
           - string
@@ -561,8 +537,6 @@ definitions:
         x-relationship: {}
       max_length:
         minimum: 1
-      max: {}
-      regex: {}
       required:
         default: true
   db_table:
@@ -576,8 +550,7 @@ definitions:
       api: true
       test: true
     fields:
-      name:
-        minLength: 1
+      name: {}
       description:
         x-ui:
           rows: 4
@@ -598,8 +571,7 @@ definitions:
 
   yyyyy_yyyyy:
     fields:
-      name:
-        minLength: 1
+      name: {}
       type:
         enum:
           - string
@@ -610,8 +582,6 @@ definitions:
         pattern: "^c[a-z0-9]{24,}$"
       max_length:
         minimum: 1
-      max: {}
-      regex: {}
       required:
         default: true
       written_by: {}
@@ -626,8 +596,7 @@ definitions:
       api: true
       test: true
     fields:
-      name:
-        minLength: 1
+      name: {}
       description: {}
       team: {}
     required:
@@ -640,9 +609,7 @@ definitions:
 
   parent1_child1:
     fields:
-      order: {}
       name:
-        minLength: 1
         maxLength: 50
       type:
         enum:
@@ -667,8 +634,7 @@ definitions:
         maxLength: 100
   parent1_child2:
     fields:
-      name:
-        minLength: 1
+      name: {}
       required:
         default: true
       start_date:
@@ -678,7 +644,6 @@ definitions:
   parent1_list:
     fields:
       name:
-        minLength: 1
         maxLength: 100
   parent1:
     x-generate:
@@ -691,7 +656,6 @@ definitions:
       api: true
     fields:
       name:
-        minLength: 1
         maxLength: 100
       organization_id:
         pattern: "^c[a-z0-9]{24,}$"
@@ -737,8 +701,7 @@ definitions:
       api: true
       test: true
     fields:
-      name:
-        minLength: 1
+      name: {}
       description: {}
       login_time: {}
       logout_time: {}
@@ -900,8 +863,7 @@ definitions:
         type: many-to-many
         target: procedure
     fields:
-      name:
-        minLength: 1
+      name: {}
       description: {}
       parent_id:
         pattern: "^c[a-z0-9]{24,}$"
@@ -969,8 +931,7 @@ definitions:
             width: 200
       dashboard: true
     fields:
-      name:
-        minLength: 1
+      name: {}
       description: {}
       organization_id:
         pattern: "^c[a-z0-9]{24,}$"
@@ -1014,8 +975,7 @@ definitions:
         row_by: resource
       dashboard: true
     fields:
-      name:
-        minLength: 1
+      name: {}
       resource_id:
         pattern: "^c[a-z0-9]{24,}$"
         x-relationship: {}
@@ -1149,10 +1109,8 @@ definitions:
             width: 100
       dashboard: true
     fields:
-      code:
-        minLength: 1
-      name:
-        minLength: 1
+      code: {}
+      name: {}
       price:
         minimum: 0
       attachable_id:
@@ -1441,8 +1399,7 @@ definitions:
       # driven by the standard approve/reject flow on purchase_per_item.approvable_id
       # (see purchase_per_item's x-approval below), not by bespoke action routes.
     fields:
-      order_no:
-        minLength: 1
+      order_no: {}
       customer_id:
         pattern: "^c[a-z0-9]{24,}$"
         x-relationship: {}
@@ -1506,8 +1463,7 @@ definitions:
         format: date
       end_date:
         format: date
-      reason:
-        minLength: 1
+      reason: {}
       approvable_id:
         pattern: "^c[a-z0-9]{24,}$"
         x-relationship:
@@ -1551,8 +1507,7 @@ definitions:
       api: true
       test: true
     fields:
-      name:
-        minLength: 1
+      name: {}
       description:
         x-ui:
           rows: 4
@@ -1584,8 +1539,7 @@ definitions:
         parentField: supply_request_id
         allocationAudit: false
     fields:
-      name:
-        minLength: 1
+      name: {}
       description:
         x-ui:
           rows: 4
@@ -1612,8 +1566,7 @@ definitions:
       api: true
       test: true
     fields:
-      name:
-        minLength: 1
+      name: {}
       capacity:
         minimum: 1
       description:
@@ -1639,8 +1592,7 @@ definitions:
         - room_type:
             width: 200
     fields:
-      room_no:
-        minLength: 1
+      room_no: {}
       room_type_id:
         pattern: "^c[a-z0-9]{24,}$"
         x-relationship: {}
@@ -1702,8 +1654,7 @@ definitions:
       result:
         allocatedField: room_id
     fields:
-      guest_name:
-        minLength: 1
+      guest_name: {}
       room_type_id:
         pattern: "^c[a-z0-9]{24,}$"
         x-relationship: {}
@@ -1772,8 +1723,7 @@ definitions:
         - status:
             width: 150
     fields:
-      order_no:
-        minLength: 1
+      order_no: {}
       status:
         minimum: 0
         maximum: 4
@@ -1839,8 +1789,7 @@ definitions:
         - status:
             width: 150
     fields:
-      asn_no:
-        minLength: 1
+      asn_no: {}
       purchase_order_id:
         pattern: "^c[a-z0-9]{24,}$"
         x-relationship:
@@ -1886,8 +1835,7 @@ definitions:
     x-approval-lines:
       - lines
     fields:
-      receipt_no:
-        minLength: 1
+      receipt_no: {}
       purchase_order_id:
         pattern: "^c[a-z0-9]{24,}$"
         x-relationship:
