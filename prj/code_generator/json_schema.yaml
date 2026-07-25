@@ -2124,3 +2124,26 @@ definitions:
         $ref: "#/definitions/product"
       approvable:
         $ref: "#/definitions/approvable"
+
+  notification:
+    # DB-backed notification store (cmd_445). Bell UI and SSE polling routes
+    # are hand-written custom code, not generated CRUD — no page/API is
+    # generated for this entity.
+    x-generate:
+      list: false
+      view: false
+      new: false
+      edit: false
+      delete: false
+      invalidate: false
+      api: false
+      test: false
+    # `payload` is Prisma `Json` — the schema deriver only derives
+    # String/Boolean/Int/DateTime scalars (schema_deriver.py _SCALAR_JSON_TYPE),
+    # so it is intentionally omitted here, same as approvable.rejection_reason
+    # is omitted above despite being a real Prisma column. x-generate is all
+    # false, so nothing in the generator needs `payload` (or `type`/`read`)
+    # declared to function; `user_id` is kept for FK/relationship registration.
+    fields:
+      user_id:
+        x-relationship: {}
