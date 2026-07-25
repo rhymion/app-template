@@ -380,25 +380,6 @@ definitions:
         items:
           $ref: "#/definitions/approval_request"
 
-  commentable:
-    x-generate:
-      list: false
-      view: false
-      new: false
-      edit: false
-      delete: false
-      invalidate: false
-      api: false
-      test: false
-    required:
-      - comments
-    properties:
-      comments:
-        type: array
-        x-outputType: comments
-        items:
-          $ref: "#/definitions/comment"
-
   comment:
     fields:
       message:
