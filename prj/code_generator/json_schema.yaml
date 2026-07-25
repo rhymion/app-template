@@ -1649,8 +1649,7 @@ definitions:
         x-relationship: {}
       floor: {}
       status:
-        minimum: 0
-        maximum: 1
+        default: available
         enum:
           - available
           - maintenance
