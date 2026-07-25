@@ -199,8 +199,6 @@ definitions:
         x-ui:
           rows: 4
 
-    required:
-      - users
     properties:
       users:
         type: array
@@ -231,8 +229,6 @@ definitions:
         x-ui:
           rows: 4
 
-    required:
-      - users
     properties:
       users:
         type: array
@@ -670,9 +666,6 @@ definitions:
         x-uri-kind: link
     required:
       - organization
-      - parent1_child1s
-      - parent1_child2s
-      - parent1_lists
     properties:
       organization:
         $ref: "#/definitions/organization"
@@ -871,10 +864,6 @@ definitions:
       assignee_id:
         pattern: "^c[a-z0-9]{24,}$"
         x-relationship: {}
-    required:
-      - children
-      - preceded_by
-      - followed_by
     properties:
       assignee:
         $ref: "#/definitions/user"
