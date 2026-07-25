@@ -1084,13 +1084,18 @@ model room_type {
   @@index([updater_id])
 }
 
+enum RoomStatus {
+  available
+  maintenance
+}
+
 model room {
   id                String             @id @default(cuid())
   room_no           String
   room_type_id      String
   room_type         room_type          @relation(fields: [room_type_id], references: [id], onDelete: Cascade)
   floor             Int?
-  status            Int                @default(0)
+  status            RoomStatus         @default(available)
   room_reservations room_reservation[]
   created_at        DateTime           @default(now()) @db.Timestamptz(0)
   updated_at        DateTime           @updatedAt @db.Timestamptz(0)
