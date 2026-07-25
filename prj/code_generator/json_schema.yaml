@@ -118,10 +118,12 @@ definitions:
         x-pii: direct
         x-gdpr-mode: both
       password:
+        x-pii: sensitive
         x-custom-component:
           target:
             - upsert
       api_key:
+        x-pii: sensitive
         x-custom-component:
           target:
             - upsert
@@ -130,6 +132,7 @@ definitions:
         x-pii: indirect
       mfa_enabled:
         default: false
+        x-pii: sensitive
         x-custom-component:
           target:
             - upsert
