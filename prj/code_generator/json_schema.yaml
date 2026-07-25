@@ -278,10 +278,6 @@ definitions:
       delete: {}
       import:
         default: false
-      role_id:
-        x-ui:
-          width: 6
-        x-relationship: {}
     properties:
       role:
         $ref: "#/definitions/role"
