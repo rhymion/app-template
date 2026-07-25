@@ -314,11 +314,21 @@ model inventory_transactionable {
   inventory_transactions inventory_transaction[]
 }
 
+enum InventoryTransactionEventType {
+  reserve
+  ship
+  receive
+  release
+  cancel
+  move
+  adjust
+}
+
 model inventory_transaction {
   id                            String                    @id @default(cuid())
   inventory_transactionable_id  String
   inventory_transactionable     inventory_transactionable @relation(fields: [inventory_transactionable_id], references: [id])
-  event_type                    String
+  event_type                    InventoryTransactionEventType
   quantity_delta                Int
   reserved_delta                Int
   product_id                    String
@@ -366,13 +376,18 @@ model inventory_movement {
   @@index([updater_id])
 }
 
+enum InventoryAdjustmentStatus {
+  pending
+  rejected
+}
+
 model inventory_adjustment {
   id                           String                     @id @default(cuid())
   inventory_id                 String
   inventory                    inventory                  @relation(fields: [inventory_id], references: [id])
   quantity_delta               Int
   reason                       String?
-  status                       String                     @default("pending")
+  status                       InventoryAdjustmentStatus @default(pending)
   approvable_id                String                     @unique
   approvable                   approvable                 @relation(fields: [approvable_id], references: [id])
   inventory_transactionable_id String?                    @unique
@@ -610,10 +625,17 @@ model db_table {
   @@index([updater_id])
 }
 
+enum FieldType {
+  string
+  number
+  boolean
+  date
+}
+
 model field {
   id           String    @id @default(cuid())
   name         String
-  type         String
+  type         FieldType
   db_table_id  String
   db_table     db_table  @relation("ParentTable", fields: [db_table_id], references: [id], onDelete: Cascade)
   reference_id String?
@@ -648,7 +670,7 @@ model xxxxx_xxxxx {
 model yyyyy_yyyyy {
   id             String      @id @default(cuid())
   name           String
-  type           String
+  type           FieldType
   xxxxx_xxxxx_id String
   xxxxx_xxxxx    xxxxx_xxxxx @relation(fields: [xxxxx_xxxxx_id], references: [id], onDelete: Cascade)
   max_length     Int?
@@ -689,7 +711,7 @@ model parent1_child1 {
   id         String   @id @default(cuid())
   order      Int      @default(0)
   name       String
-  type       String
+  type       FieldType
   parent1_id String
   parent1    parent1  @relation(fields: [parent1_id], references: [id], onDelete: Cascade)
   max_length Int?
