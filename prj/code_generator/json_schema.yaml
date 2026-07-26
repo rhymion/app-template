@@ -459,8 +459,6 @@ definitions:
   attachment:
     fields:
       type:
-        minimum: 0
-        maximum: 3
         enum:
           - image
           - file
@@ -1057,8 +1055,6 @@ definitions:
         pattern: "^c[a-z0-9]{24,}$"
         x-relationship: {}
       day_of_week:
-        minimum: 0
-        maximum: 6
         enum:
           - Sunday
           - Monday
@@ -1743,8 +1739,6 @@ definitions:
         minimum: 0
         default: 0
       status:
-        minimum: 0
-        maximum: 3
         enum:
           - outstanding
           - partially_received
@@ -1772,8 +1766,6 @@ definitions:
       order_no:
         minLength: 1
       status:
-        minimum: 0
-        maximum: 4
         enum:
           - draft
           - issued
@@ -1810,8 +1802,6 @@ definitions:
         minimum: 0
         default: 0
       status:
-        minimum: 0
-        maximum: 3
         enum:
           - outstanding
           - partially_matched
@@ -1843,8 +1833,6 @@ definitions:
         x-relationship:
           labelField: order_no
       status:
-        minimum: 0
-        maximum: 4
         enum:
           - draft
           - sent

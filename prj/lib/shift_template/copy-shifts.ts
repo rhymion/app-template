@@ -11,6 +11,11 @@ dayjs.extend(timezonePlugin);
 
 type TxClient = Pick<typeof prisma, 'shift'>;
 
+/** JS Date.day()/dayjs.day() index (0 = Sunday) to DayOfWeek enum member name. */
+const DAY_OF_WEEK_NAMES = [
+  'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday',
+] as const;
+
 /** Extract local {h, m, s} from a Timetz Date (stored UTC-normalized at epoch 1970-01-01). */
 function localTimeIn(date: Date, tz: string): { h: number; m: number; s: number } {
   const parts = new Intl.DateTimeFormat('en', {
@@ -78,7 +83,7 @@ export async function copyShiftTemplatesToShifts(
     !current.isAfter(endDay, 'day');
     current = current.add(1, 'day')
   ) {
-    const dayOfWeek = current.day(); // 0 = Sunday, same convention as JS Date
+    const dayOfWeek = DAY_OF_WEEK_NAMES[current.day()]; // 0 = Sunday, same convention as JS Date
     const dayTemplates = templates.filter((t) => t.day_of_week === dayOfWeek);
 
     for (const template of dayTemplates) {
