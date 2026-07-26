@@ -466,9 +466,16 @@ model attachable {
   product     product?
 }
 
+enum AttachmentType {
+  image
+  file
+  video
+  audio
+}
+
 model attachment {
   id                      String     @id @default(cuid())
-  type                    Int        @default(0)
+  type                    AttachmentType @default(image)
   order                   Int        @default(0)
   name                    String
   path                    String
@@ -836,11 +843,21 @@ model booking {
   @@index([updater_id])
 }
 
+enum DayOfWeek {
+  Sunday
+  Monday
+  Tuesday
+  Wednesday
+  Thursday
+  Friday
+  Saturday
+}
+
 model shift_template {
   id          String   @id @default(cuid())
   user_id     String
   user        user     @relation("ShiftTemplateUser", fields: [user_id], references: [id])
-  day_of_week Int
+  day_of_week DayOfWeek
   start_time  DateTime @db.Timetz(0)
   end_time    DateTime @db.Timetz(0)
   created_at  DateTime @default(now()) @db.Timestamptz(0)
@@ -1160,10 +1177,18 @@ model room_reservation {
 // x-receiving: Receiving lifecycle (PO / ASN / Receipt)
 // ============================================================
 
+enum ReceivingPurchaseOrderStatus {
+  draft
+  issued
+  partially_received
+  received
+  cancelled
+}
+
 model receiving_purchase_order {
   id                             String                           @id @default(cuid())
   order_no                       String
-  status                         Int                           @default(0)
+  status                         ReceivingPurchaseOrderStatus     @default(draft)
   lines                          receiving_purchase_order_line[]
   receiving_asns                 receiving_asn[]
   receiving_receipts             receiving_receipt[]
@@ -1178,6 +1203,13 @@ model receiving_purchase_order {
   @@index([updater_id])
 }
 
+enum ReceivingPurchaseOrderLineStatus {
+  outstanding
+  partially_received
+  fully_received
+  cancelled
+}
+
 model receiving_purchase_order_line {
   id                          String                   @id @default(cuid())
   receiving_purchase_order_id String
@@ -1188,7 +1220,7 @@ model receiving_purchase_order_line {
   done_quantity               Int                      @default(0)
   cancelled_quantity          Int                      @default(0)
   outstanding_quantity        Int                      @default(0)
-  status                      Int                      @default(0)
+  status                      ReceivingPurchaseOrderLineStatus @default(outstanding)
   created_at                  DateTime                 @default(now()) @db.Timestamptz(0)
   updated_at                  DateTime                 @updatedAt @db.Timestamptz(0)
 
@@ -1196,12 +1228,20 @@ model receiving_purchase_order_line {
   @@index([product_id])
 }
 
+enum ReceivingAsnStatus {
+  draft
+  sent
+  partially_matched
+  matched
+  cancelled
+}
+
 model receiving_asn {
   id                 String                    @id @default(cuid())
   asn_no             String
   purchase_order_id  String?
   purchase_order     receiving_purchase_order? @relation(fields: [purchase_order_id], references: [id])
-  status             Int                       @default(0)
+  status             ReceivingAsnStatus        @default(draft)
   lines              receiving_asn_line[]
   receiving_receipts receiving_receipt[]
   created_at         DateTime                  @default(now()) @db.Timestamptz(0)
@@ -1216,6 +1256,13 @@ model receiving_asn {
   @@index([updater_id])
 }
 
+enum ReceivingAsnLineStatus {
+  outstanding
+  partially_matched
+  fully_matched
+  cancelled
+}
+
 model receiving_asn_line {
   id                   String        @id @default(cuid())
   receiving_asn_id     String
@@ -1226,7 +1273,7 @@ model receiving_asn_line {
   done_quantity        Int           @default(0)
   cancelled_quantity   Int           @default(0)
   outstanding_quantity Int           @default(0)
-  status               Int           @default(0)
+  status               ReceivingAsnLineStatus @default(outstanding)
   created_at           DateTime      @default(now()) @db.Timestamptz(0)
   updated_at           DateTime      @updatedAt @db.Timestamptz(0)
 
