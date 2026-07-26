@@ -85,7 +85,7 @@ export async function populateReceivingReceiptLineSingleApproval(
   const receipt = await prisma.receiving_receipt.create({
     data: {
       receipt_no: `RRL-${Date.now()}`,
-      status: 0,
+      status: 'draft',
       creator_id: creatorId,
       updater_id: creatorId,
     },
@@ -97,7 +97,7 @@ export async function populateReceivingReceiptLineSingleApproval(
       receiving_receipt_id: receipt.id,
       product_id: product.id,
       receipt_quantity: opts?.receiptQuantity ?? 5,
-      status: 0,
+      status: 'pending',
       inventory_id: opts?.inventoryId ?? null,
       approvable_id: approvableItem.id,
     },
@@ -106,7 +106,7 @@ export async function populateReceivingReceiptLineSingleApproval(
   const approvalRequests = [];
   for (const flowId of approvalFlowIds) {
     const ar = await prisma.approval_request.create({
-      data: { approvable_id: approvableItem.id, approval_flow_id: flowId, status: 0 },
+      data: { approvable_id: approvableItem.id, approval_flow_id: flowId, status: 'Pending' },
     });
     approvalRequests.push(ar);
   }
