@@ -426,9 +426,17 @@ model comment {
   @@index([commentable_id])
 }
 
+enum ReactionType {
+  Like
+  Love
+  Laugh
+  Surprised
+  Sad
+}
+
 model reaction {
-  id         String   @id @default(cuid())
-  type       Int
+  id         String       @id @default(cuid())
+  type       ReactionType
   comment_id String
   comment    comment  @relation(fields: [comment_id], references: [id], onDelete: Cascade)
   user_id    String
@@ -502,17 +510,38 @@ model dashboard {
   @@index([updater_id])
 }
 
+enum DashboardWidgetChartType {
+  pie
+  column
+  bar
+  line
+}
+
+enum DashboardWidgetStackMode {
+  grouped
+  stacked
+  standardized
+}
+
+enum DashboardWidgetGroupByBucket {
+  day
+  week
+  month
+  quarter
+  year
+}
+
 model dashboard_widget {
   id             String    @id @default(cuid())
   dashboard_id   String
   dashboard      dashboard @relation(fields: [dashboard_id], references: [id], onDelete: Cascade)
   name            String
   entity_name     String
-  chart_type      Int
+  chart_type      DashboardWidgetChartType
   group_by_field  String
-  stack_mode      Int?
+  stack_mode      DashboardWidgetStackMode?
   series_field    String?
-  group_by_bucket Int?
+  group_by_bucket DashboardWidgetGroupByBucket?
   filter_field    String?
   filter_value    String?
   order          Int       @default(0)

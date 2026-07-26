@@ -420,8 +420,6 @@ definitions:
       api: custom
     fields:
       type:
-        minimum: 0
-        maximum: 4
         enum:
           - Like
           - Love
@@ -481,8 +479,6 @@ definitions:
       entity_name:
         minLength: 1
       chart_type:
-        minimum: 0
-        maximum: 3
         enum:
           - pie
           - column
@@ -490,16 +486,12 @@ definitions:
           - line
         default: 1
       stack_mode:
-        minimum: 0
-        maximum: 2
         enum:
           - grouped
           - stacked
           - standardized
       series_field: {}
       group_by_bucket:
-        minimum: 0
-        maximum: 4
         enum:
           - day
           - week
