@@ -36,7 +36,7 @@ describe('API: Receiving Receipt Line — Terminal Reject (D7)', () => {
             url: `/api/approval_request/${arId}/reject`,
           }).then((res) => {
             expect(res.status).to.eq(200);
-            expect(res.body.status).to.eq(3); // terminal_rejected
+            expect(res.body.status).to.eq('TerminalRejected'); // terminal_rejected
 
             cy.request({
               url: `${INV_API}/${seed.inventory.id}`,
@@ -73,7 +73,7 @@ describe('API: Receiving Receipt Line — Terminal Reject (D7)', () => {
           url: `/api/approval_request/${arId}/reject`,
         }).then((res) => {
           expect(res.status).to.eq(200);
-          expect(res.body.status).to.eq(3);
+          expect(res.body.status).to.eq('TerminalRejected');
         });
       });
     });

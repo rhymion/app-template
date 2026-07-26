@@ -356,8 +356,7 @@ definitions:
         x-relationship:
           labelField: [entity_name, approver_role.name]
       status:
-        minimum: 0
-        maximum: 3
+        default: Pending
         enum:
           - Pending
           - Approved
@@ -1103,8 +1102,6 @@ definitions:
       start_time: {}
       end_time: {}
       status:
-        minimum: 0
-        maximum: 2
         enum:
           - Scheduled
           - Approved
@@ -1513,9 +1510,7 @@ definitions:
           type: one-to-one_bridge
           labelField: id
       status:
-        minimum: 0
-        maximum: 2
-        default: 0
+        default: pending
         x-enum-namespace: LeaveRequestStatus
         enum:
           - pending
@@ -1895,8 +1890,7 @@ definitions:
         x-relationship:
           labelField: asn_no
       status:
-        minimum: 0
-        maximum: 2
+        default: draft
         enum:
           - draft
           - confirmed
@@ -1981,8 +1975,6 @@ definitions:
       receipt_quantity:
         minimum: 0
       status:
-        minimum: 0
-        maximum: 2
         enum:
           - pending
           - split
@@ -2083,8 +2075,6 @@ definitions:
       quantity:
         minimum: 1
       status:
-        minimum: 0
-        maximum: 2
         enum:
           - pending
           - split

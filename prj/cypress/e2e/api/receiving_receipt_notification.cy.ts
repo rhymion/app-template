@@ -26,12 +26,12 @@ describe('API: Receiving Receipt Notifications', () => {
           headers: { 'X-API-Key': setup.requestorUser.api_key },
           body: {
             receipt_no: `RR-NOTIF-${Date.now()}`,
-            status: 0,
+            status: 'draft',
             lines: [
               {
                 product_id: setup.product.id,
                 receipt_quantity: 1,
-                status: 0,
+                status: 'pending',
                 assignee_id: setup.approverUser.id,
               },
             ],
@@ -63,12 +63,12 @@ describe('API: Receiving Receipt Notifications', () => {
           headers: { 'X-API-Key': setup.requestorUser.api_key },
           body: {
             receipt_no: `RR-NOTIF-${Date.now()}`,
-            status: 0,
+            status: 'draft',
             lines: [
               {
                 product_id: setup.product.id,
                 receipt_quantity: 1,
-                status: 0,
+                status: 'pending',
               },
             ],
           },
@@ -97,12 +97,12 @@ describe('API: Receiving Receipt Notifications', () => {
           headers: { 'X-API-Key': setup.requestorUser.api_key },
           body: {
             receipt_no: `RR-NOTIF-${Date.now()}`,
-            status: 0,
+            status: 'draft',
             lines: [
               {
                 product_id: setup.product.id,
                 receipt_quantity: 1,
-                status: 0,
+                status: 'pending',
               },
             ],
           },

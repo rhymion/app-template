@@ -114,7 +114,7 @@ export async function copyShiftTemplatesToShifts(
               user_id: template.user_id,
               start_time: shiftStart,
               end_time: shiftEnd,
-              status: 0,
+              status: 'Scheduled',
               creator_id: userId,
               updater_id: userId,
             },

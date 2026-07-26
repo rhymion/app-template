@@ -284,7 +284,7 @@ describe('Reservation Allocation (B3/B4)', () => {
                   url: `/api/approval_request/${ar.id}/reject`,
                 }).then((rejectRes) => {
                   expect(rejectRes.status).to.eq(200);
-                  expect(rejectRes.body.status).to.eq(3); // terminal_rejected
+                  expect(rejectRes.body.status).to.eq('TerminalRejected'); // terminal_rejected
 
                   cy.task<any>('db:getApprovableById', { approvable_id: item.approvable_id }).then((approvable: any) => {
                     expect(approvable.approved_at).to.not.be.null;
