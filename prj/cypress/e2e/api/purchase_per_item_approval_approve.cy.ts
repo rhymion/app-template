@@ -50,7 +50,7 @@ describe('API: Purchase Per Item — Approve / Ship (cmd_309 item3)', () => {
               })
               .then((approveRes) => {
                 expect(approveRes.status).to.eq(200);
-                expect(approveRes.body.status).to.eq(1); // approved
+                expect(approveRes.body.status).to.eq('Approved'); // approved
                 return cy.wrap({ item, orderId });
               });
           });
@@ -191,7 +191,7 @@ describe('API: Purchase Per Item — Approve / Ship (cmd_309 item3)', () => {
 
                     // Sibling child (still pending) must be unaffected.
                     cy.task<any>('db:getPurchasePerItemById', { id: childB.id }).then((siblingAfter) => {
-                      expect(siblingAfter.status).to.eq(0); // pending
+                      expect(siblingAfter.status).to.eq('pending'); // pending
                     });
                     cy.task<any>('db:getInventoryTransactionsByBridge', {
                       inventory_transactionable_id: childB.inventory_transactionable_id,

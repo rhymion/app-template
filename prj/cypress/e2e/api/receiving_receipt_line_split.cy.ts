@@ -54,7 +54,7 @@ describe('API: Receiving Receipt Line — Split (cmd_296)', () => {
 
         // Parent: status flipped to split (1), approvable_id preserved (not null'd).
         cy.task<any>('db:getReceivingReceiptLineById', { id: line.id }).then((parent) => {
-          expect(parent.status).to.eq(1);
+          expect(parent.status).to.eq('split');
           expect(parent.approvable_id).to.eq(line.approvable_id);
         });
 
@@ -81,7 +81,7 @@ describe('API: Receiving Receipt Line — Split (cmd_296)', () => {
             expect(child.inventory_id).to.eq(inventory.id);
             expect(child.approvable_id).to.not.be.null;
             expect(child.approvable_id).to.not.eq(line.approvable_id);
-            expect(child.status).to.eq(0); // pending
+            expect(child.status).to.eq('pending'); // pending
             // inherited (non-overridden) parent fields carried over
             expect(child.receiving_receipt_id).to.eq(line.receiving_receipt_id);
             expect(child.product_id).to.eq(line.product_id);
@@ -232,7 +232,7 @@ describe('API: Receiving Receipt Line — Split (cmd_296)', () => {
       });
       // Parent must remain unmodified after the rejected request.
       cy.task<any>('db:getReceivingReceiptLineById', { id: line.id }).then((parent) => {
-        expect(parent.status).to.eq(0);
+        expect(parent.status).to.eq('pending');
       });
     });
   });
@@ -261,7 +261,7 @@ describe('API: Receiving Receipt Line — Split (cmd_296)', () => {
           expect(res.body.error || res.body.message).to.match(/different product/i);
 
           cy.task<any>('db:getReceivingReceiptLineById', { id: line.id }).then((parent) => {
-            expect(parent.status).to.eq(0); // unchanged — not split
+            expect(parent.status).to.eq('pending'); // unchanged — not split
           });
           cy.task<any>('db:getReceivingReceiptLineChildren', { parentId: line.id }).then((children) => {
             expect(children).to.have.length(0);

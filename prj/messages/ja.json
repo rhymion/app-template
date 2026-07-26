@@ -152,7 +152,8 @@
   },
   "LeaveRequestStatus": {
     "pending": "保留",
-    "approved": "承認"
+    "approved": "承認",
+    "rejected": "却下"
   },
   "ShiftStatus": {
     "scheduled": "予定",

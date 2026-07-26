@@ -64,7 +64,7 @@ describe('API: Purchase Per Item — Split (cmd_305 FIX-B)', () => {
               expect(splitRes.body.ok).to.eq(true);
 
               cy.task<any>('db:getPurchasePerItemById', { id: parent.id }).then((parentAfter) => {
-                expect(parentAfter.status).to.eq(1); // split
+                expect(parentAfter.status).to.eq('split'); // split
               });
 
               cy.task<any>('db:getPurchasePerItemChildren', { parentId: parent.id }).then((children) => {
@@ -73,7 +73,7 @@ describe('API: Purchase Per Item — Split (cmd_305 FIX-B)', () => {
                 expect(quantities).to.deep.eq([6, 14]);
                 for (const child of children) {
                   expect(child.parent_id).to.eq(parent.id);
-                  expect(child.status).to.eq(0); // pending
+                  expect(child.status).to.eq('pending'); // pending
                   expect(child.approvable_id).to.not.be.null;
                   expect(child.approvable_id).to.not.eq(parent.approvable_id);
                   expect(child.inventory_transactionable_id).to.not.be.null;
@@ -246,7 +246,7 @@ describe('API: Purchase Per Item — Split (cmd_305 FIX-B)', () => {
                 expect(splitRes.body.error || splitRes.body.message).to.match(/Insufficient inventory/);
 
                 cy.task<any>('db:getPurchasePerItemById', { id: parent.id }).then((parentAfter) => {
-                  expect(parentAfter.status).to.eq(0); // unchanged — not split
+                  expect(parentAfter.status).to.eq('pending'); // unchanged — not split
                 });
 
                 cy.task<any>('db:getPurchasePerItemChildren', { parentId: parent.id }).then((children) => {
@@ -316,7 +316,7 @@ describe('API: Purchase Per Item — Split (cmd_305 FIX-B)', () => {
               expect(splitRes.body.ok).to.eq(true);
 
               cy.task<any>('db:getPurchasePerItemById', { id: parent.id }).then((parentAfter) => {
-                expect(parentAfter.status).to.eq(1); // split
+                expect(parentAfter.status).to.eq('split'); // split
               });
 
               cy.task<any>('db:getPurchasePerItemChildren', { parentId: parent.id }).then((children) => {
@@ -482,7 +482,7 @@ describe('API: Purchase Per Item — Split (cmd_305 FIX-B)', () => {
           }).then((res) => {
             expect(res.status).to.eq(400);
             cy.task<any>('db:getPurchasePerItemById', { id: parent.id }).then((parentAfter) => {
-              expect(parentAfter.status).to.eq(0); // unchanged — not split
+              expect(parentAfter.status).to.eq('pending'); // unchanged — not split
             });
           });
         });
@@ -536,7 +536,7 @@ describe('API: Purchase Per Item — Split (cmd_305 FIX-B)', () => {
 
               // tx rolled back entirely: parent untouched, no children created
               cy.task<any>('db:getPurchasePerItemById', { id: parent.id }).then((parentAfter) => {
-                expect(parentAfter.status).to.eq(0);
+                expect(parentAfter.status).to.eq('pending');
               });
               cy.task<any>('db:getPurchasePerItemChildren', { parentId: parent.id }).then((children) => {
                 expect(children).to.have.length(0);
