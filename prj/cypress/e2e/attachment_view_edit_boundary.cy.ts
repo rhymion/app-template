@@ -1,7 +1,7 @@
 // cmd_421 Batch4 (DP-C): browser-driven regression coverage for cmd_419's
 // three attachment bugs, scoped to resource + product — the only two
-// entities wired to components/_standard/AttachmentSection (per karo's
-// scoping ruling, matching subtask_419b's original investigation scope):
+// entities wired to components/_standard/AttachmentSection (scoped to
+// the original investigation scope for cmd_419):
 //   bug1 (persistence): a stale-closure/useMemo bug in AttachmentSection.tsx
 //     silently discarded a just-added file on save. Fixed by memoizing
 //     initialImages/initialFiles on the `attachments` array reference.
@@ -24,8 +24,8 @@
 // IMPORTANT — bug3 fix landing status (see subtask_421f report for detail):
 // the schema half of the bug3 fix is commit 1a6890c on branch
 // doreen/cmd419-view-boundary-fix, which is NOT YET MERGED into this
-// branch's history as of this spec's authoring (karo's ruling: hold that
-// branch unmerged until cmd_419 QC completes). The 'view screen read-only'
+// branch's history as of this spec's authoring (that branch is being
+// held unmerged until cmd_419 QC completes). The 'view screen read-only'
 // assertions below (`it.skip` markers none — they run for real) will FAIL
 // against a checkout that lacks 1a6890c, and will PASS once cmd_419 lands.
 // That is expected, correct regression-catching behavior, not a defect in

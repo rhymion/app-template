@@ -4,8 +4,7 @@ import { TEST_API_KEY } from '../../support/test-credentials';
 // generic 13.5/13.6 templates, applied to receiving_receipt_line):
 // receiving_receipt_line's terminal reject is a no-op on inventory — its
 // x-ledger-source only fires on approve (afterApprove), which as of Phase2c
-// remains a TODO stub. See qc_subtask_281p_gunshi.yaml e2e_gate_verdict and
-// subtask_281n_gunshi.yaml final_phase2_plan.Phase2c (G13/G14).
+// remains a TODO stub (Phase2c/G13/G14 planned but not yet implemented).
 
 const INV_API = '/api/inventory';
 

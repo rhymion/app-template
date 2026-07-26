@@ -4,7 +4,7 @@ import { TEST_API_KEY } from '../../support/test-credentials';
 // receiving_receipt_line (quantityField=receipt_quantity, perPartRequired=
 // [inventory_id], parentField=parent_id). Covers the quantity invariant
 // (Σ(parts) == parent), the boundary cases, and approvable_id mandatory
-// (殿裁定B — approvable is never deleted/null'd; only pending
+// (approved design — approvable is never deleted/null'd; only pending
 // approval_requests are removed and status flips to split).
 
 describe('API: Receiving Receipt Line — Split (cmd_296)', () => {
@@ -58,7 +58,7 @@ describe('API: Receiving Receipt Line — Split (cmd_296)', () => {
           expect(parent.approvable_id).to.eq(line.approvable_id);
         });
 
-        // approvable record itself is NOT deleted (殿裁定B — history/audit preserved).
+        // approvable record itself is NOT deleted (approved design — history/audit preserved).
         cy.task<any>('db:getApprovableById', { approvable_id: line.approvable_id }).then((approvable) => {
           expect(approvable).to.not.be.null;
         });
