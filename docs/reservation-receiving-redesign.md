@@ -7,8 +7,8 @@
 > **種別**: 設計書（コード変更・実装なし）
 > **Target**: app-template (this repository)
 >           + `app-generator` (generator template変更)
-> **作成**: 2026-07-05 | cmd_277 / design_277a (gunshi)
-> **前提調査**: cmd_276 subtask_276a/276b (ashigaru2)
+> **作成**: 2026-07-05 | cmd_277 / design_277a
+> **前提調査**: cmd_276 subtask_276a/276b
 
 ---
 

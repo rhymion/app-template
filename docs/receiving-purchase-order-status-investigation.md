@@ -3,7 +3,7 @@
 > **種別**: 調査のみ（コード変更・commitなし）
 > **Target**: app-template (this repository)
 > **作成**: 2026-07-05 | cmd_276 / subtask_276a
-> **担当**: ashigaru2
+> **担当**: (implementor)
 
 ---
 

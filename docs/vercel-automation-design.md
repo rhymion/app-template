@@ -420,9 +420,9 @@ infra), `SHADOW_DATABASE_URL`, `TEST_RESET_TOKEN`.
 | PD-4 | resolved (cmd_292) | `BLOB_READ_WRITE_TOKEN` previously noted as "cannot automate". **Superseded:** `vercel blob create-store` CLI is available and supported (see §15). |
 | PD-5 | low | `vercel blob get-store` output format for token extraction — needs verification during implementation (§15). |
 
-**cmd_292 要裁可点 (for Shogun decision — must be resolved before ashigaru implementation):**
+**cmd_292 decision point (for maintainer decision — must be resolved before implementation):**
 
-| ID | Decision point | Gunshi recommendation |
+| ID | Decision point | Design-review recommendation |
 |---|---|---|
 | DC-1 | Neon provisioning機構: Marketplace Integration vs API直接 | **API (vercel-setup.sh get-or-create)** — scriptable, get-or-create symmetric to gcp-setup.sh; Marketplace adds new instance only |
 | DC-2 | Neon prod/staging分離: project分離 vs branch分離 | **Branch分離 (1 project, main=prod, staging=staging branch)** — Neon推奨, fewer projects, efficient |
@@ -734,7 +734,7 @@ Step 4: migrate:deploy (staging)(updated — uses DATABASE_URL_UNPOOLED_STAGING)
 
 ---
 
-## 16. Script File Changes Summary (cmd_292 — for ashigaru implementation)
+## 16. Script File Changes Summary (cmd_292 — for implementation)
 
 ### scripts/vercel-env.sh
 

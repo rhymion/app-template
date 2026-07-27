@@ -4,7 +4,7 @@ import { TEST_API_KEY, TEST_CREDENTIALS } from '../../support/test-credentials';
 // purchase_per_item's x-splittable action (quantityField=quantity,
 // perPartRequired=[inventory_id], parentField=parent_id) — child generation,
 // per-child inventory bridge, auto-allocate, DP-B1a hard error, and the
-// parent-reservation-release bug (subtask_305h gunshi QC): the split
+// parent-reservation-release bug (subtask_305h QC): the split
 // template's parent-release WHERE clause used `_row.location ?? ''`, which
 // never matches inventory.location=NULL rows (the default/most common case —
 // location is only written on inventory_transaction as '' via O-6

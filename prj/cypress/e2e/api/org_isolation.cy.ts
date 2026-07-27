@@ -1,5 +1,5 @@
-// cmd_452: org-membership IDOR regression suite (subtask_452a gunshi audit,
-// subtask_452b ashigaru4 fix). Uses `resource` — the only entity in this
+// cmd_452: org-membership IDOR regression suite (design review,
+// implementation fix). Uses `resource` — the only entity in this
 // schema that is both org-scoped (organization_id) and fully CRUD+api
 // enabled — as the target. R1 belongs to org_a (created by populateResource,
 // which also enrolls the main TEST_CREDENTIALS user in org_a). user_b is a
@@ -248,5 +248,5 @@ describe('API: org-membership isolation (cmd_452)', () => {
   // is a template-level fix with no live entity to exercise via e2e until a
   // future entity combines both. Adding a schema-only synthetic entity
   // solely to exercise this branch was judged out of scope for a security
-  // patch (see subtask_452b report to gunshi for the full rationale).
+  // patch (see cmd_452 for the full rationale).
 });

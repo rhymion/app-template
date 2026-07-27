@@ -2,7 +2,7 @@
 
 **cmd**: cmd_296 (設計フェーズ)  
 **作成**: 2026-07-09  
-**担当**: gunshi  
+**担当**: (design review)  
 **状態**: 殿裁可待ち  
 **協調**: cmd_295 (x-approval-lines / approvable pre-create 方式) 設計書を踏まえた設計
 
