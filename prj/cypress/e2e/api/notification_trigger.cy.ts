@@ -1,10 +1,10 @@
 // cmd_445 subtask E: end-to-end regression coverage for the exact 9-step
 // mechanism in the RCA verification design
-// (queue/reports/subtask_445a_gunshi.yaml verification_design.local_single_process.mechanism).
+// (based on the notification trigger verification design).
 //
 // Reuses db:setupLeaveRequestApprovalFlow's flowWithRole fixture as-is
 // (requestor_role_id + approver_role_id both set, and each returned user
-// holds exactly one of those roles). The RCA's final root cause (subtask_445i)
+// holds exactly one of those roles). The RCA's final root cause (cmd_445)
 // is that approval_request creation is gated on requestor/approver role
 // matching the approval_flow's role fields *exactly* — a flow or user set up
 // without that strict role wiring silently produces zero approval_requests

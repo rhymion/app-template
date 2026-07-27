@@ -8,7 +8,7 @@ import prisma from '@/lib/prisma';
  * (x-reservation.policy.orderBy: expiration_date asc, lot_number asc, id asc).
  *
  * This is a Type2 move-cancel (correction_3_cancel_dual_purpose in
- * subtask_281n_gunshi.yaml) — ledger-only. Unlike the Type1 terminal cancel
+ * design decision) — ledger-only. Unlike the Type1 terminal cancel
  * in service_after_reject.ts, approvable/approval_request are never touched:
  * the line stays pending before and after the move.
  *
