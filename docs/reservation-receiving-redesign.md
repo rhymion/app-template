@@ -5,7 +5,7 @@
 > **DP-4(認証再設計)のみ存置。** 変遷の記録として本ファイルは保持する。
 
 > **種別**: 設計書（コード変更・実装なし）
-> **対象**: proj_c (`~/work/generated-apps/app-template`, branch `rebase/app-template-wip`)
+> **Target**: app-template (this repository)
 >           + `app-generator` (generator template変更)
 > **作成**: 2026-07-05 | cmd_277 / design_277a (gunshi)
 > **前提調査**: cmd_276 subtask_276a/276b (ashigaru2)

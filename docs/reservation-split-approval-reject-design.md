@@ -2,7 +2,7 @@
 
 **cmd_305 FIX-B (#2) + FIX-C (#3) — Integrated Design (rev.2, post-殿裁定)**
 
-> Revised 2026-07-11 to reflect Shogun rulings (shogun_rulings_dp in queue/shogun_to_karo.yaml).
+> Revised 2026-07-11 to reflect approved design rulings.
 > Key changes from rev.1: (1) allow_choice / temporary-rejection / resubmit-to-Pending path
 > entirely removed from FIX-C scope. (2) reason_kind is integer enum on approval_history.
 > (3) FIX-B reservation logic unified: inventory_id optional; auto-allocate when absent.
