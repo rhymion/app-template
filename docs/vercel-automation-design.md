@@ -1,12 +1,12 @@
 # Vercel Environment Automation Script Design
 
 **Created:** 2026-07-07
-**Status:** cmd_292 addendum in progress — V-1 (DB) and V-5 (Blob) superseded by Shogun ruling (see §6, §15)
+**Status:** cmd_292 addendum in progress — V-1 (DB) and V-5 (Blob) superseded by approved ruling (see §6, §15)
 **Scope:** Vercel production deployment automation for app-template (proj_c)
 **Mirrors:** `scripts/gcp-*.sh` (parallel automation suite for the GCP Cloud Run path,
-in `~/work/sandbox/app-generator-2/scripts/`)
+in the app-generator repository's `scripts/`)
 **Supersedes:** the original draft of this document, previously located at
-`~/work/sandbox/app-generator-2/docs/knowledge/vercel-automation-design.md`
+`docs/knowledge/vercel-automation-design.md` in the app-generator repository
 (see redirect note left at that path).
 
 ---
@@ -14,7 +14,7 @@ in `~/work/sandbox/app-generator-2/scripts/`)
 ## 0. Objective
 
 Automate Vercel environment variable setup and deploy for **app-template**
-(`~/work/generated-apps/app-template`, proj_c — the wrapper repo that consumes the
+(this repository, proj_c — the wrapper repo that consumes the
 `app-generator` submodule), providing the same scriptable experience as the GCP
 automation suite (`scripts/gcp-env.sh` / `gcp-setup.sh` / `gcp-deploy.sh` /
 `gcp-teardown.sh` in proj_b).
@@ -28,8 +28,8 @@ migration, both of which must precede a working deploy.
 
 ## 1. Deploy Target (Corrected — was wrong in the initial draft)
 
-**Deploy target is `~/work/generated-apps/app-template` (proj_c), NOT
-`~/work/sandbox/app-generator-2` (proj_b).**
+**Deploy target is this repository (app-template, proj_c), NOT
+the app-generator repository (proj_b).**
 
 - proj_b (`app-generator-2`) is the generator **source** — it has no `.gitmodules` and
   is also used as a self-hosted GCP demo app. It is not what gets deployed to Vercel.
@@ -144,7 +144,7 @@ touching `vercel.json`.
 
 ### 3.2 `vercel.json` design
 
-File: `~/work/generated-apps/app-template/vercel.json` (NEW — at app-template root)
+File: `vercel.json` in this repository (app-template) (NEW — at app-template root)
 
 ```json
 {
@@ -177,7 +177,7 @@ the primary approach. `vercel-setup.sh` may add `--rootDirectory app-generator` 
 
 ## 4. Scripts Placement (Corrected — was wrongly proposed under app-generator-2/scripts/)
 
-All Vercel automation scripts live in **`~/work/generated-apps/app-template/scripts/`**
+All Vercel automation scripts live in **`scripts/` in this repository (app-template)**
 (not `app-generator-2/scripts/`, not inside the `app-generator/` submodule):
 
 1. Deploy target is app-template (proj_c). Its `scripts/` is the natural home for
@@ -197,8 +197,8 @@ Files (all in `app-template/scripts/` unless noted):
 - `vercel-setup.sh` — link + inject + first-time migration
 - `vercel-deploy.sh` — submodule checkout guard + `vercel deploy`
 - `vercel-teardown.sh` — env var removal + unlink
-- `~/work/generated-apps/app-template/.env.production.local.example` — template
-- `~/work/generated-apps/app-template/vercel.json` — build config (§3.2)
+- `.env.production.local.example` in this repository (app-template) — template
+- `vercel.json` in this repository (app-template) — build config (§3.2)
 
 ---
 
@@ -260,7 +260,7 @@ bash scripts/vercel-teardown.sh
 
 ## 6. DB Provider Decision Gate (V-1)
 
-> **⚠ cmd_292 Shogun ruling (2026-07-07): V-1 superseded.**
+> **⚠ cmd_292 ruling (2026-07-07): V-1 superseded.**
 > Prisma Postgres is replaced by **Neon** as the Vercel DB provider.
 > The original Prisma Postgres decision and rationale are preserved below for audit trail.
 > Active design: see §13 (Neon provisioning) and §8.1 (updated env var inventory).
@@ -420,9 +420,9 @@ infra), `SHADOW_DATABASE_URL`, `TEST_RESET_TOKEN`.
 | PD-4 | resolved (cmd_292) | `BLOB_READ_WRITE_TOKEN` previously noted as "cannot automate". **Superseded:** `vercel blob create-store` CLI is available and supported (see §15). |
 | PD-5 | low | `vercel blob get-store` output format for token extraction — needs verification during implementation (§15). |
 
-**cmd_292 要裁可点 (for Shogun decision — must be resolved before ashigaru implementation):**
+**cmd_292 decision point (for maintainer decision — must be resolved before implementation):**
 
-| ID | Decision point | Gunshi recommendation |
+| ID | Decision point | Design-review recommendation |
 |---|---|---|
 | DC-1 | Neon provisioning機構: Marketplace Integration vs API直接 | **API (vercel-setup.sh get-or-create)** — scriptable, get-or-create symmetric to gcp-setup.sh; Marketplace adds new instance only |
 | DC-2 | Neon prod/staging分離: project分離 vs branch分離 | **Branch分離 (1 project, main=prod, staging=staging branch)** — Neon推奨, fewer projects, efficient |
@@ -734,7 +734,7 @@ Step 4: migrate:deploy (staging)(updated — uses DATABASE_URL_UNPOOLED_STAGING)
 
 ---
 
-## 16. Script File Changes Summary (cmd_292 — for ashigaru implementation)
+## 16. Script File Changes Summary (cmd_292 — for implementation)
 
 ### scripts/vercel-env.sh
 

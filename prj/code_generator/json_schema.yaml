@@ -356,8 +356,7 @@ definitions:
         x-relationship:
           labelField: [entity_name, approver_role.name]
       status:
-        minimum: 0
-        maximum: 3
+        default: Pending
         enum:
           - Pending
           - Approved
@@ -417,8 +416,6 @@ definitions:
       api: custom
     fields:
       type:
-        minimum: 0
-        maximum: 4
         enum:
           - Like
           - Love
@@ -456,8 +453,6 @@ definitions:
   attachment:
     fields:
       type:
-        minimum: 0
-        maximum: 3
         enum:
           - image
           - file
@@ -480,8 +475,6 @@ definitions:
       entity_name:
         minLength: 1
       chart_type:
-        minimum: 0
-        maximum: 3
         enum:
           - pie
           - column
@@ -489,16 +482,12 @@ definitions:
           - line
         default: 1
       stack_mode:
-        minimum: 0
-        maximum: 2
         enum:
           - grouped
           - stacked
           - standardized
       series_field: {}
       group_by_bucket:
-        minimum: 0
-        maximum: 4
         enum:
           - day
           - week
@@ -1054,8 +1043,6 @@ definitions:
         pattern: "^c[a-z0-9]{24,}$"
         x-relationship: {}
       day_of_week:
-        minimum: 0
-        maximum: 6
         enum:
           - Sunday
           - Monday
@@ -1103,8 +1090,6 @@ definitions:
       start_time: {}
       end_time: {}
       status:
-        minimum: 0
-        maximum: 2
         enum:
           - Scheduled
           - Approved
@@ -1513,9 +1498,7 @@ definitions:
           type: one-to-one_bridge
           labelField: id
       status:
-        minimum: 0
-        maximum: 2
-        default: 0
+        default: pending
         x-enum-namespace: LeaveRequestStatus
         enum:
           - pending
@@ -1645,8 +1628,7 @@ definitions:
         x-relationship: {}
       floor: {}
       status:
-        minimum: 0
-        maximum: 1
+        default: available
         enum:
           - available
           - maintenance
@@ -1745,8 +1727,6 @@ definitions:
         minimum: 0
         default: 0
       status:
-        minimum: 0
-        maximum: 3
         enum:
           - outstanding
           - partially_received
@@ -1774,8 +1754,6 @@ definitions:
       order_no:
         minLength: 1
       status:
-        minimum: 0
-        maximum: 4
         enum:
           - draft
           - issued
@@ -1812,8 +1790,6 @@ definitions:
         minimum: 0
         default: 0
       status:
-        minimum: 0
-        maximum: 3
         enum:
           - outstanding
           - partially_matched
@@ -1845,8 +1821,6 @@ definitions:
         x-relationship:
           labelField: order_no
       status:
-        minimum: 0
-        maximum: 4
         enum:
           - draft
           - sent
@@ -1896,8 +1870,7 @@ definitions:
         x-relationship:
           labelField: asn_no
       status:
-        minimum: 0
-        maximum: 2
+        default: draft
         enum:
           - draft
           - confirmed
@@ -1982,8 +1955,6 @@ definitions:
       receipt_quantity:
         minimum: 0
       status:
-        minimum: 0
-        maximum: 2
         enum:
           - pending
           - split
@@ -2084,8 +2055,6 @@ definitions:
       quantity:
         minimum: 1
       status:
-        minimum: 0
-        maximum: 2
         enum:
           - pending
           - split

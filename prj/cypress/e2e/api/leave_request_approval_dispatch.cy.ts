@@ -20,7 +20,7 @@ describe('API: Leave Request — Approval Event Dispatch', () => {
             url: `/api/leave_request/${data.record.id}`,
             headers: { 'X-API-Key': setup.approverUser.api_key },
           }).then((getRes) => {
-            expect(getRes.body.status).to.eq(0);
+            expect(getRes.body.status).to.eq('pending');
             expect(getRes.body.approvable.approved_at).to.be.null;
           });
 
@@ -39,7 +39,7 @@ describe('API: Leave Request — Approval Event Dispatch', () => {
               url: `/api/leave_request/${data.record.id}`,
               headers: { 'X-API-Key': setup.approverUser.api_key },
             }).then((getRes) => {
-              expect(getRes.body.status).to.eq(1);
+              expect(getRes.body.status).to.eq('approved');
               expect(getRes.body.approvable.approved_at).to.not.be.null;
             });
           });
@@ -67,7 +67,7 @@ describe('API: Leave Request — Approval Event Dispatch', () => {
               url: `/api/leave_request/${data.record.id}`,
               headers: { 'X-API-Key': setup.approverUser1.api_key },
             }).then((getRes) => {
-              expect(getRes.body.status).to.eq(0);
+              expect(getRes.body.status).to.eq('pending');
               expect(getRes.body.approvable.approved_at).to.be.null;
             });
           });
@@ -95,7 +95,7 @@ describe('API: Leave Request — Approval Event Dispatch', () => {
               url: `/api/leave_request/${data.record.id}`,
               headers: { 'X-API-Key': setup.approverUser.api_key },
             }).then((getRes) => {
-              expect(getRes.body.status).to.eq(2);
+              expect(getRes.body.status).to.eq('rejected');
               expect(getRes.body.approvable.approved_at).to.be.null;
             });
           });
@@ -124,7 +124,7 @@ describe('API: Leave Request — Approval Event Dispatch', () => {
               url: `/api/leave_request/${data.record.id}`,
               headers: { 'X-API-Key': setup.approverUser.api_key },
             }).then((getRes) => {
-              expect(getRes.body.status).to.eq(2);
+              expect(getRes.body.status).to.eq('rejected');
               expect(getRes.body.approvable.rejection_reason).to.eq('Insufficient staffing coverage on requested dates');
             });
           });
@@ -152,7 +152,7 @@ describe('API: Leave Request — Approval Event Dispatch', () => {
               url: `/api/leave_request/${data.record.id}`,
               headers: { 'X-API-Key': setup.approverUser.api_key },
             }).then((getRes) => {
-              expect(getRes.body.status).to.eq(2);
+              expect(getRes.body.status).to.eq('rejected');
               expect(getRes.body.approvable.rejection_reason).to.be.null;
             });
           });

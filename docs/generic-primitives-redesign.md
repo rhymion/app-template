@@ -1,11 +1,10 @@
 # 汎用プリミティブ再設計書: Approval Flow + Event Trigger + Split + Ledger
 
 > **種別**: 設計書（コード変更・実装なし）
-> **対象**: proj_c (`~/work/generated-apps/app-template`, branch `rebase/app-template-wip`)
->           + `app-generator` (proj_b: `~/work/sandbox/app-generator-2`, branch `doreen/cloud`)
-> **初版**: 2026-07-05 | cmd_278 / design_278a (gunshi)
-> **改訂**: 2026-07-05 | cmd_278 / design_278b (gunshi) — 殿裁定R1〜R8を反映
-> **改訂**: 2026-07-06 | cmd_279 / design_279a (gunshi) — 殿裁可O-1〜O-7を反映(確定版)
+> **Target**: app-template (this repository) and app-generator (submodule)
+> **初版**: 2026-07-05 | cmd_278 / design_278a
+> **改訂**: 2026-07-05 | cmd_278 / design_278b — 殿裁定R1〜R8を反映
+> **改訂**: 2026-07-06 | cmd_279 / design_279a — 殿裁可O-1〜O-7を反映(確定版)
 > **前提**: cmd_277 / design_277a — DP-4(認証再設計)は再検討(R5)、DP-1/DP-2/DP-3を本設計で上書き
 > **方針**: app-generator は domain 非依存の汎用 CRUD ツール。
 >           domain 固有ロジックを汎用プリミティブ(approval flow / event trigger / split / ledger)で実現する。

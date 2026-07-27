@@ -67,7 +67,8 @@
   },
   "LeaveRequestStatus": {
     "pending": "Pending",
-    "approved": "Approved"
+    "approved": "Approved",
+    "rejected": "Rejected"
   },
   "ShiftStatus": {
     "scheduled": "Scheduled",

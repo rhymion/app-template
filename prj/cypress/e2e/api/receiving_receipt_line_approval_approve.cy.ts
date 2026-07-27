@@ -56,7 +56,7 @@ describe('API: Receiving Receipt Line — Approve / Receive Ledger (cmd_309 item
           url: `/api/approval_request/${arId}/approve`,
         }).then((res) => {
           expect(res.status).to.eq(200);
-          expect(res.body.status).to.eq(1);
+          expect(res.body.status).to.eq('Approved');
 
           cy.request({
             url: `${INV_API}/${inventory.id}`,
@@ -125,7 +125,7 @@ describe('API: Receiving Receipt Line — Approve / Receive Ledger (cmd_309 item
 
               // Sibling untouched — no ledger row, still pending.
               cy.task<any>('db:getReceivingReceiptLineById', { id: childB.id }).then((siblingAfter: any) => {
-                expect(siblingAfter.status).to.eq(0);
+                expect(siblingAfter.status).to.eq('pending');
               });
               cy.task<any>('db:getInventoryTransactionsByBridge', {
                 inventory_transactionable_id: childB.inventory_transactionable_id,

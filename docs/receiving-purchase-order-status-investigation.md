@@ -1,9 +1,9 @@
 # receiving_asn / purchase_order ライフサイクル 現状調査報告
 
 > **種別**: 調査のみ（コード変更・commitなし）
-> **対象**: proj_c (`~/work/generated-apps/app-template`, branch `rebase/app-template-wip`)
+> **Target**: app-template (this repository)
 > **作成**: 2026-07-05 | cmd_276 / subtask_276a
-> **担当**: ashigaru2
+> **担当**: (implementor)
 
 ---
 

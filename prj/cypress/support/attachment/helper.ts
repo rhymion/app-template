@@ -56,7 +56,7 @@ export async function getAttachableAttachments(attachableId: string) {
  */
 export async function seedAttachment(params: {
   attachableId: string;
-  type: number;
+  type: 'image' | 'file' | 'video' | 'audio';
   name: string;
   path: string;
   order?: number;

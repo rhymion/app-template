@@ -32,8 +32,8 @@
 // this spec.
 import { TEST_CREDENTIALS } from '../support/test-credentials';
 
-const TYPE_IMAGE = 0;
-const TYPE_FILE = 1;
+const TYPE_IMAGE = 'image';
+const TYPE_FILE = 'file';
 
 function pngFile(name: string) {
   return {

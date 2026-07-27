@@ -269,13 +269,20 @@ model approval_flow {
   @@index([updater_id])
 }
 
+enum ApprovalRequestStatus {
+  Pending
+  Approved
+  Rejected
+  TerminalRejected
+}
+
 model approval_request {
   id                 String             @id @default(cuid())
   approvable_id      String
   approvable         approvable         @relation(fields: [approvable_id], references: [id], onDelete: Cascade)
   approval_flow_id   String
   approval_flow      approval_flow      @relation(fields: [approval_flow_id], references: [id])
-  status             Int                @default(0)
+  status             ApprovalRequestStatus @default(Pending)
   approval_histories approval_history[]
   created_at         DateTime           @default(now()) @db.Timestamptz(0)
   updated_at         DateTime           @updatedAt @db.Timestamptz(0)
@@ -315,11 +322,21 @@ model inventory_transactionable {
   inventory_transactions inventory_transaction[]
 }
 
+enum InventoryTransactionEventType {
+  reserve
+  ship
+  receive
+  release
+  cancel
+  move
+  adjust
+}
+
 model inventory_transaction {
   id                            String                    @id @default(cuid())
   inventory_transactionable_id  String
   inventory_transactionable     inventory_transactionable @relation(fields: [inventory_transactionable_id], references: [id])
-  event_type                    String
+  event_type                    InventoryTransactionEventType
   quantity_delta                Int
   reserved_delta                Int
   product_id                    String
@@ -367,13 +384,18 @@ model inventory_movement {
   @@index([updater_id])
 }
 
+enum InventoryAdjustmentStatus {
+  pending
+  rejected
+}
+
 model inventory_adjustment {
   id                           String                     @id @default(cuid())
   inventory_id                 String
   inventory                    inventory                  @relation(fields: [inventory_id], references: [id])
   quantity_delta               Int
   reason                       String?
-  status                       String                     @default("pending")
+  status                       InventoryAdjustmentStatus @default(pending)
   approvable_id                String                     @unique
   approvable                   approvable                 @relation(fields: [approvable_id], references: [id])
   inventory_transactionable_id String?                    @unique
@@ -405,9 +427,17 @@ model comment {
   @@index([commentable_id])
 }
 
+enum ReactionType {
+  Like
+  Love
+  Laugh
+  Surprised
+  Sad
+}
+
 model reaction {
-  id         String   @id @default(cuid())
-  type       Int
+  id         String       @id @default(cuid())
+  type       ReactionType
   comment_id String
   comment    comment  @relation(fields: [comment_id], references: [id], onDelete: Cascade)
   user_id    String
@@ -444,9 +474,16 @@ model attachable {
   product     product?
 }
 
+enum AttachmentType {
+  image
+  file
+  video
+  audio
+}
+
 model attachment {
   id                      String     @id @default(cuid())
-  type                    Int        @default(0)
+  type                    AttachmentType @default(image)
   order                   Int        @default(0)
   name                    String
   path                    String
@@ -474,17 +511,38 @@ model dashboard {
   @@index([updater_id])
 }
 
+enum DashboardWidgetChartType {
+  pie
+  column
+  bar
+  line
+}
+
+enum DashboardWidgetStackMode {
+  grouped
+  stacked
+  standardized
+}
+
+enum DashboardWidgetGroupByBucket {
+  day
+  week
+  month
+  quarter
+  year
+}
+
 model dashboard_widget {
   id             String    @id @default(cuid())
   dashboard_id   String
   dashboard      dashboard @relation(fields: [dashboard_id], references: [id], onDelete: Cascade)
   name            String
   entity_name     String
-  chart_type      Int
+  chart_type      DashboardWidgetChartType
   group_by_field  String
-  stack_mode      Int?
+  stack_mode      DashboardWidgetStackMode?
   series_field    String?
-  group_by_bucket Int?
+  group_by_bucket DashboardWidgetGroupByBucket?
   filter_field    String?
   filter_value    String?
   order          Int       @default(0)
@@ -611,10 +669,17 @@ model db_table {
   @@index([updater_id])
 }
 
+enum FieldType {
+  string
+  number
+  boolean
+  date
+}
+
 model field {
   id           String    @id @default(cuid())
   name         String
-  type         String
+  type         FieldType
   db_table_id  String
   db_table     db_table  @relation("ParentTable", fields: [db_table_id], references: [id], onDelete: Cascade)
   reference_id String?
@@ -649,7 +714,7 @@ model xxxxx_xxxxx {
 model yyyyy_yyyyy {
   id             String      @id @default(cuid())
   name           String
-  type           String
+  type           FieldType
   xxxxx_xxxxx_id String
   xxxxx_xxxxx    xxxxx_xxxxx @relation(fields: [xxxxx_xxxxx_id], references: [id], onDelete: Cascade)
   max_length     Int?
@@ -690,7 +755,7 @@ model parent1_child1 {
   id         String   @id @default(cuid())
   order      Int      @default(0)
   name       String
-  type       String
+  type       FieldType
   parent1_id String
   parent1    parent1  @relation(fields: [parent1_id], references: [id], onDelete: Cascade)
   max_length Int?
@@ -807,11 +872,21 @@ model booking {
   @@index([updater_id])
 }
 
+enum DayOfWeek {
+  Sunday
+  Monday
+  Tuesday
+  Wednesday
+  Thursday
+  Friday
+  Saturday
+}
+
 model shift_template {
   id          String   @id @default(cuid())
   user_id     String
   user        user     @relation("ShiftTemplateUser", fields: [user_id], references: [id])
-  day_of_week Int
+  day_of_week DayOfWeek
   start_time  DateTime @db.Timetz(0)
   end_time    DateTime @db.Timetz(0)
   created_at  DateTime @default(now()) @db.Timestamptz(0)
@@ -826,13 +901,19 @@ model shift_template {
   @@index([user_id])
 }
 
+enum ShiftStatus {
+  Scheduled
+  Approved
+  Cancelled
+}
+
 model shift {
   id         String   @id @default(cuid())
   user_id    String
   user       user     @relation("ShiftUser", fields: [user_id], references: [id])
   start_time DateTime @db.Timestamptz(0)
   end_time   DateTime @db.Timestamptz(0)
-  status     Int
+  status     ShiftStatus
   created_at DateTime @default(now()) @db.Timestamptz(0)
   updated_at DateTime @updatedAt @db.Timestamptz(0)
   creator_id String
@@ -930,6 +1011,12 @@ model purchase_order {
   @@index([updater_id])
 }
 
+enum PurchasePerItemStatus {
+  pending
+  split
+  rejected
+}
+
 model purchase_per_item {
   id                    String                 @id @default(cuid())
   purchase_order_id     String
@@ -937,7 +1024,7 @@ model purchase_per_item {
   product_id            String
   product               product                @relation(fields: [product_id], references: [id], onDelete: Cascade)
   quantity              Int
-  status                Int                    @default(0)
+  status                PurchasePerItemStatus  @default(pending)
   price                 Int?
   approvable_id                 String                    @unique
   approvable                    approvable                @relation(fields: [approvable_id], references: [id])
@@ -963,6 +1050,12 @@ model purchase_per_item {
   @@index([updater_id])
 }
 
+enum LeaveRequestStatus {
+  pending
+  approved
+  rejected
+}
+
 model leave_request {
   id            String     @id @default(cuid())
   user_id       String
@@ -970,7 +1063,7 @@ model leave_request {
   start_date    DateTime   @db.Timestamptz(0)
   end_date      DateTime   @db.Timestamptz(0)
   reason        String
-  status        Int     @default(0)
+  status        LeaveRequestStatus @default(pending)
   approvable_id String     @unique
   approvable    approvable @relation(fields: [approvable_id], references: [id])
   created_at    DateTime   @default(now()) @db.Timestamptz(0)
@@ -1062,13 +1155,18 @@ model room_type {
   @@index([updater_id])
 }
 
+enum RoomStatus {
+  available
+  maintenance
+}
+
 model room {
   id                String             @id @default(cuid())
   room_no           String
   room_type_id      String
   room_type         room_type          @relation(fields: [room_type_id], references: [id], onDelete: Cascade)
   floor             Int?
-  status            Int                @default(0)
+  status            RoomStatus         @default(available)
   room_reservations room_reservation[]
   created_at        DateTime           @default(now()) @db.Timestamptz(0)
   updated_at        DateTime           @updatedAt @db.Timestamptz(0)
@@ -1108,10 +1206,18 @@ model room_reservation {
 // x-receiving: Receiving lifecycle (PO / ASN / Receipt)
 // ============================================================
 
+enum ReceivingPurchaseOrderStatus {
+  draft
+  issued
+  partially_received
+  received
+  cancelled
+}
+
 model receiving_purchase_order {
   id                             String                           @id @default(cuid())
   order_no                       String
-  status                         Int                           @default(0)
+  status                         ReceivingPurchaseOrderStatus     @default(draft)
   lines                          receiving_purchase_order_line[]
   receiving_asns                 receiving_asn[]
   receiving_receipts             receiving_receipt[]
@@ -1126,6 +1232,13 @@ model receiving_purchase_order {
   @@index([updater_id])
 }
 
+enum ReceivingPurchaseOrderLineStatus {
+  outstanding
+  partially_received
+  fully_received
+  cancelled
+}
+
 model receiving_purchase_order_line {
   id                          String                   @id @default(cuid())
   receiving_purchase_order_id String
@@ -1136,7 +1249,7 @@ model receiving_purchase_order_line {
   done_quantity               Int                      @default(0)
   cancelled_quantity          Int                      @default(0)
   outstanding_quantity        Int                      @default(0)
-  status                      Int                      @default(0)
+  status                      ReceivingPurchaseOrderLineStatus @default(outstanding)
   created_at                  DateTime                 @default(now()) @db.Timestamptz(0)
   updated_at                  DateTime                 @updatedAt @db.Timestamptz(0)
 
@@ -1144,12 +1257,20 @@ model receiving_purchase_order_line {
   @@index([product_id])
 }
 
+enum ReceivingAsnStatus {
+  draft
+  sent
+  partially_matched
+  matched
+  cancelled
+}
+
 model receiving_asn {
   id                 String                    @id @default(cuid())
   asn_no             String
   purchase_order_id  String?
   purchase_order     receiving_purchase_order? @relation(fields: [purchase_order_id], references: [id])
-  status             Int                       @default(0)
+  status             ReceivingAsnStatus        @default(draft)
   lines              receiving_asn_line[]
   receiving_receipts receiving_receipt[]
   created_at         DateTime                  @default(now()) @db.Timestamptz(0)
@@ -1164,6 +1285,13 @@ model receiving_asn {
   @@index([updater_id])
 }
 
+enum ReceivingAsnLineStatus {
+  outstanding
+  partially_matched
+  fully_matched
+  cancelled
+}
+
 model receiving_asn_line {
   id                   String        @id @default(cuid())
   receiving_asn_id     String
@@ -1174,12 +1302,18 @@ model receiving_asn_line {
   done_quantity        Int           @default(0)
   cancelled_quantity   Int           @default(0)
   outstanding_quantity Int           @default(0)
-  status               Int           @default(0)
+  status               ReceivingAsnLineStatus @default(outstanding)
   created_at           DateTime      @default(now()) @db.Timestamptz(0)
   updated_at           DateTime      @updatedAt @db.Timestamptz(0)
 
   @@index([receiving_asn_id])
   @@index([product_id])
+}
+
+enum ReceivingReceiptStatus {
+  draft
+  confirmed
+  cancelled
 }
 
 model receiving_receipt {
@@ -1189,7 +1323,7 @@ model receiving_receipt {
   purchase_order    receiving_purchase_order? @relation(fields: [purchase_order_id], references: [id])
   asn_id            String?
   asn               receiving_asn?            @relation(fields: [asn_id], references: [id])
-  status            Int                       @default(0)
+  status            ReceivingReceiptStatus    @default(draft)
   confirmed_at      DateTime?                 @db.Timestamptz(0)
   lines             receiving_receipt_line[]
   created_at        DateTime                  @default(now()) @db.Timestamptz(0)
@@ -1205,6 +1339,12 @@ model receiving_receipt {
   @@index([updater_id])
 }
 
+enum ReceivingReceiptLineStatus {
+  pending
+  split
+  rejected
+}
+
 model receiving_receipt_line {
   id                   String            @id @default(cuid())
   receiving_receipt_id String
@@ -1212,7 +1352,7 @@ model receiving_receipt_line {
   product_id           String
   product              product           @relation(fields: [product_id], references: [id], onDelete: Cascade)
   receipt_quantity     Int
-  status               Int               @default(0)
+  status               ReceivingReceiptLineStatus @default(pending)
   inventory_id         String?
   inventory            inventory?        @relation("ReceiptLineInventory", fields: [inventory_id], references: [id])
   approvable_id        String           @unique

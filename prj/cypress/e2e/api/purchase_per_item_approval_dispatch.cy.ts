@@ -1,6 +1,6 @@
 import { TEST_API_KEY, TEST_CREDENTIALS } from '../../support/test-credentials';
 
-// cmd_305 FIX-B follow-up (subtask_305i, gunshi test_coverage_gap): permanent,
+// cmd_305 FIX-B follow-up (subtask_305i, test-coverage-gap review): permanent,
 // entity-focused coverage for purchase_per_item's terminal-reject reservation
 // release (lib/purchase_per_item/service_after_reject.ts, invoked via
 // on_rejected dispatch — FIX-C). This path already correctly undoes the O-6
@@ -55,7 +55,7 @@ describe('API: Purchase Per Item — Terminal Reject Reservation Release (cmd_30
                 })
                 .then((rejectRes) => {
                   expect(rejectRes.status).to.eq(200);
-                  expect(rejectRes.body.status).to.eq(3); // terminal_rejected
+                  expect(rejectRes.body.status).to.eq('TerminalRejected'); // terminal_rejected
                   return cy.wrap({ item, orderId });
                 });
             });
@@ -176,7 +176,7 @@ describe('API: Purchase Per Item — Terminal Reject Reservation Release (cmd_30
                     url: `/api/approval_request/${ar.id}/reject`,
                   }).then((rejectRes) => {
                     expect(rejectRes.status).to.eq(200);
-                    expect(rejectRes.body.status).to.eq(3);
+                    expect(rejectRes.body.status).to.eq('TerminalRejected');
 
                     cy.task<any>('db:getInventoryTransactionsByBridge', {
                       inventory_transactionable_id: child.inventory_transactionable_id,

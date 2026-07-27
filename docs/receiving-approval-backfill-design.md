@@ -2,7 +2,7 @@
 
 **cmd**: cmd_295 (設計フェーズ)  
 **作成**: 2026-07-09  
-**担当**: gunshi  
+**担当**: (design review)  
 **状態**: 殿裁可待ち
 
 ---
@@ -195,7 +195,7 @@ for (const _apprId of _linesApprIds) {
 }
 ```
 
-**build_context.py の変更 (L186–197 周辺)** — **【2026-07-10 訂正・subtask_295b QC (qc_subtask_295b_gunshi.yaml) 指摘反映】**:
+**build_context.py の変更 (L186–197 周辺)** — **【2026-07-10 訂正・subtask_295b QC 指摘反映】**:
 
 > ⚠️ 当初案(下記取消線相当)は誤り: `_child_bridge_excludes` から `approvable_id` を
 > 除外すると `field_map_create` (fmc) に `approvable_id: f.approvable_id` が含まれる。
@@ -335,7 +335,7 @@ receiving_receipt:          # ← base entity 定義に追加
 #### json_schema.yaml
 - `receiving_receipt` 定義に `x-approval-lines: [lines]` を追加 (2 行)
 
-#### build_context.py 【2026-07-10 訂正・subtask_295b QC (qc_subtask_295b_gunshi.yaml) 指摘反映 — §3/§5.2 と同内容】
+#### build_context.py 【2026-07-10 訂正・subtask_295b QC 指摘反映 — §3/§5.2 と同内容】
 - **変更関数**: `_build_child_data()` (L149–255)
   - `_child_bridge_excludes` の計算ブロック自体は**変更しない** (`approvable_id` は引き続き除外対象 = `field_map_create` から除外したまま。除外を外すと fmc とインデックス注入の二重 `approvable_id` キーで TS1117 になる — 詳細は §3 案A参照)
   - 代わりに `_parent_approval_lines = set(get_approval_lines_props(schema['definitions'].get(model, {}), model, schema))` を計算し、対象 prop_name の場合のみ child dict に `approval_indexed: True`, `approval_array_var: f'_{cv}ApprIds'` を追加
