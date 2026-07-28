@@ -126,7 +126,7 @@ const { releaseQty }   = await req.json();   // release の場合
 - `app-generator/code_generator/templates/action_buttons.tsx.jinja2` L5-13: qty引数を受ける関数を生成するが、ボタン(L28)は `handle{{...}}(id)` と**id única渡しで呼び出しており、qtyを渡す入力UIが生成されない**。
 - 同ファイルL9: `body: JSON.stringify(... { quantity: qty } ...)` — キー名が固定で`quantity`。ルート側キー名（`requestedQty`/`releaseQty`、`generators.py` L1137）と噛み合っていない。
 
-この2点はテンプレートのバグであり、`purchase_order`固有ではなく、`x-reservation.actions`でship/release actionを持つ全entityに影響する（generator全体のバグ）。修正は本調査のスコープ外（設計→軍師レビュー→殿裁可が必要な生成器変更のため、別cmdを推奨）。
+この2点はテンプレートのバグであり、`purchase_order`固有ではなく、`x-reservation.actions`でship/release actionを持つ全entityに影響する（generator全体のバグ）。修正は本調査のスコープ外（設計→軍師レビュー→承認が必要な生成器変更のため、別cmdを推奨）。
 
 ---
 
@@ -213,7 +213,7 @@ const { releaseQty }   = await req.json();   // release の場合
 
 ### 5. 修正候補（調査のみ・実装はしない）
 
-以下は方向性の提示のみ。いずれも生成器（`code_generator/`）側の変更を要するため、設計→軍師レビュー→殿裁可のプロセスに乗せることを推奨:
+以下は方向性の提示のみ。いずれも生成器（`code_generator/`）側の変更を要するため、設計→軍師レビュー→承認のプロセスに乗せることを推奨:
 
 1. **案A（session/API-key二経路化）**: `lib/api-auth.ts`に`authenticateRequest()`のような、まずセッションcookieを見て(`getSessionUserId()`)、無ければ`X-API-Key`/`Bearer`にフォールバックする関数を新設し、標準entity route・action routeの両方をこれに切替える。外部APIコンシューマ（API key保持者）・ブラウザUI（セッション保持者）の両方が同一routeを叩けるようになる。影響範囲: `api_route.ts.jinja2`, `_build_action_route_code`(generators.py)ほか、`authenticateApiKey`を使う全route生成箇所。
 2. **案B（内部専用route分離）**: `ReceivingConfirmForm.tsx`用に`getSessionUserId()`ベースの内部専用read route（例: `/api/_internal/inventory-for-receipt`）を別途生成し、公開REST API(`/api/inventory`)とは分離する。`ReservationActionButtons.tsx`が叩くaction routeについても同様に、action route自体の認証を`getSessionUserId()`に変更（外部APIとしての利用実績・必要性が薄いなら案Aより単純）。

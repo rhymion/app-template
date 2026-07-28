@@ -3,8 +3,8 @@
 > **種別**: 設計書（コード変更・実装なし）
 > **Target**: app-template (this repository) and app-generator (submodule)
 > **初版**: 2026-07-05 | cmd_278 / design_278a
-> **改訂**: 2026-07-05 | cmd_278 / design_278b — 殿裁定R1〜R8を反映
-> **改訂**: 2026-07-06 | cmd_279 / design_279a — 殿裁可O-1〜O-7を反映(確定版)
+> **改訂**: 2026-07-05 | cmd_278 / design_278b — 確定方針R1〜R8を反映
+> **改訂**: 2026-07-06 | cmd_279 / design_279a — 承認O-1〜O-7を反映(確定版)
 > **前提**: cmd_277 / design_277a — DP-4(認証再設計)は再検討(R5)、DP-1/DP-2/DP-3を本設計で上書き
 > **方針**: app-generator は domain 非依存の汎用 CRUD ツール。
 >           domain 固有ロジックを汎用プリミティブ(approval flow / event trigger / split / ledger)で実現する。
@@ -105,7 +105,7 @@ app-generator/lib/room_reservation/service.ts:101:export const reserveRoomReserv
 
 **調査対象**: `generators.py:1014-1023` (ship ロジック)
 
-**殿確認(2026-07-06, O-4)**: quantity は予約分を含む。経路別意味論は以下の通り確定:
+**確認(2026-07-06, O-4)**: quantity は予約分を含む。経路別意味論は以下の通り確定:
 
 | 経路 | quantity_delta | reserved_delta | 説明 |
 |---|---|---|---|
@@ -127,13 +127,13 @@ CHECK制約(quantity >= reserved)は conditional_update で代替。Prisma 非�
 
 ---
 
-## パート B: 汎用プリミティブ設計 (殿裁定R1〜R8反映済み)
+## パート B: 汎用プリミティブ設計 (確定方針R1〜R8反映済み)
 
 ---
 
 ### B-1. x-reservation の存置と将来廃止方針 【R8反映】
 
-> **殿裁定R8**: x-reservation のスコープを可能な限り縮小し、x-approval 等の汎用機能で代替できる範囲を広げる。両方が定義された場合は警告を出した上で x-approval を優先する。将来的に x-reservation 自体を廃止する方向性を明記する。
+> **確定方針R8**: x-reservation のスコープを可能な限り縮小し、x-approval 等の汎用機能で代替できる範囲を広げる。両方が定義された場合は警告を出した上で x-approval を優先する。将来的に x-reservation 自体を廃止する方向性を明記する。
 
 **現行の状態**: x-reservation (count mode) は entity-agnostic に設計されているが、
 ship/release/cancel の直接アクション route を生成するため、approval flow と競合する。
@@ -199,7 +199,7 @@ cmd_277 DP-1 の「ship/release 数量指定 UI」はこの **split→approve UX
 
 ### B-3. event trigger を rejection でも発火する拡張 + 在庫関連 terminal reject 【R7反映】
 
-> **殿裁定R7**: 在庫関連の rejection は再申請なしの終端却下(terminal reject)として扱う。
+> **確定方針R7**: 在庫関連の rejection は再申請なしの終端却下(terminal reject)として扱う。
 > 既存の approval_flow が前提とする「再申請ありき」の reject とは別の扱いにする。
 > 必要であれば approval_request に新しい status 値を追加してよい。
 
@@ -245,7 +245,7 @@ x-approval:
 
 ### B-4. split 機能 (x-splittable) — 新規 【R6反映】
 
-> **殿裁定R6**: 子 entity の approval を本体とする設計は OK(採用)。
+> **確定方針R6**: 子 entity の approval を本体とする設計は OK(採用)。
 > approve/reject 後の split は不可。split は承認前のみ許可する。
 
 **キーワード**: `x-splittable: true` を approvable entity のスキーマ定義に付与
@@ -299,14 +299,14 @@ entity が x-splittable の場合:
 
 ### B-5. inventory transaction entity + inventory materialized cache 【R1+R2+R3 大幅改訂】
 
-> **殿裁定R1**: inventory は inventory_transaction の materialized cache である。
+> **確定方針R1**: inventory は inventory_transaction の materialized cache である。
 > inventory の create/update/delete は全て inventory_transaction 経由で行う。
 > inventory_allocation(予約)も inventory_transaction へ統合する。
 > inventory テーブルの存在理由は性能上の理由(SUM集計の回避)のみ。
 >
-> **殿裁定R2**: inventory_transaction は approval/rejection を経ずに作成可能(approval は任意)。
+> **確定方針R2**: inventory_transaction は approval/rejection を経ずに作成可能(approval は任意)。
 >
-> **殿裁定R3**: inventory_transaction は source_id を直接カラムとして持たない。
+> **確定方針R3**: inventory_transaction は source_id を直接カラムとして持たない。
 > 代わりに bridge pattern (inventory_transactionable) を使う。
 
 #### B-5-1. 全体アーキテクチャ
@@ -592,7 +592,7 @@ purchase_order_line 1行で合計60個を2拠点から予約。既存設計を�
 
 ### B-6. receiving_receipt への汎用パターン適用 + inventory 事前指定 【R4反映】
 
-> **殿裁定R4**: inventory は遅くとも approval 前に指定する。
+> **確定方針R4**: inventory は遅くとも approval 前に指定する。
 
 **方針**: receiving_receipt を x-approval + x-ledger-source + x-splittable の組み合わせで再構成。
 
@@ -673,7 +673,7 @@ if (line.inventory_id === null) {
 
 ### DP-4 再検討: 認証簡素化 【R5反映】
 
-> **殿裁定R5**: UIもAPIも同じgetter/serviceを呼ぶ。session+API keyの二経路(dual-mode)を用意する必要は
+> **確定方針R5**: UIもAPIも同じgetter/serviceを呼ぶ。session+API keyの二経路(dual-mode)を用意する必要は
 > ない可能性が大きい。本当にAPI keyによる外部API認証が必要かを見極めた上で簡素化する。
 > ただし confirm route の無認証問題(security bug)の封鎖は必須。
 
@@ -732,7 +732,7 @@ export async function requireSession(): Promise<{ userId: string }> {
 
 ---
 
-## 殿裁可点 一覧 (確定版 / dashboard 🚨要裁可 転記用)
+## 要承認論点 一覧 (確定版 / dashboard 🚨要裁可 転記用)
 
 ### ★ R1〜R8 で決着した論点(取り下げ)
 
@@ -867,4 +867,4 @@ B-5-9 で確認済み: 確定設計(O-2+O-6)は「1 order line → N inventory_t
 - ブランチ切替: なし (`rebase/app-template-wip` を維持)
 - コード変更: なし (設計書ファイルの改訂のみ)
 - git add/commit/generate-code: 未実行
-- 実装はすべて殿裁可後の別 cmd で行う
+- 実装はすべて承認後の別 cmd で行う

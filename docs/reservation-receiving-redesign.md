@@ -96,7 +96,7 @@ bodyにline contextを追加するだけで対応できる。inventory_allocatio
 この設計は inventory_allocation を split/update する実装で、generator側の
 `_build_action_route_code` cancel branch に実装される。
 
-### 1.7 殿裁可点 DP-1
+### 1.7 要承認論点 DP-1
 
 - [ ] **DP-1-A**: per-line指定方式 = Option A(親エンドポイントにline context追加) vs Option B(明細行エンドポイント)
 - [ ] **DP-1-B**: cancel部分取消の3分割方式(Done/Cancelled/Not-yet)への同意 (過去裁定の再確認)
@@ -148,7 +148,7 @@ receiving_receipt: { status: [0=draft, 1=confirmed, 2=cancelled], confirmed_at }
 | **A(推奨)** | `inventoryMutation: create_receipt`(新値)で作成時に在庫更新するrouteを生成 | 既存 confirm_receipt との後方互換を保ちつつ新規に定義 |
 | B | `confirm_receipt`の実装を変更してcreate時に発火 | 既存スキーマ値を再利用できるが、意味が混乱する |
 
-### 2.5 殿裁可点 DP-2
+### 2.5 要承認論点 DP-2
 
 - [ ] **DP-2-A**: receipt作成=即座に在庫加算(confirm不要)の方針への同意
 - [ ] **DP-2-B**: statusフィールド温存(消さないが現在未使用)の方針への同意
@@ -227,7 +227,7 @@ await prisma.$transaction(async (tx) => {
 | `code_generator/generate.py` x-receiving処理 | inventory_id をlineに含むcreate transactionを生成するロジック追加 |
 | UIコンポーネントテンプレート | receiving_receipt 作成フォームにinventory selectorを追加 |
 
-### 3.7 殿裁可点 DP-3
+### 3.7 要承認論点 DP-3
 
 - [ ] **DP-3-A**: inventory_idの配置 = line レベル(推奨A) vs receipt レベル(B)
 - [ ] **DP-3-B**: 今回はselect-existing only(inventory_id required)で実装する方針への同意
@@ -320,7 +320,7 @@ proj_cだけでなく、app-generatorを使う全プロジェクト(proj_b, proj
 2. 既存のAPI-key専用設計の意図的な制約が緩和される
 3. 将来の全generate-codeで新テンプレートが使われる
 
-### 4.8 殿裁可点 DP-4
+### 4.8 要承認論点 DP-4
 
 - [ ] **DP-4-A**: `authenticateRequest()` = session優先 + API key fallback 方式への同意
 - [ ] **DP-4-B**: generator全体への広域波及 (全entity routeがブラウザセッション対応になること)への明確な同意
@@ -394,7 +394,7 @@ DP-4は技術的難度が最も低い(関数追加+文字列置換)。DP-2/DP-3�
 
 ---
 
-## 7. 殿裁可点 一覧 (dashboard 🚨要裁可 転記用)
+## 7. 要承認論点 一覧 (dashboard 🚨要裁可 転記用)
 
 ### DP-1: per-line ship/release/cancel + 数量UI
 
@@ -435,4 +435,4 @@ DP-4は技術的難度が最も低い(関数追加+文字列置換)。DP-2/DP-3�
 - ブランチ切替: なし (`rebase/app-template-wip` を維持)
 - コード変更: なし (この設計書ファイルの新規作成のみ)
 - git add/commit/generate-code: 未実行
-- 実装はすべて殿裁可後の別cmdで行う
+- 実装はすべて承認後の別cmdで行う

@@ -84,7 +84,7 @@ _NEON_API="https://console.neon.tech/api/v2"
 # create --help` (not in the listed choices) and via an actual `projects
 # create --region-id aws-ap-northeast-1` API call, which fails with "requested
 # region not found" (available_regions did not include it either). Falls back
-# to aws-ap-southeast-1 (Singapore) per the Lord's ruling on cmd_301
+# to aws-ap-southeast-1 (Singapore) per the maintainer's ruling on cmd_301
 # (2026-07-10) — geographically closest available region to the intended
 # ap-northeast-1, ahead of the existing happy-path project's aws-us-east-1.
 # Override with NEON_REGION_ID if a different region is later confirmed
@@ -176,7 +176,7 @@ for b in json.load(sys.stdin):
 # A branch created via the raw Neon REST API without an `endpoints` payload
 # (see the staging-branch creation below) gets no compute, and
 # `neonctl connection-string` then has nothing to resolve a connection
-# through (confirmed live — Lord's report). This neonctl version has no
+# through (confirmed live — per the maintainer's verification). This neonctl version has no
 # dedicated `neonctl endpoints` command, so existence is checked via
 # `neonctl api .../endpoints` (authenticated REST passthrough); a read-write
 # compute is added only if none exists (idempotent).
@@ -218,7 +218,7 @@ for b in json.load(sys.stdin).get('branches', []):
 
   # E3: guarantee a compute is attached before asking for a connection string
   # (see ensure_branch_compute above) — applies to both branches, since the
-  # Lord's report also called out checking production, not staging alone.
+  # maintainer's verification also called out checking production, not staging alone.
   ensure_branch_compute "$branch_name"
 
   # `-o table` (the default) is the actual raw connection string on stdout for
