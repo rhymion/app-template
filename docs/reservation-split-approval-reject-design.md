@@ -173,7 +173,7 @@ New state: `const [rejectionReason, setRejectionReason] = useState('')` and
 
 ### Confirmed decisions (確定方針)
 
-- 軍師案B: each split child gets a new `inventory_transactionable` bridge; parent
+- 案B: each split child gets a new `inventory_transactionable` bridge; parent
   reservations are released; each child gets its own reservation.
 - `inventory_id` (optional) added to `purchase_per_item`; included in
   `x-splittable.perPartRequired` for per-part lot selection.

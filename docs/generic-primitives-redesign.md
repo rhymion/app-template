@@ -732,7 +732,7 @@ export async function requireSession(): Promise<{ userId: string }> {
 
 ---
 
-## 要承認論点 一覧 (確定版 / dashboard 🚨要裁可 転記用)
+## 要承認論点 一覧 (確定版 / dashboard 🚨要承認 転記用)
 
 ### ★ R1〜R8 で決着した論点(取り下げ)
 
@@ -760,11 +760,11 @@ export async function requireSession(): Promise<{ userId: string }> {
 
 | 裁可ID | 内容 | 推奨 |
 |---|---|---|
-| **R5-new-A** | action routes を session-only (requireSession()) にする設計への同意 | **要裁可** |
-| **R5-new-B** | cypress API e2e の action routes テスト修正への同意(session 確立ヘルパー利用) | **要裁可** |
-| **R7-new-A** | approval_request に `terminal_rejected` status を追加することへの同意 | **要裁可** |
-| **R8-new-A** | x-reservation + x-approval 両方定義時に x-approval 優先 + 警告を generator に実装することへの同意 | **要裁可** |
-| **R8-new-B** | x-reservation の将来廃止方針を設計書に明記することへの同意 | **要裁可** |
+| **R5-new-A** | action routes を session-only (requireSession()) にする設計への同意 | **要承認** |
+| **R5-new-B** | cypress API e2e の action routes テスト修正への同意(session 確立ヘルパー利用) | **要承認** |
+| **R7-new-A** | approval_request に `terminal_rejected` status を追加することへの同意 | **要承認** |
+| **R8-new-A** | x-reservation + x-approval 両方定義時に x-approval 優先 + 警告を generator に実装することへの同意 | **要承認** |
+| **R8-new-B** | x-reservation の将来廃止方針を設計書に明記することへの同意 | **要承認** |
 | **B-2-A** | approval 付与先の選択基準を schema 設計者の判断に委ねる設計 | **委ねる(spec依存)** |
 | **B-3-A** | x-approval.on_rejected + on_rejected_dispatch.ts.jinja2 追加 | **採用推奨** |
 | **B-6-A** | receiving_receipt_line に x-approval + x-splittable + inventory_id required を付与する方針 | **採用推奨** |
@@ -807,7 +807,7 @@ export async function requireSession(): Promise<{ userId: string }> {
 
 ## 将来拡張: split order line by inventory transaction / inventory 【O-8-2追記・非実装】
 
-> **殿方針(2026-07-06, O-8)**: 主要タスク完了後で良い。現時点は**非実装**。
+> **方針(2026-07-06, O-8)**: 主要タスク完了後で良い。現時点は**非実装**。
 > 実装は主要タスク(DP-4改/B-3/B-5 Phase1/B-4/B-5 Phase2)完了後に別 cmd で起票。
 
 ### 背景
