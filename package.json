@@ -5,7 +5,7 @@
   "description": "Template repository for the Rhymion App Generator. Edit prj/, then deploy.",
   "scripts": {
     "setup": "bash scripts/setup.sh",
-    "sync": "bash scripts/sync-prj.sh",
+    "sync": "npm --prefix app-generator run prj:sync",
     "dev": "bash scripts/sync-prj.sh && npm --prefix app-generator run dev:full",
     "build": "bash scripts/sync-prj.sh && npm --prefix app-generator run build:full",
     "start": "npm --prefix app-generator run start",
