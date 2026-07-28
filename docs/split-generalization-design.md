@@ -3,7 +3,7 @@
 **cmd**: cmd_296 (設計フェーズ)  
 **作成**: 2026-07-09  
 **担当**: (design review)  
-**状態**: 殿裁可待ち  
+**状態**: 承認待ち  
 **協調**: cmd_295 (x-approval-lines / approvable pre-create 方式) 設計書を踏まえた設計
 
 ---
@@ -181,7 +181,7 @@ if (_totalQty !== (parent as Record<string, unknown>).{{ quantity_field }} as nu
 
 ### 4.1 設計方針
 
-殿裁定: **approvable_id は mandatory 維持。split で null 化せず、approvable も削除しない。**
+確定方針: **approvable_id は mandatory 維持。split で null 化せず、approvable も削除しない。**
 
 変更前 (現行・問題あり):
 ```ts
@@ -608,7 +608,7 @@ generate.py の `if not _def_val.get('x-splittable'):` は `True` も dict も�
 
 ---
 
-## 9. 殿裁可を要する論点
+## 9. 承認を要する論点
 
 ```
 🚨 dashboard 要対応転記用

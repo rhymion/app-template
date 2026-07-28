@@ -1,6 +1,6 @@
 # Design: Split Approval/Rejection & Rejection Classification
 
-**cmd_305 FIX-B (#2) + FIX-C (#3) — Integrated Design (rev.2, post-殿裁定)**
+**cmd_305 FIX-B (#2) + FIX-C (#3) — Integrated Design (rev.2, post-確定方針)**
 
 > Revised 2026-07-11 to reflect approved design rulings.
 > Key changes from rev.1: (1) allow_choice / temporary-rejection / resubmit-to-Pending path
@@ -171,7 +171,7 @@ New state: `const [rejectionReason, setRejectionReason] = useState('')` and
 
 ## FIX-B: Split Child Bridge Allocation
 
-### Confirmed decisions (殿裁定)
+### Confirmed decisions (確定方針)
 
 - 軍師案B: each split child gets a new `inventory_transactionable` bridge; parent
   reservations are released; each child gets its own reservation.
@@ -429,7 +429,7 @@ operational tool.
 
 ---
 
-## Decisions — All Confirmed (殿裁定 2026-07-11)
+## Decisions — All Confirmed (確定方針 2026-07-11)
 
 | ID | Decision | Ruling |
 |----|----------|--------|
