@@ -433,8 +433,13 @@ infra), `SHADOW_DATABASE_URL`, `TEST_RESET_TOKEN`.
 
 ## 10. Confirmed Configuration Values (V-2, V-3, V-5, V-6, V-7)
 
-- **V-2** project name: `app-generator-sample` (`VERCEL_PROJECT_NAME`)
-- **V-3** team: `team_dV6bZ5phXWZj0nuGdtinMzJQ` (`VERCEL_ORG_ID`)
+- **V-2** project name (`VERCEL_PROJECT_NAME`) and **V-3** team (`VERCEL_ORG_ID`) —
+  see `.env.production.local.example` for the current confirmed values, or run
+  `vercel project ls` / inspect `.vercel/project.json` for the live-linked state.
+  Not duplicated as literals here: if the target project/team changes, this
+  section would otherwise go stale independently of the actual config file
+  (confirmed 2026-07-28 to still match the live-linked project — see
+  `subtask_477h_vercel_deploy_target_verification` report for verification method).
 - **V-5** Vercel Blob (`BLOB_READ_WRITE_TOKEN`) — **cmd_292 update:** `vercel blob create-store` CLI is available; provisioning now automatable in vercel-setup.sh (§15). Uploads API code migration (`app/api/uploads/`) still tracked as PD-3 (separate cmd).
 - **V-6** Upstash Redis shared with GCP (`REDIS_URL`, Upstash global tier, HTTP-based) — get-or-create in vercel-setup.sh (§14)
 - **V-7** personal token (`VERCEL_TOKEN` env var only, never `--token` flag)
