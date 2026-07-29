@@ -37,8 +37,25 @@ jobs:
       - name: Install app-generator Python dependencies
         working-directory: app-generator
         run: pip install -r requirements.txt
-      - name: Create env file
-        run: echo "AUTH_SECRET=${{ secrets.AUTH_SECRET }}" >> app-generator/.env.test.local
+      - name: Generate disposable test-only AUTH_SECRET (not a production secret)
+        # Same fix as app-generator's ci.yml: AUTH_SECRET is a throwaway
+        # value scoped to this CI run only, so it's generated in-workflow
+        # instead of read from repository secrets. GitHub does not pass
+        # repository secrets to Dependabot-authored `pull_request` runs or
+        # to fork PRs, so referencing secrets.AUTH_SECRET here made CI
+        # unusable for those PRs: the secret resolved empty, got written to
+        # .env.test.local anyway, and only surfaced much later as an Auth.js
+        # MissingSecret failure deep into the UI test suite.
+        run: echo "AUTH_SECRET=$(openssl rand -base64 32)" >> app-generator/.env.test.local
+      - name: Verify required test env is non-empty (fail-closed)
+        # Guards right at env-generation time so a future accidental
+        # regression back to an empty/undefined value fails fast here
+        # instead of resurfacing as a confusing downstream test failure.
+        run: |
+          if [ -z "$(grep '^AUTH_SECRET=' app-generator/.env.test.local | cut -d= -f2-)" ]; then
+            echo "::error::AUTH_SECRET resolved empty in app-generator/.env.test.local — refusing to continue."
+            exit 1
+          fi
       - name: Generate code, start test database, push schema and build
         run: npm run test:e2e:build
       - name: Run API E2E tests
