@@ -9,6 +9,26 @@ in the app-generator repository's `scripts/`)
 `docs/knowledge/vercel-automation-design.md` in the app-generator repository
 (see redirect note left at that path).
 
+> **⚠ cmd_484 correction (2026-07-29): §1/§3/§3.1/§3.2/§4 build-strategy design
+> superseded in practice — root-level `vercel.json` removed.** This document's
+> originally adopted build strategy ("pre-generated commit + explicit root
+> `vercel.json` `buildCommand`", §3) was never actually deployed. Every live
+> Vercel project connected to this repository (`app-generator-sample`,
+> `sample-app`, `oshicry`, `real-estate` — confirmed via `vercel project
+> inspect` against the `rhymion-labs` team scope, 2026-07-29) has **Vercel
+> Project Settings → Root Directory = `app-generator`**, which is the
+> "alternative considered (not adopted as primary)" design originally
+> described in §3.2. `scripts/vercel-setup.sh` Step 1.5 already implements
+> and enforces this alternative (`_VERCEL_ROOT_DIRECTORY="${VERCEL_ROOT_DIRECTORY:-app-generator}"`,
+> written via the Vercel Projects API) — the actual, shipped automation
+> silently pivoted to the alternative design after this document was written,
+> and this document was never updated to match. The root-level `vercel.json`
+> this document specified (§3.2) was consequently **dead configuration**,
+> never read by any live deployment, and has been deleted (cmd_484). See §17
+> for the corrected design. Additionally, §3's claim that Python/uv are
+> unavailable in the Vercel build environment was never actually tested and
+> is **false** — see §17 for the empirical correction.
+
 ---
 
 ## 0. Objective
@@ -172,6 +192,13 @@ file** (must be set per-project in the dashboard). `vercel.json` with explicit
 `buildCommand` (adopted above) is fully version-controlled and reproducible, so it is
 the primary approach. `vercel-setup.sh` may add `--rootDirectory app-generator` to
 `vercel link` if this alternative is later preferred.
+
+> **⚠ cmd_484 correction:** this "alternative" is what actually shipped —
+> `scripts/vercel-setup.sh` Step 1.5 sets Root Directory to `app-generator`
+> via the Vercel Projects API, and every live project confirms it. The
+> "primary" design above (root `vercel.json`, adopted at the time this
+> section was written) was never actually deployed and has been removed.
+> See §17.
 
 ---
 
@@ -768,6 +795,115 @@ Step 4: migrate:deploy (staging)(updated — uses DATABASE_URL_UNPOOLED_STAGING)
 | Add Upstash provisioning vars | `UPSTASH_EMAIL=`, `UPSTASH_API_KEY=`, `UPSTASH_PRIMARY_REGION=ap-northeast-1` |
 | Update Blob section | `BLOB_READ_WRITE_TOKEN=` note: "Auto-provisioned by vercel-setup.sh Step C"; `VERCEL_BLOB_STORE_ID=` |
 
-### vercel.json
+### vercel.json (app-template root)
 
-No changes required — build command is DB-provider agnostic.
+Historical note only — this file was removed in cmd_484 (see §17). It was
+dead configuration by the time of the cmd_292 addendum (no live project's
+Root Directory pointed at the app-template repo root), so this section's
+original "no changes required" verdict was moot in practice, not merely
+unaffected by the cmd_292 DB-provider change.
+
+---
+
+## 17. Build Strategy Correction (cmd_484): Root Directory = `app-generator`, not root `vercel.json`
+
+> **Superseded:** §1 ("Deploy Target"), §3 ("Build Command"), §3.1, §3.2, and
+> the `vercel.json` deliverable in §13/§16 above. Kept for historical record;
+> do not follow §3/§3.2 for new setup — follow this section instead.
+
+### 17.1 What actually ships
+
+Every Vercel project connected to this repository sets **Project Settings →
+Root Directory = `app-generator`**, not the app-template superproject root.
+Confirmed 2026-07-29 via `vercel project inspect <name>` (team `rhymion-labs`)
+against all four projects with build history rooted in this repo:
+
+| Project | Root Directory | Build Command (effective) |
+|---|---|---|
+| `app-generator-sample` | `app-generator` | `npm run vercel-build` |
+| `sample-app` | `app-generator` | `npm run vercel-build` |
+| `oshicry` | `app-generator` | `npm run vercel-build` |
+| `real-estate` | `app-generator` | `npm run vercel-build` |
+
+With Root Directory set this way, Vercel reads **`app-generator/vercel.json`**
+(inside the submodule), not any file at the app-template superproject root.
+`app-generator/vercel.json`'s `buildCommand` is `npm run vercel-build`, which
+runs `app-generator/package.json`'s `vercel-build` script:
+
+```
+run-s prj:sync python-generate migrate:deploy db:generate db:seed-tenant build
+```
+
+This **does** run code generation at build time (`python-generate` = `uv venv
+--python 3.12 .venv && ... && npm run generate-code`) — no pre-generated-commit
+strategy is needed, and none is in effect. Generated application code
+(`app/`, `components/`, `lib/`, etc.) is produced fresh on every build rather
+than being committed to the submodule.
+
+This design is also already implemented in automation, not just observed:
+`scripts/vercel-setup.sh` Step 1.5 ("Ensure Vercel project Root Directory")
+reads and, if necessary, `PATCH`es a linked project's `rootDirectory` to
+`${VERCEL_ROOT_DIRECTORY:-app-generator}` via the Vercel Projects API. The
+automation was evidently updated to this design after this document (§3.2)
+was written, and this document was never updated to match — that gap is what
+cmd_484 closes.
+
+### 17.2 Python/uv availability in the Vercel build container — §3's claim was never tested and is false
+
+§3 ("Why the existing scripts don't work on Vercel") asserted "no Python/uv
+available in the Vercel build environment" as the reason code generation
+could not run in `buildCommand`. This was never empirically verified when
+written (cmd_290/subtask_290c, 2026-07-07) and is **false**: production build
+logs for `app-generator-sample` (deployed 2026-07-24), `sample-app`
+(2026-06-26), and `real-estate` (2026-06-05) all show `uv venv --python 3.12
+.venv && ... && npm run generate-code` completing successfully as part of
+`npm run vercel-build`, followed by `Build Completed`. `uv` provisions its
+own Python 3.12 interpreter at build time; no system Python needs to be
+preinstalled in the Vercel image. This same unverified assumption was
+independently repeated (not re-verified against the live build environment)
+in an earlier cmd_480 investigation report — both trace back to this
+document's original, untested §3 claim. Lesson: a claim about what a runtime
+environment can or cannot do must be checked against that runtime directly
+(actual build logs, or a real deploy) — restating an earlier design
+document's stated rationale, however confidently worded, is not
+verification.
+
+### 17.3 Disposition of root-level `vercel.json`
+
+Deleted (cmd_484). It specified `buildCommand: bash scripts/sync-prj.sh &&
+npm --prefix app-generator run db:generate && npm --prefix app-generator run
+build` — a "pre-generated commit" strategy (§3) that both (a) was never
+actually deployed by any live project, per §17.1, and (b) would have relied
+on committed generated code, which the design principle recorded in §3
+itself explicitly aimed to avoid once code generation was proven to work in
+the Vercel build container (§17.2). Keeping it around as inert, misleading
+configuration was itself a source of confusion. `README.md` / `README_ja.md`
+already document the correct, live procedure ("Set Root Directory to
+`app-generator/`") and required no changes for this correction.
+
+`scripts/sync-prj.sh` is unaffected by this correction — it retains its
+existing callers (`package.json` `dev`/`build` on this branch) independent of
+this file's removal. A separate, not-yet-merged change (branch
+`doreen/subtask_480c_sync_prj_retirement`, commit `1ef16c4`) narrows
+`sync-prj.sh`'s callers further and updates its header comment; that change
+predates this correction and is not reflected on `doreen/vercel-auto` as of
+this writing, so the two should be reconciled at merge time.
+
+### 17.4 Standing pitfall: a dashboard Build/Install Command override outlives a Root Directory change
+
+Not part of this correction's changes, but recorded here since it is exactly
+the design property that made §17.1's outcome possible and is worth guarding
+against going forward: a Vercel project's dashboard-level Build/Install
+Command **override** (set once via the dashboard UI or the Projects API, not
+via `vercel.json`) takes precedence over `vercel.json` and does **not**
+auto-adjust when Root Directory is changed afterward. A command written for
+one Root Directory (e.g. one that includes `--prefix app-generator`, written
+when Root Directory was the repository root) silently breaks once Root
+Directory is changed to `app-generator` — the command still runs, but now
+resolves paths relative to a cwd that has already moved one level down,
+producing a doubled path (`app-generator/app-generator/...`) and a
+`package.json`-not-found failure. Any future Root Directory change should be
+paired with a check of whether a Build/Install Command override is set on
+the project (Project Settings → Build & Development Settings — an "Override"
+toggle next to each of Build/Install/Output Command) and, if so, whether it
+still matches the new Root Directory.
