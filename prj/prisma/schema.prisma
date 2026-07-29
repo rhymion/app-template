@@ -361,8 +361,8 @@ model inventory_transaction {
 
 model inventory_movement {
   id                           String                     @id @default(cuid())
-  from_inventory_id            String?
-  from_inventory               inventory?                 @relation("InventoryMovementFrom", fields: [from_inventory_id], references: [id])
+  from_inventory_id            String
+  from_inventory               inventory                  @relation("InventoryMovementFrom", fields: [from_inventory_id], references: [id])
   to_inventory_id               String
   to_inventory                  inventory                  @relation("InventoryMovementTo", fields: [to_inventory_id], references: [id])
   quantity                     Int
