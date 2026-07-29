@@ -205,7 +205,7 @@ your-app/           ← app-template のフォーク
 
 ### prj:sync の流れ
 
-`dev` / `build` の各コマンドは最初に `scripts/sync-prj.sh` を実行し、`prj/.` を `app-generator/` に上書きコピーします。手動で呼び出すことも可能ですが、通常は不要です — 同期処理は `dev`・`build`・`test:e2e:build`・app-generator の `vercel-build` に既に含まれています。同期だけを単独で確認したい特殊なケースでのみ使用してください：
+`dev` / `build`（ルートの `package.json`）は最初に `scripts/sync-prj.sh` を実行し、`prj/.` を `app-generator/` に上書きコピーします。これは**ローカル専用の経路**です。Vercel ビルドは別の仕組み（`app-generator/vercel.json` の `vercel-build` が `prj:sync` = `app-generator/scripts/prj_sync.py` を実行、`scripts/sync-prj.sh` ではない — [§17.6](./docs/vercel-automation-design.md#176-scriptssync-prjsh-retirement-re-judged-cmd_485) 参照）を使います。`test:e2e:build` も既に `scripts/sync-prj.sh` ではなく `prj:sync` を使用しています。手動でローカル同期を呼び出すことも可能ですが、`dev`/`build` に既に組み込まれているため通常は不要です：
 
 ```bash
 npm run sync   # 他の操作なしで prj/ → app-generator/ をコピー
@@ -213,7 +213,11 @@ npm run sync   # 他の操作なしで prj/ → app-generator/ をコピー
 
 ワークフロー：`prj/` を編集 → `npm run dev`（自動で同期）→ ジェネレーターが再生成 → アプリが再起動。
 
+**`scripts/sync-prj.sh` の廃止状況：** 現在残っている呼び出し元は上記の `dev`/`build` のみで、Vercel デプロイ経路からは呼ばれていません（このリポジトリのルートに `vercel.json` は存在しません。下記参照）。`dev`/`build` を `prj:sync` に切り替える変更が別途未マージのまま存在し、それが取り込まれれば `scripts/sync-prj.sh` の呼び出し元はゼロになり、完全に削除すべき対象になります。
+
 ### Vercel デプロイ
+
+**このリポジトリのルートに `vercel.json` を追加してはならない。** このリポジトリの実運用デプロイはすべて Vercel の Project Settings → Root Directory を `app-generator/` に設定しており、Vercel はそこから `vercel.json` を読み込みます — ルート直下の `vercel.json` は冗長であるだけでなく、ビルドを実際に壊します（Root Directory 設定による1回と、古いルート設定内の `--prefix app-generator` による1回、パス解決が二重に走るため）。確認済みの故障モードは [docs/vercel-automation-design.md §17.5](./docs/vercel-automation-design.md#175-confirmed-rule-cmd_485-a-root-level-verceljson-must-never-exist-in-this-repository) を参照。
 
 フォーク後、[初回セットアップ](#初回セットアップ) を終えたら：
 

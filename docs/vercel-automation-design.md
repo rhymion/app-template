@@ -688,7 +688,10 @@ this file's removal. A separate, not-yet-merged change (branch
 `doreen/subtask_480c_sync_prj_retirement`, commit `1ef16c4`) narrows
 `sync-prj.sh`'s callers further and updates its header comment; that change
 predates this correction and is not reflected on `doreen/vercel-auto` as of
-this writing, so the two should be reconciled at merge time.
+this writing. **This is not a simple reconcile-at-merge-time situation —
+the premise `1ef16c4` narrows toward (keep `sync-prj.sh` alive because
+`vercel.json` needs it) no longer holds now that `vercel.json` is deleted.
+See §17.6 for the re-judged conclusion.**
 
 ### 17.4 Standing pitfall: a dashboard Build/Install Command override outlives a Root Directory change
 
@@ -708,3 +711,106 @@ paired with a check of whether a Build/Install Command override is set on
 the project (Project Settings → Build & Development Settings — an "Override"
 toggle next to each of Build/Install/Output Command) and, if so, whether it
 still matches the new Root Directory.
+
+### 17.5 Confirmed rule (cmd_485): a root-level `vercel.json` must never exist in this repository
+
+**Rule:** `vercel.json` must not be recreated at the app-template repository
+root, for any reason, regardless of what Root Directory is set to in the
+dashboard. Directly confirmed as the cause of an actual (not hypothetical)
+deploy failure: with Root Directory already set to `app-generator` (§17.1),
+the root-level `vercel.json` this document originally specified (§3.2)
+still had its `buildCommand`/`installCommand` applied — both written
+assuming a repository-root cwd (`npm --prefix app-generator run …`) — on
+top of a build cwd Vercel had already moved to `app-generator/` via the
+Root Directory setting. The two `--prefix app-generator` segments stacked
+into a doubled path (`/vercel/path0/app-generator/app-generator/`) and the
+build failed with a missing-`package.json` error. Deleting the file
+(cmd_484) is what fixed this deploy: with no root `vercel.json` present,
+Vercel fell through to **`app-generator/vercel.json`** (`buildCommand: npm
+run vercel-build`), which succeeded.
+
+This is the same failure shape as §17.4's dashboard-override pitfall — a
+build-command source written for one cwd silently breaking once Root
+Directory moves the effective cwd — except the source here is a **committed
+file** rather than a dashboard setting, which is why it is called out as its
+own numbered rule: a dashboard override is at least visible and auditable
+per-project in Project Settings, but a committed root `vercel.json` is
+invisible in that view and will silently reappear (and refail, the same
+way) for every project built from this repo if anyone re-adds it — e.g.
+while "restoring" what looks like missing Vercel config, or copying a
+pattern from an older revision of this document. Consistent with this
+project's general preference for not committing generated/deploy-config
+output that the platform can already derive on its own —
+`app-generator/vercel.json` is the single source of truth for the build
+command that actually ships.
+
+**`app-generator/vercel.json`'s `buildCommand` runs `npm run vercel-build`**,
+confirmed by reading `app-generator/package.json` (no live deploy needed —
+static config, §17.1):
+
+```
+"vercel-build": "run-s prj:sync python-generate migrate:deploy db:generate db:seed-tenant build"
+```
+
+This **does** include `migrate:deploy` and `db:seed-tenant` on every single
+build/deploy (not just first-time setup) — confirmed by the script
+definition itself, not inferred.
+
+**Which DB a build's `migrate:deploy`/`db:seed-tenant` touch**, confirmed by
+reading the environment-variable injection config (§7, §8 — no live check
+performed):
+- `vercel-env.sh inject preview` sets `DATABASE_URL` to `DATABASE_URL_STAGING`
+  (Neon `staging` branch, **pooled** endpoint) for `preview` deployments; a
+  `production` deploy gets `DATABASE_URL_PROD` instead (§7 table). Every
+  preview deploy across every branch shares the one staging DB — deliberate
+  (§7).
+- The `migrate:deploy` embedded in `vercel-build` runs against whatever
+  `DATABASE_URL` the build environment has — i.e. the **pooled** endpoint on
+  both `preview` and `production`. This is a different code path from
+  `vercel-setup.sh`'s own one-time `migrate:deploy` call, which explicitly
+  uses the **unpooled** endpoints (§7, "Migrations use unpooled endpoints")
+  because PgBouncer transaction mode does not preserve DDL statement
+  ordering. §7's unpooled-endpoint rationale therefore does not cover the
+  `migrate:deploy` that runs inside `vercel-build` on every ordinary
+  build/deploy — this is a config-reading observation only, not something
+  this task investigates or fixes further.
+
+### 17.6 `scripts/sync-prj.sh` retirement re-judged (cmd_485)
+
+Re-judging the conclusion `1ef16c4` (branch
+`doreen/subtask_480c_sync_prj_retirement`) reached — "keep `sync-prj.sh`,
+narrow its callers to `vercel.json` only, because the Vercel build container
+has no Python runtime to run `prj_sync.py`" — against the state established
+by this document as of cmd_484/cmd_485:
+
+1. The premise is gone twice over. (a) The root `vercel.json` `1ef16c4`
+   intended to leave as `sync-prj.sh`'s sole remaining caller no longer
+   exists (§17.3/§17.5) — there is nothing left calling it via the Vercel
+   path. (b) §17.2 already confirms, empirically, that the Vercel build
+   container **does** have Python available (`uv` provisions its own
+   Python 3.12 at build time) — so even if a root `vercel.json` were
+   reintroduced for some other reason, "no Python at build time" would not
+   be a valid reason to route it through `scripts/sync-prj.sh` instead of
+   `prj:sync`.
+2. This does **not** mean `scripts/sync-prj.sh` can be deleted immediately
+   on this branch. On `doreen/vercel-auto` as of this writing, root
+   `package.json`'s `dev` and `build` scripts still call
+   `bash scripts/sync-prj.sh` directly (`1ef16c4`'s switch of those two
+   scripts to `prj:sync` has not been merged here). Deleting the script now
+   would break `npm run dev` / `npm run build` at the app-template root.
+3. **Verdict:** retirement is correct, but the *shape* of it changes from
+   what `1ef16c4` planned. `1ef16c4` planned a narrowing (fewer callers,
+   keep the file for `vercel.json`). The correct plan now is a **full
+   deletion**, gated on landing the one remaining piece of `1ef16c4` that is
+   still needed regardless of `vercel.json`'s fate — switching root
+   `package.json`'s `dev`/`build` from `bash scripts/sync-prj.sh` to
+   `npm --prefix app-generator run prj:sync` (already written, on the
+   unmerged branch). Once that lands, `scripts/sync-prj.sh` has zero
+   callers anywhere in this repository and should be deleted outright in
+   the same or an immediately following change — not kept "just in case,"
+   since the two premises for keeping it (point 1 above) are both gone.
+4. Whoever merges `doreen/subtask_480c_sync_prj_retirement` should update
+   its commit message / PR description and this document's `1ef16c4`
+   commit reference accordingly — the "kept, not deleted: `vercel.json`'s
+   `buildCommand` still depends on it" rationale in that commit's message
+   will be stale the moment it lands after cmd_484.

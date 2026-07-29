@@ -205,7 +205,7 @@ Fork (or use as a template) this repo. All your changes go into `prj/`. The gene
 
 ### prj:sync flow
 
-Every `dev` and `build` command runs `scripts/sync-prj.sh` first, which overlay-copies `prj/.` onto `app-generator/`. You can also trigger it manually — though in normal use this is not necessary, since sync is already embedded in `dev`, `build`, `test:e2e:build`, and the app-generator's `vercel-build`. Run it only when you want to verify the sync in isolation:
+`dev` and `build` (root `package.json`) run `scripts/sync-prj.sh` first, which overlay-copies `prj/.` onto `app-generator/`. This is a **local-only** path: the Vercel build uses a separate mechanism (`app-generator/vercel.json`'s `vercel-build`, which runs `prj:sync` — `app-generator/scripts/prj_sync.py` — not `scripts/sync-prj.sh`; see [§17.6](./docs/vercel-automation-design.md#176-scriptssync-prjsh-retirement-re-judged-cmd_485)). `test:e2e:build` already uses `prj:sync` too, not `scripts/sync-prj.sh`. You can also trigger the local sync manually — not necessary in normal use, since it's already embedded in `dev`/`build`:
 
 ```bash
 npm run sync   # copy prj/ → app-generator/ without starting anything else
@@ -213,7 +213,11 @@ npm run sync   # copy prj/ → app-generator/ without starting anything else
 
 Workflow: edit `prj/` → run `npm run dev` (syncs automatically) → generator regenerates → app reloads.
 
+**`scripts/sync-prj.sh` retirement status:** its only remaining callers are `dev`/`build` above — it is *not* used by any Vercel deploy path (there is no `vercel.json` at this repository's root; see below). A pending, not-yet-merged change switches `dev`/`build` to `prj:sync` as well, at which point `scripts/sync-prj.sh` will have zero callers and should be deleted outright.
+
 ### Vercel deploy
+
+**Never add a `vercel.json` file at this repository's root.** Every live deployment of this repository sets Vercel Project Settings → Root Directory to `app-generator/`, which is where Vercel reads `vercel.json` from — a root-level `vercel.json` here is not just redundant, it actively breaks the build (paths resolve twice through `app-generator/`, once from the Root Directory setting and once from any `--prefix app-generator` inside the stale root config). See [docs/vercel-automation-design.md §17.5](./docs/vercel-automation-design.md#175-confirmed-rule-cmd_485-a-root-level-verceljson-must-never-exist-in-this-repository) for the confirmed failure mode.
 
 After forking and completing [First-time setup](#first-time-setup):
 
