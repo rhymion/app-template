@@ -438,8 +438,7 @@ infra), `SHADOW_DATABASE_URL`, `TEST_RESET_TOKEN`.
   `vercel project ls` / inspect `.vercel/project.json` for the live-linked state.
   Not duplicated as literals here: if the target project/team changes, this
   section would otherwise go stale independently of the actual config file
-  (confirmed 2026-07-28 to still match the live-linked project — see
-  `subtask_477h_vercel_deploy_target_verification` report for verification method).
+  (confirmed 2026-07-28 to still match the live-linked project).
 - **V-5** Vercel Blob (`BLOB_READ_WRITE_TOKEN`) — **cmd_292 update:** `vercel blob create-store` CLI is available; provisioning now automatable in vercel-setup.sh (§15). Uploads API code migration (`app/api/uploads/`) still tracked as PD-3 (separate cmd).
 - **V-6** Upstash Redis shared with GCP (`REDIS_URL`, Upstash global tier, HTTP-based) — get-or-create in vercel-setup.sh (§14)
 - **V-7** personal token (`VERCEL_TOKEN` env var only, never `--token` flag)
