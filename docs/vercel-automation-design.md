@@ -682,16 +682,10 @@ configuration was itself a source of confusion. `README.md` / `README_ja.md`
 already document the correct, live procedure ("Set Root Directory to
 `app-generator/`") and required no changes for this correction.
 
-`scripts/sync-prj.sh` is unaffected by this correction — it retains its
-existing callers (`package.json` `dev`/`build` on this branch) independent of
-this file's removal. A separate, not-yet-merged change (branch
-`doreen/subtask_480c_sync_prj_retirement`, commit `1ef16c4`) narrows
-`sync-prj.sh`'s callers further and updates its header comment; that change
-predates this correction and is not reflected on `doreen/vercel-auto` as of
-this writing. **This is not a simple reconcile-at-merge-time situation —
-the premise `1ef16c4` narrows toward (keep `sync-prj.sh` alive because
-`vercel.json` needs it) no longer holds now that `vercel.json` is deleted.
-See §17.6 for the re-judged conclusion.**
+`scripts/sync-prj.sh` is retired as a follow-up to this correction: with the
+root `vercel.json` gone, and `package.json`'s `dev`/`build` switched to
+`prj:sync` (see §17.6), it had zero remaining callers and has been deleted
+outright.
 
 ### 17.4 Standing pitfall: a dashboard Build/Install Command override outlives a Root Directory change
 
@@ -775,42 +769,37 @@ performed):
   build/deploy — this is a config-reading observation only, not something
   this task investigates or fixes further.
 
-### 17.6 `scripts/sync-prj.sh` retirement re-judged (cmd_485)
+### 17.6 `scripts/sync-prj.sh` retired (cmd_485)
 
-Re-judging the conclusion `1ef16c4` (branch
-`doreen/subtask_480c_sync_prj_retirement`) reached — "keep `sync-prj.sh`,
-narrow its callers to `vercel.json` only, because the Vercel build container
-has no Python runtime to run `prj_sync.py`" — against the state established
-by this document as of cmd_484/cmd_485:
+`scripts/sync-prj.sh` has been deleted. Root `package.json`'s `dev` and
+`build` scripts now run `npm --prefix app-generator run prj:sync` (i.e.
+`app-generator/scripts/prj_sync.py`) instead of `bash scripts/sync-prj.sh`,
+matching `test:e2e:build` and `generate-code`, which already used `prj:sync`.
+`prj:sync` also deep-merges `messages/*.json` rather than overwriting it
+wholesale — a strict improvement over the plain `cp -a` `sync-prj.sh` used.
 
-1. The premise is gone twice over. (a) The root `vercel.json` `1ef16c4`
-   intended to leave as `sync-prj.sh`'s sole remaining caller no longer
-   exists (§17.3/§17.5) — there is nothing left calling it via the Vercel
-   path. (b) §17.2 already confirms, empirically, that the Vercel build
-   container **does** have Python available (`uv` provisions its own
-   Python 3.12 at build time) — so even if a root `vercel.json` were
-   reintroduced for some other reason, "no Python at build time" would not
-   be a valid reason to route it through `scripts/sync-prj.sh` instead of
-   `prj:sync`.
-2. This does **not** mean `scripts/sync-prj.sh` can be deleted immediately
-   on this branch. On `doreen/vercel-auto` as of this writing, root
-   `package.json`'s `dev` and `build` scripts still call
-   `bash scripts/sync-prj.sh` directly (`1ef16c4`'s switch of those two
-   scripts to `prj:sync` has not been merged here). Deleting the script now
-   would break `npm run dev` / `npm run build` at the app-template root.
-3. **Verdict:** retirement is correct, but the *shape* of it changes from
-   what `1ef16c4` planned. `1ef16c4` planned a narrowing (fewer callers,
-   keep the file for `vercel.json`). The correct plan now is a **full
-   deletion**, gated on landing the one remaining piece of `1ef16c4` that is
-   still needed regardless of `vercel.json`'s fate — switching root
-   `package.json`'s `dev`/`build` from `bash scripts/sync-prj.sh` to
-   `npm --prefix app-generator run prj:sync` (already written, on the
-   unmerged branch). Once that lands, `scripts/sync-prj.sh` has zero
-   callers anywhere in this repository and should be deleted outright in
-   the same or an immediately following change — not kept "just in case,"
-   since the two premises for keeping it (point 1 above) are both gone.
-4. Whoever merges `doreen/subtask_480c_sync_prj_retirement` should update
-   its commit message / PR description and this document's `1ef16c4`
-   commit reference accordingly — the "kept, not deleted: `vercel.json`'s
-   `buildCommand` still depends on it" rationale in that commit's message
-   will be stale the moment it lands after cmd_484.
+**Lineage of this decision, for anyone reading the git history:** an earlier
+branch (`doreen/subtask_480c_sync_prj_retirement`, commit `1ef16c4`)
+concluded the opposite — *keep* `sync-prj.sh` and narrow its callers to
+`vercel.json` only, reasoning that the Vercel build container had no Python
+runtime to run `prj_sync.py`. That conclusion does not apply here, for two
+independent reasons:
+
+1. Its premise for keeping the file — a root-level `vercel.json` that needed
+   a Python-free sync mechanism — no longer exists; that file was deleted for
+   an unrelated, confirmed deploy-breaking reason (§17.3/§17.5).
+2. Its premise about Python availability was itself never actually verified
+   empirically and turned out to be false: §17.2 confirms the Vercel build
+   container **does** have Python available (`uv` provisions its own Python
+   3.12 at build time). So even independent of point 1, routing through
+   `scripts/sync-prj.sh` to avoid a Python dependency was never necessary.
+
+With both premises gone, `1ef16c4`'s content (the `dev`/`build` → `prj:sync`
+switch) was carried forward into this change, but its file-retention
+rationale was not — `scripts/sync-prj.sh` had zero remaining callers
+anywhere in this repository once `dev`/`build` switched, and was deleted in
+the same change rather than kept "just in case."
+
+`prj:sync` requires Python 3 to run, but this introduces no new prerequisite:
+`test:e2e:build` and `generate-code` already required Python 3 before this
+change (see the Prerequisites table in `README.md`/`README_ja.md`).

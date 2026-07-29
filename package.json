@@ -6,8 +6,8 @@
   "scripts": {
     "setup": "bash scripts/setup.sh",
     "sync": "npm --prefix app-generator run prj:sync",
-    "dev": "bash scripts/sync-prj.sh && npm --prefix app-generator run dev:full",
-    "build": "bash scripts/sync-prj.sh && npm --prefix app-generator run build:full",
+    "dev": "npm --prefix app-generator run prj:sync && npm --prefix app-generator run dev:full",
+    "build": "npm --prefix app-generator run prj:sync && npm --prefix app-generator run build:full",
     "start": "npm --prefix app-generator run start",
     "test:e2e:build": "npm --prefix app-generator run prj:sync && npm --prefix app-generator run test:e2e:build",
     "test:e2e:cy:start": "npm --prefix app-generator run test:e2e:cy:start",

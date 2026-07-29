@@ -19,12 +19,11 @@ app-template/
 │   ├── lib/             (entity-specific custom server logic)
 │   └── messages/ja.json
 ├── app-generator/       ← submodule (do not edit directly)
-├── scripts/sync-prj.sh  ← copies prj/. → app-generator/
 ├── package.json         ← local dev/build shortcuts
 └── README.md
 ```
 
-**Rule of thumb:** edit `prj/`, never `app-generator/`. Every local dev/build command runs `scripts/sync-prj.sh` first, which overlay-copies `prj/.` onto `app-generator/`.
+**Rule of thumb:** edit `prj/`, never `app-generator/`. Every local dev/build command runs `prj:sync` first (`npm --prefix app-generator run prj:sync`, i.e. `app-generator/scripts/prj_sync.py`), which overlay-copies `prj/.` onto `app-generator/` and deep-merges `messages/*.json` instead of overwriting them. `prj:sync` requires Python 3 to run, but `test:e2e:build` and `generate-code` already required it before this — no new prerequisite is introduced.
 
 **The `app-generator/` submodule** is pinned at a specific commit and is generally not modified directly. Local temporary changes (for debugging or experimentation) are fine — they do not affect this repository's history as long as you do not commit the updated submodule pointer. If you need a persistent change to the generator, contribute it upstream to `app-generator` and then update the submodule pin here.
 
@@ -143,7 +142,7 @@ For Vercel deploys the port is managed by the platform — no change needed.
 2. Put any custom entity-specific overrides in `prj/components/<entity>/`, `prj/lib/<entity>/`, `prj/messages/`.
 3. Run `npm run dev` — `prj/` is overlay-copied into `app-generator/`, the code generator regenerates, and the app reloads.
 
-`sync-prj.sh` uses `cp -a prj/. app-generator/`, so it only **adds or overwrites** files. It never deletes generator files that aren't in `prj/`. If you need a clean slate, run `git submodule deinit -f app-generator && git submodule update --init --recursive` to reset the submodule.
+`prj:sync` (`app-generator/scripts/prj_sync.py`) copies `prj/.` onto `app-generator/`, so it only **adds or overwrites** files — it never deletes generator files that aren't in `prj/`. For `messages/*.json` it deep-merges instead of overwriting (your keys win on collision; keys you don't define are kept). If you need a clean slate, run `git submodule deinit -f app-generator && git submodule update --init --recursive` to reset the submodule.
 
 ---
 
@@ -197,23 +196,20 @@ your-app/           ← fork of app-template
 │   ├── components/
 │   ├── lib/
 │   └── messages/ja.json
-├── app-generator/  ← submodule (never edited directly)
-└── scripts/sync-prj.sh
+└── app-generator/  ← submodule (never edited directly)
 ```
 
 Fork (or use as a template) this repo. All your changes go into `prj/`. The generator engine is pinned at a specific commit and upgraded explicitly — not by editing it in place.
 
 ### prj:sync flow
 
-`dev` and `build` (root `package.json`) run `scripts/sync-prj.sh` first, which overlay-copies `prj/.` onto `app-generator/`. This is a **local-only** path: the Vercel build uses a separate mechanism (`app-generator/vercel.json`'s `vercel-build`, which runs `prj:sync` — `app-generator/scripts/prj_sync.py` — not `scripts/sync-prj.sh`; see [§17.6](./docs/vercel-automation-design.md#176-scriptssync-prjsh-retirement-re-judged-cmd_485)). `test:e2e:build` already uses `prj:sync` too, not `scripts/sync-prj.sh`. You can also trigger the local sync manually — not necessary in normal use, since it's already embedded in `dev`/`build`:
+`dev`, `build`, `generate-code`, and `test:e2e:build` (root `package.json`) all run `prj:sync` first (`npm --prefix app-generator run prj:sync`, i.e. `app-generator/scripts/prj_sync.py`), which overlay-copies `prj/.` onto `app-generator/` and deep-merges `messages/*.json` (your keys win on collision; keys you don't define are preserved, instead of being dropped by a plain overwrite). The Vercel deploy path uses the same mechanism — `app-generator/vercel.json`'s `vercel-build` also runs `prj:sync` — so local and deployed builds sync identically; see [§17.6](./docs/vercel-automation-design.md#176-scriptssync-prjsh-retired-cmd_485) for how this was unified. You can also trigger the sync manually — not necessary in normal use, since it's already embedded in those commands:
 
 ```bash
-npm run sync   # copy prj/ → app-generator/ without starting anything else
+npm run sync   # copy/merge prj/ → app-generator/ without starting anything else
 ```
 
 Workflow: edit `prj/` → run `npm run dev` (syncs automatically) → generator regenerates → app reloads.
-
-**`scripts/sync-prj.sh` retirement status:** its only remaining callers are `dev`/`build` above — it is *not* used by any Vercel deploy path (there is no `vercel.json` at this repository's root; see below). A pending, not-yet-merged change switches `dev`/`build` to `prj:sync` as well, at which point `scripts/sync-prj.sh` will have zero callers and should be deleted outright.
 
 ### Vercel deploy
 

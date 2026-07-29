@@ -19,12 +19,11 @@ app-template/
 │   ├── lib/             （エンティティごとのカスタムサーバーロジック）
 │   └── messages/ja.json
 ├── app-generator/       ← submodule（直接編集しない）
-├── scripts/sync-prj.sh  ← prj/. → app-generator/ をコピー
 ├── package.json         ← ローカルの dev/build ショートカット
 └── README.md
 ```
 
-**原則**：`prj/` のみを編集し、`app-generator/` は直接いじらない。各ローカル dev/build コマンドは最初に `scripts/sync-prj.sh` を実行し、`prj/.` を `app-generator/` に上書きコピーします。
+**原則**：`prj/` のみを編集し、`app-generator/` は直接いじらない。各ローカル dev/build コマンドは最初に `prj:sync`(`npm --prefix app-generator run prj:sync`、実体は `app-generator/scripts/prj_sync.py`)を実行し、`prj/.` を `app-generator/` に上書きコピー、`messages/*.json` はdeep-mergeします。`prj:sync` の実行には Python 3 が必要ですが、`test:e2e:build` と `generate-code` は元々 Python 3 を前提としていたため、新たな前提条件が増えるわけではありません。
 
 **`app-generator/` サブモジュール**は特定のコミットに固定されており、基本的に直接変更しません。ローカルでの一時的な変更（デバッグや実験目的）は問題ありません — サブモジュールのポインタをコミットしなければ、このリポジトリの履歴に影響しません。ジェネレータへの永続的な変更が必要な場合は、上流の `app-generator` にコントリビュートし、その後ここでサブモジュールのピンを更新するのが正しい流れです。
 
@@ -143,7 +142,7 @@ Vercel 上のポートはプラットフォーム管理のため変更不要で�
 2. エンティティ単位の上書きは `prj/components/<entity>/`、`prj/lib/<entity>/`、`prj/messages/` に置く。
 3. `npm run dev` を実行 — `prj/` が `app-generator/` に上書きされ、コード生成とアプリ起動まで自動で行われます。
 
-`sync-prj.sh` は `cp -a prj/. app-generator/` を使うため、**追加と上書きのみ**を行い、ジェネレータ側のファイルを削除することはありません。クリーンに戻したいときは `git submodule deinit -f app-generator && git submodule update --init --recursive` で submodule を初期化してください。
+`prj:sync`(`app-generator/scripts/prj_sync.py`)は `prj/.` を `app-generator/` へコピーするため、**追加と上書きのみ**を行い、ジェネレータ側のファイルを削除することはありません。`messages/*.json` のみ上書きでなくdeep-mergeします（衝突時はあなたの値が優先・あなたが定義していないキーはそのまま保持）。クリーンに戻したいときは `git submodule deinit -f app-generator && git submodule update --init --recursive` で submodule を初期化してください。
 
 ---
 
@@ -197,23 +196,20 @@ your-app/           ← app-template のフォーク
 │   ├── components/
 │   ├── lib/
 │   └── messages/ja.json
-├── app-generator/  ← サブモジュール（直接編集しない）
-└── scripts/sync-prj.sh
+└── app-generator/  ← サブモジュール（直接編集しない）
 ```
 
 このリポジトリをフォーク（またはテンプレートとして利用）します。変更はすべて `prj/` に加えます。ジェネレーターエンジンは特定のコミットに固定され、明示的にアップデートします（直接編集はしません）。
 
 ### prj:sync の流れ
 
-`dev` / `build`（ルートの `package.json`）は最初に `scripts/sync-prj.sh` を実行し、`prj/.` を `app-generator/` に上書きコピーします。これは**ローカル専用の経路**です。Vercel ビルドは別の仕組み（`app-generator/vercel.json` の `vercel-build` が `prj:sync` = `app-generator/scripts/prj_sync.py` を実行、`scripts/sync-prj.sh` ではない — [§17.6](./docs/vercel-automation-design.md#176-scriptssync-prjsh-retirement-re-judged-cmd_485) 参照）を使います。`test:e2e:build` も既に `scripts/sync-prj.sh` ではなく `prj:sync` を使用しています。手動でローカル同期を呼び出すことも可能ですが、`dev`/`build` に既に組み込まれているため通常は不要です：
+`dev`・`build`・`generate-code`・`test:e2e:build`（すべてルートの `package.json`）は最初に `prj:sync`(`npm --prefix app-generator run prj:sync`、実体は `app-generator/scripts/prj_sync.py`)を実行し、`prj/.` を `app-generator/` に上書きコピーしつつ `messages/*.json` はdeep-mergeします（あなたの値が衝突時優先・未定義キーは保持され、単純上書きのように失われません）。Vercel デプロイ経路も同じ仕組みを使います — `app-generator/vercel.json` の `vercel-build` も `prj:sync` を実行するため、ローカルとデプロイ先で同期処理が一致しています(統一の経緯は[§17.6](./docs/vercel-automation-design.md#176-scriptssync-prjsh-retired-cmd_485)参照)。手動で呼び出すことも可能ですが、通常は不要です — 同期処理は上記コマンドに既に含まれています：
 
 ```bash
-npm run sync   # 他の操作なしで prj/ → app-generator/ をコピー
+npm run sync   # 他の操作なしで prj/ → app-generator/ をコピー/マージ
 ```
 
 ワークフロー：`prj/` を編集 → `npm run dev`（自動で同期）→ ジェネレーターが再生成 → アプリが再起動。
-
-**`scripts/sync-prj.sh` の廃止状況：** 現在残っている呼び出し元は上記の `dev`/`build` のみで、Vercel デプロイ経路からは呼ばれていません（このリポジトリのルートに `vercel.json` は存在しません。下記参照）。`dev`/`build` を `prj:sync` に切り替える変更が別途未マージのまま存在し、それが取り込まれれば `scripts/sync-prj.sh` の呼び出し元はゼロになり、完全に削除すべき対象になります。
 
 ### Vercel デプロイ
 
