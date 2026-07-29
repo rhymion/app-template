@@ -13,3 +13,14 @@ Task: $ARGUMENTS
 
 - Edit only files under `prj/`. Do **not** touch `app-generator/`.
 - Temporary adjustments to generated code belong in `prj/` — not in the generator templates.
+
+## Completion gate
+
+Run in this order (mirrors `app-generator/.claude/commands/update-code.md §Completion gate`):
+
+1. `npm run test:e2e:build`  — prj:sync + docker:up:test + generate-code + db:push + db:generate + db:seed-tenant + build
+2. `npm run test:e2e:cy:api` — API Cypress specs only
+3. `npm run lint`
+4. `npm --prefix app-generator audit --omit=dev --audit-level=high`
+
+(`npm --prefix app-generator run test:pytest` and `npm --prefix app-generator run test` are skipped unless the change affects Python or component code.)

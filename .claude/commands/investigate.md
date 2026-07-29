@@ -14,3 +14,7 @@ Task: $ARGUMENTS
 - **Read**: both `prj/` and `app-generator/` are in scope for reading.
 - **Write**: `prj/` only (investigation notes, if any output is needed).
 - Do **not** modify `app-generator/`.
+
+## Completion gate
+
+None. No files modified, no commands run.
