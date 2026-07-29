@@ -394,7 +394,7 @@ DP-4は技術的難度が最も低い(関数追加+文字列置換)。DP-2/DP-3�
 
 ---
 
-## 7. 要承認論点 一覧 (dashboard 🚨要裁可 転記用)
+## 7. 要承認論点 一覧 (dashboard 🚨要承認 転記用)
 
 ### DP-1: per-line ship/release/cancel + 数量UI
 
