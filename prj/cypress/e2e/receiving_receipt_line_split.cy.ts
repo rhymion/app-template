@@ -75,7 +75,7 @@ describe('UI: Receiving Receipt Line — Split (cmd_296)', () => {
           // Real-behavior confirmation: the browser-driven split actually
           // persisted (status flipped, approvable preserved, 2 children created).
           cy.task<any>('db:getReceivingReceiptLineById', { id: line.id }).then((parent) => {
-            expect(parent.status).to.eq(1);
+            expect(parent.status).to.eq('split');
             expect(parent.approvable_id).to.eq(line.approvable_id);
           });
           cy.task<any>('db:getReceivingReceiptLineChildren', { parentId: line.id }).then((children) => {
