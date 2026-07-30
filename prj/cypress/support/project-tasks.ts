@@ -47,5 +47,41 @@ export function getProjectTasks(): Record<string, (...args: any[]) => any> {
         { inventoryId: params.inventoryId, productId: params.productId, receiptQuantity: params.receiptQuantity }
       );
     },
+    async 'db:seedReservationInventory'(params: { quantity: number }) {
+      const { seedReservationInventory } = require('./purchase_order/reservation_helper');
+      return await seedReservationInventory(params.quantity);
+    },
+    async 'db:getInventoryAllocation'(params: { purchase_order_id: string }) {
+      const { getInventoryAllocation } = require('./purchase_order/reservation_helper');
+      return await getInventoryAllocation(params.purchase_order_id);
+    },
+    async 'db:setInventoryQuantity'(params: { inventory_id: string; quantity: number }) {
+      const { setInventoryQuantity } = require('./purchase_order/reservation_helper');
+      return await setInventoryQuantity(params.inventory_id, params.quantity);
+    },
+    async 'db:seedSecondInventoryLot'(params: { product_id: string; quantity: number; location: string }) {
+      const { seedSecondInventoryLot } = require('./purchase_order/reservation_helper');
+      return await seedSecondInventoryLot(params.product_id, params.quantity, params.location);
+    },
+    async 'db:seedSecondProduct'(params: { quantity: number }) {
+      const { seedSecondProduct } = require('./purchase_order/reservation_helper');
+      return await seedSecondProduct(params.quantity);
+    },
+    async 'db:setupPurchasePerItemSingleApprovalFlow'() {
+      const { setupPurchasePerItemSingleApprovalFlow } = require('./purchase_order/reservation_helper');
+      return await setupPurchasePerItemSingleApprovalFlow();
+    },
+    async 'db:getPurchasePerItemsForOrder'(params: { purchase_order_id: string }) {
+      const { getPurchasePerItemsForOrder } = require('./purchase_order/reservation_helper');
+      return await getPurchasePerItemsForOrder(params.purchase_order_id);
+    },
+    async 'db:getPurchasePerItemById'(params: { id: string }) {
+      const { getPurchasePerItemById } = require('./purchase_order/reservation_helper');
+      return await getPurchasePerItemById(params.id);
+    },
+    async 'db:getPurchasePerItemChildren'(params: { parentId: string }) {
+      const { getPurchasePerItemChildren } = require('./purchase_order/reservation_helper');
+      return await getPurchasePerItemChildren(params.parentId);
+    },
   };
 }
