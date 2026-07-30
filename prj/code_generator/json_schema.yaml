@@ -448,3 +448,603 @@ definitions:
         items:
           $ref: "#/definitions/dashboard_widget"
 
+  # ============================================================
+  # Inventory management (procure-to-receive)
+  # ============================================================
+  # Derived from prj/spec/inventory-er-diagram.mermaid. See the matching
+  # section at the bottom of prj/prisma/schema.prisma for the two deliberate
+  # deviations from the diagram (decimal -> Int, and createdById /
+  # receivedById / recordedById folded into the built-in creator_id).
+  #
+  # Line entities (purchase_order_line, asn_line, goods_receipt_line) carry
+  # their own x-generate because other entities reference them by FK, and
+  # schema-yaml-configuration.md §15.9 forbids a FK targeting an embedded
+  # child. Consequence (§7.3 Rule 1): a header's line list renders read-only
+  # on the header page; lines are created and edited on their own pages.
+
+  unit_of_measure:
+    x-generate:
+      list: true
+      view: true
+      new: true
+      edit: true
+      delete: true
+      invalidate: false
+      api: true
+      test: true
+      search: true
+    x-import-key: [code]
+    x-display:
+      table:
+        - code:
+            primary: true
+            width: 120
+        - name:
+            width: 240
+    fields:
+      code: {}
+      name: {}
+
+  item:
+    x-generate:
+      list: true
+      view: true
+      new: true
+      edit: true
+      delete: true
+      invalidate: false
+      api: true
+      test: true
+      search: true
+    x-import-key: [sku]
+    x-display:
+      table:
+        - sku:
+            primary: true
+            width: 160
+        - name:
+            width: 260
+        - unit_of_measure:
+            width: 140
+        - is_lot_tracked:
+            width: 130
+      dashboard: true
+    fields:
+      sku: {}
+      name: {}
+      description:
+        x-ui:
+          rows: 3
+      is_lot_tracked:
+        default: false
+      is_serial_tracked:
+        default: false
+      shelf_life_days: {}
+    properties:
+      unit_of_measure:
+        $ref: "#/definitions/unit_of_measure"
+
+  location:
+    x-generate:
+      list: true
+      view: true
+      new: true
+      edit: true
+      delete: true
+      invalidate: false
+      api: true
+      test: true
+      search: true
+    x-import-key: [code]
+    x-relationships:
+      bins:
+        type: one-to-many
+        target: bin
+        labelField: code
+    x-display:
+      table:
+        - code:
+            primary: true
+            width: 120
+        - name:
+            width: 240
+        - type:
+            width: 180
+    fields:
+      code: {}
+      name: {}
+      type:
+        enum:
+          - WAREHOUSE
+          - STORE
+          - DISTRIBUTION_CENTER
+          - SUPPLIER_SITE
+        default: WAREHOUSE
+    required:
+      - bins
+    properties:
+      bins:
+        type: array
+        x-outputType: list
+        items:
+          $ref: "#/definitions/bin"
+
+  bin:
+    x-generate:
+      list: true
+      view: true
+      new: true
+      edit: true
+      delete: true
+      invalidate: false
+      api: true
+      test: true
+      search: true
+    x-display:
+      table:
+        - code:
+            primary: true
+            width: 140
+        - name:
+            width: 200
+        - location:
+            width: 180
+        - zone:
+            width: 160
+    fields:
+      code: {}
+      name: {}
+      zone:
+        enum:
+          - RECEIVING
+          - STORAGE
+          - PICKING
+          - QUARANTINE
+          - SHIPPING
+        default: STORAGE
+    properties:
+      location:
+        $ref: "#/definitions/location"
+
+  supplier:
+    x-generate:
+      list: true
+      view: true
+      new: true
+      edit: true
+      delete: true
+      invalidate: false
+      api: true
+      test: true
+      search: true
+    x-import-key: [code]
+    x-display:
+      table:
+        - code:
+            primary: true
+            width: 140
+        - name:
+            width: 280
+    fields:
+      code: {}
+      name: {}
+
+  purchase_order:
+    x-generate:
+      list: true
+      view: true
+      new: true
+      edit: true
+      delete: true
+      invalidate: false
+      api: true
+      test: true
+      search: true
+    x-import-key: [po_number]
+    x-relationships:
+      purchase_order_lines:
+        type: one-to-many
+        target: purchase_order_line
+        labelField: item.sku
+    x-display:
+      table:
+        - po_number:
+            primary: true
+            width: 160
+        - name:
+            width: 220
+        - supplier:
+            width: 190
+        - status:
+            width: 170
+        - requested_delivery_date:
+            width: 170
+      dashboard: true
+    fields:
+      po_number: {}
+      name: {}
+      status:
+        enum:
+          - DRAFT
+          - APPROVED
+          - SENT
+          - ACKNOWLEDGED
+          - PARTIALLY_RECEIVED
+          - CLOSED
+          - CANCELLED
+        default: DRAFT
+      requested_delivery_date:
+        format: date
+      confirmed_delivery_date:
+        format: date
+      currency:
+        default: USD
+    required:
+      - purchase_order_lines
+    properties:
+      supplier:
+        $ref: "#/definitions/supplier"
+      purchase_order_lines:
+        type: array
+        x-outputType: list
+        items:
+          $ref: "#/definitions/purchase_order_line"
+
+  purchase_order_line:
+    x-generate:
+      list: true
+      view: true
+      new: true
+      edit: true
+      delete: true
+      invalidate: false
+      api: true
+      test: true
+      search: false
+    x-display:
+      table:
+        - item:
+            primary: true
+            width: 180
+        - purchase_order:
+            width: 160
+        - quantity_ordered:
+            width: 150
+        - unit_price:
+            width: 150
+        - status:
+            width: 180
+    fields:
+      quantity_ordered: {}
+      unit_price: {}
+      requested_delivery_date:
+        format: date
+      status:
+        enum:
+          - OPEN
+          - PARTIALLY_RECEIVED
+          - FULFILLED
+          - CANCELLED
+        default: OPEN
+      purchase_order_id:
+        x-relationship:
+          labelField: po_number
+      item_id:
+        x-relationship:
+          labelField: sku
+    properties:
+      purchase_order:
+        $ref: "#/definitions/purchase_order"
+      item:
+        $ref: "#/definitions/item"
+      unit_of_measure:
+        $ref: "#/definitions/unit_of_measure"
+
+  asn:
+    x-generate:
+      list: true
+      view: true
+      new: true
+      edit: true
+      delete: true
+      invalidate: false
+      api: true
+      test: true
+      search: true
+    x-import-key: [asn_number]
+    x-relationships:
+      asn_lines:
+        type: one-to-many
+        target: asn_line
+        labelField: item.sku
+    x-display:
+      table:
+        - asn_number:
+            primary: true
+            width: 160
+        - name:
+            width: 220
+        - supplier:
+            width: 190
+        - status:
+            width: 160
+        - expected_arrival_at:
+            width: 190
+      dashboard: true
+    fields:
+      asn_number: {}
+      name: {}
+      carrier: {}
+      tracking_number: {}
+      shipped_at: {}
+      expected_arrival_at: {}
+      status:
+        enum:
+          - PENDING
+          - SHIPPED
+          - IN_TRANSIT
+          - ARRIVED
+          - RECEIVED
+          - CANCELLED
+        default: PENDING
+    required:
+      - asn_lines
+    properties:
+      supplier:
+        $ref: "#/definitions/supplier"
+      asn_lines:
+        type: array
+        x-outputType: list
+        items:
+          $ref: "#/definitions/asn_line"
+
+  asn_line:
+    x-generate:
+      list: true
+      view: true
+      new: true
+      edit: true
+      delete: true
+      invalidate: false
+      api: true
+      test: true
+      search: false
+    x-display:
+      table:
+        - item:
+            primary: true
+            width: 180
+        - asn:
+            width: 160
+        - quantity_shipped:
+            width: 150
+        - lot_number:
+            width: 150
+    fields:
+      quantity_shipped: {}
+      lot_number: {}
+      expiry_date:
+        format: date
+      asn_id:
+        x-relationship:
+          labelField: asn_number
+      purchase_order_line_id:
+        x-relationship:
+          labelField:
+            - purchase_order.po_number
+            - item.sku
+      item_id:
+        x-relationship:
+          labelField: sku
+    properties:
+      asn:
+        $ref: "#/definitions/asn"
+      purchase_order_line:
+        $ref: "#/definitions/purchase_order_line"
+      item:
+        $ref: "#/definitions/item"
+      unit_of_measure:
+        $ref: "#/definitions/unit_of_measure"
+
+  goods_receipt:
+    x-generate:
+      list: true
+      view: true
+      new: true
+      edit: true
+      delete: true
+      invalidate: false
+      api: true
+      test: true
+      search: true
+    x-import-key: [receipt_number]
+    x-relationships:
+      goods_receipt_lines:
+        type: one-to-many
+        target: goods_receipt_line
+        labelField: item.sku
+    x-display:
+      table:
+        - receipt_number:
+            primary: true
+            width: 170
+        - name:
+            width: 220
+        - supplier:
+            width: 180
+        - location:
+            width: 170
+        - status:
+            width: 150
+        - received_at:
+            width: 190
+      dashboard: true
+    fields:
+      receipt_number: {}
+      name: {}
+      received_at: {}
+      status:
+        enum:
+          - DRAFT
+          - POSTED
+          - COMPLETED
+          - CANCELLED
+        default: DRAFT
+      notes:
+        x-ui:
+          rows: 3
+    required:
+      - goods_receipt_lines
+    properties:
+      supplier:
+        $ref: "#/definitions/supplier"
+      location:
+        $ref: "#/definitions/location"
+      goods_receipt_lines:
+        type: array
+        x-outputType: list
+        items:
+          $ref: "#/definitions/goods_receipt_line"
+
+  goods_receipt_line:
+    x-generate:
+      list: true
+      view: true
+      new: true
+      edit: true
+      delete: true
+      invalidate: false
+      api: true
+      test: true
+      search: false
+    x-display:
+      table:
+        - item:
+            primary: true
+            width: 180
+        - goods_receipt:
+            width: 170
+        - quantity_received:
+            width: 160
+        - status:
+            width: 170
+        - destination_bin:
+            width: 160
+    fields:
+      quantity_received: {}
+      lot_number: {}
+      expiry_date:
+        format: date
+      status:
+        enum:
+          - RECEIVED
+          - INSPECTING
+          - ACCEPTED
+          - REJECTED
+          - PUT_AWAY
+        default: RECEIVED
+      discrepancy_reason: {}
+      goods_receipt_id:
+        x-relationship:
+          labelField: receipt_number
+      purchase_order_line_id:
+        x-relationship:
+          labelField:
+            - purchase_order.po_number
+            - item.sku
+      asn_line_id:
+        x-relationship:
+          labelField:
+            - asn.asn_number
+            - item.sku
+      item_id:
+        x-relationship:
+          labelField: sku
+      destination_bin_id:
+        x-relationship:
+          labelField: code
+    properties:
+      goods_receipt:
+        $ref: "#/definitions/goods_receipt"
+      purchase_order_line:
+        $ref: "#/definitions/purchase_order_line"
+      asn_line:
+        $ref: "#/definitions/asn_line"
+      item:
+        $ref: "#/definitions/item"
+      unit_of_measure:
+        $ref: "#/definitions/unit_of_measure"
+      destination_bin:
+        $ref: "#/definitions/bin"
+
+  inventory_transaction:
+    x-generate:
+      list: true
+      view: true
+      new: true
+      edit: true
+      delete: true
+      invalidate: false
+      api: true
+      test: true
+      search: false
+    x-display:
+      table:
+        - item:
+            primary: true
+            width: 180
+        - location:
+            width: 170
+        - transaction_type:
+            width: 180
+        - quantity_change:
+            width: 150
+        - occurred_at:
+            width: 190
+      dashboard: true
+    fields:
+      quantity_change: {}
+      transaction_type:
+        enum:
+          - RECEIPT
+          - ISSUE
+          - TRANSFER_IN
+          - TRANSFER_OUT
+          - ADJUSTMENT
+          - WRITE_OFF
+          - RETURN
+        default: RECEIPT
+      reason: {}
+      lot_number: {}
+      serial_number: {}
+      expiry_date:
+        format: date
+      source_document_type: {}
+      source_document_ref: {}
+      occurred_at: {}
+      item_id:
+        x-relationship:
+          labelField: sku
+      bin_id:
+        x-relationship:
+          labelField: code
+      goods_receipt_id:
+        x-relationship:
+          labelField: receipt_number
+      goods_receipt_line_id:
+        x-relationship:
+          labelField:
+            - goods_receipt.receipt_number
+            - item.sku
+    properties:
+      item:
+        $ref: "#/definitions/item"
+      location:
+        $ref: "#/definitions/location"
+      bin:
+        $ref: "#/definitions/bin"
+      goods_receipt:
+        $ref: "#/definitions/goods_receipt"
+      goods_receipt_line:
+        $ref: "#/definitions/goods_receipt_line"
+

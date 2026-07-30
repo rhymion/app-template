@@ -102,6 +102,32 @@ model user {
   notifications             notification[]      @relation("NotificationUser")
   anonymized_at             DateTime?            // Timestamp when PII was scrubbed (GDPR anonymization)
 
+  // Inventory management (see "Inventory management models" at the end of this file)
+  created_unit_of_measures       unit_of_measure[]       @relation("UnitOfMeasureCreator")
+  updated_unit_of_measures       unit_of_measure[]       @relation("UnitOfMeasureUpdater")
+  created_items                  item[]                  @relation("ItemCreator")
+  updated_items                  item[]                  @relation("ItemUpdater")
+  created_locations              location[]              @relation("LocationCreator")
+  updated_locations              location[]              @relation("LocationUpdater")
+  created_bins                   bin[]                   @relation("BinCreator")
+  updated_bins                   bin[]                   @relation("BinUpdater")
+  created_suppliers              supplier[]              @relation("SupplierCreator")
+  updated_suppliers              supplier[]              @relation("SupplierUpdater")
+  created_purchase_orders        purchase_order[]        @relation("PurchaseOrderCreator")
+  updated_purchase_orders        purchase_order[]        @relation("PurchaseOrderUpdater")
+  created_purchase_order_lines   purchase_order_line[]   @relation("PurchaseOrderLineCreator")
+  updated_purchase_order_lines   purchase_order_line[]   @relation("PurchaseOrderLineUpdater")
+  created_asns                   asn[]                   @relation("AsnCreator")
+  updated_asns                   asn[]                   @relation("AsnUpdater")
+  created_asn_lines              asn_line[]              @relation("AsnLineCreator")
+  updated_asn_lines              asn_line[]              @relation("AsnLineUpdater")
+  created_goods_receipts         goods_receipt[]         @relation("GoodsReceiptCreator")
+  updated_goods_receipts         goods_receipt[]         @relation("GoodsReceiptUpdater")
+  created_goods_receipt_lines    goods_receipt_line[]    @relation("GoodsReceiptLineCreator")
+  updated_goods_receipt_lines    goods_receipt_line[]    @relation("GoodsReceiptLineUpdater")
+  created_inventory_transactions inventory_transaction[] @relation("InventoryTransactionCreator")
+  updated_inventory_transactions inventory_transaction[] @relation("InventoryTransactionUpdater")
+
   @@index([api_key])
   @@index([creator_id])
   @@index([tenant_id])
@@ -475,4 +501,415 @@ model VerificationToken {
   expires    DateTime
 
   @@unique([identifier, token])
+}
+
+// ============================================================
+// Inventory management models (procure-to-receive)
+// ============================================================
+// Derived from prj/spec/inventory-er-diagram.mermaid.
+//
+// Two deliberate deviations from the ER diagram, both forced by / preferred
+// because of framework constraints:
+//
+//  1. `decimal` → `Int`.  The generator's Prisma→JSON scalar derivation
+//     (`code_generator/schema_deriver.py` `_SCALAR_JSON_TYPE`) supports only
+//     String / Boolean / Int / DateTime / native enums; a `Decimal` column
+//     aborts `generate-code` with `SchemaDivergenceError`.  Quantities are
+//     therefore whole stock-keeping units and `unit_price` is stored in
+//     minor currency units (e.g. cents), not major units.
+//
+//  2. The diagram's `createdById` (purchase_order), `receivedById`
+//     (goods_receipt) and `recordedById` (inventory_transaction) columns all
+//     map onto the framework's built-in `creator_id` audit column instead of
+//     a second FK to `user`; likewise `recordedAt` maps onto `created_at`.
+
+enum LocationType {
+  WAREHOUSE
+  STORE
+  DISTRIBUTION_CENTER
+  SUPPLIER_SITE
+}
+
+enum BinZone {
+  RECEIVING
+  STORAGE
+  PICKING
+  QUARANTINE
+  SHIPPING
+}
+
+enum PurchaseOrderStatus {
+  DRAFT
+  APPROVED
+  SENT
+  ACKNOWLEDGED
+  PARTIALLY_RECEIVED
+  CLOSED
+  CANCELLED
+}
+
+enum PurchaseOrderLineStatus {
+  OPEN
+  PARTIALLY_RECEIVED
+  FULFILLED
+  CANCELLED
+}
+
+enum AsnStatus {
+  PENDING
+  SHIPPED
+  IN_TRANSIT
+  ARRIVED
+  RECEIVED
+  CANCELLED
+}
+
+enum GoodsReceiptStatus {
+  DRAFT
+  POSTED
+  COMPLETED
+  CANCELLED
+}
+
+enum GoodsReceiptLineStatus {
+  RECEIVED
+  INSPECTING
+  ACCEPTED
+  REJECTED
+  PUT_AWAY
+}
+
+enum InventoryTransactionType {
+  RECEIPT
+  ISSUE
+  TRANSFER_IN
+  TRANSFER_OUT
+  ADJUSTMENT
+  WRITE_OFF
+  RETURN
+}
+
+model unit_of_measure {
+  id         String   @id @default(cuid())
+  code       String   @unique
+  name       String
+  created_at DateTime @default(now()) @db.Timestamptz(0)
+  updated_at DateTime @updatedAt @db.Timestamptz(0)
+  creator_id String
+  creator    user     @relation("UnitOfMeasureCreator", fields: [creator_id], references: [id])
+  updater_id String
+  updater    user     @relation("UnitOfMeasureUpdater", fields: [updater_id], references: [id])
+
+  items                item[]                @relation("ItemUnitOfMeasure")
+  purchase_order_lines purchase_order_line[] @relation("PurchaseOrderLineUnitOfMeasure")
+  asn_lines            asn_line[]            @relation("AsnLineUnitOfMeasure")
+  goods_receipt_lines  goods_receipt_line[]  @relation("GoodsReceiptLineUnitOfMeasure")
+
+  @@index([creator_id])
+  @@index([updater_id])
+}
+
+model item {
+  id                 String          @id @default(cuid())
+  sku                String          @unique
+  name               String
+  description        String?
+  unit_of_measure_id String
+  unit_of_measure    unit_of_measure @relation("ItemUnitOfMeasure", fields: [unit_of_measure_id], references: [id], onDelete: Restrict)
+  is_lot_tracked     Boolean         @default(false)
+  is_serial_tracked  Boolean         @default(false)
+  shelf_life_days    Int?
+  created_at         DateTime        @default(now()) @db.Timestamptz(0)
+  updated_at         DateTime        @updatedAt @db.Timestamptz(0)
+  creator_id         String
+  creator            user            @relation("ItemCreator", fields: [creator_id], references: [id])
+  updater_id         String
+  updater            user            @relation("ItemUpdater", fields: [updater_id], references: [id])
+
+  purchase_order_lines   purchase_order_line[]   @relation("PurchaseOrderLineItem")
+  asn_lines              asn_line[]              @relation("AsnLineItem")
+  goods_receipt_lines    goods_receipt_line[]    @relation("GoodsReceiptLineItem")
+  inventory_transactions inventory_transaction[] @relation("InventoryTransactionItem")
+
+  @@index([creator_id])
+  @@index([updater_id])
+  @@index([unit_of_measure_id])
+}
+
+model location {
+  id         String       @id @default(cuid())
+  code       String       @unique
+  name       String
+  type       LocationType @default(WAREHOUSE)
+  created_at DateTime     @default(now()) @db.Timestamptz(0)
+  updated_at DateTime     @updatedAt @db.Timestamptz(0)
+  creator_id String
+  creator    user         @relation("LocationCreator", fields: [creator_id], references: [id])
+  updater_id String
+  updater    user         @relation("LocationUpdater", fields: [updater_id], references: [id])
+
+  bins                   bin[]                   @relation("BinLocation")
+  goods_receipts         goods_receipt[]         @relation("GoodsReceiptLocation")
+  inventory_transactions inventory_transaction[] @relation("InventoryTransactionLocation")
+
+  @@index([creator_id])
+  @@index([updater_id])
+}
+
+model bin {
+  id          String   @id @default(cuid())
+  location_id String
+  location    location @relation("BinLocation", fields: [location_id], references: [id], onDelete: Cascade)
+  code        String
+  name        String
+  zone        BinZone  @default(STORAGE)
+  created_at  DateTime @default(now()) @db.Timestamptz(0)
+  updated_at  DateTime @updatedAt @db.Timestamptz(0)
+  creator_id  String
+  creator     user     @relation("BinCreator", fields: [creator_id], references: [id])
+  updater_id  String
+  updater     user     @relation("BinUpdater", fields: [updater_id], references: [id])
+
+  goods_receipt_lines    goods_receipt_line[]    @relation("GoodsReceiptLineDestinationBin")
+  inventory_transactions inventory_transaction[] @relation("InventoryTransactionBin")
+
+  @@unique([location_id, code])
+  @@index([creator_id])
+  @@index([updater_id])
+  @@index([location_id])
+}
+
+model supplier {
+  id         String   @id @default(cuid())
+  code       String   @unique
+  name       String
+  created_at DateTime @default(now()) @db.Timestamptz(0)
+  updated_at DateTime @updatedAt @db.Timestamptz(0)
+  creator_id String
+  creator    user     @relation("SupplierCreator", fields: [creator_id], references: [id])
+  updater_id String
+  updater    user     @relation("SupplierUpdater", fields: [updater_id], references: [id])
+
+  purchase_orders purchase_order[] @relation("PurchaseOrderSupplier")
+  asns            asn[]            @relation("AsnSupplier")
+  goods_receipts  goods_receipt[]  @relation("GoodsReceiptSupplier")
+
+  @@index([creator_id])
+  @@index([updater_id])
+}
+
+model purchase_order {
+  id                       String              @id @default(cuid())
+  po_number                String              @unique
+  name                     String
+  supplier_id              String
+  supplier                 supplier            @relation("PurchaseOrderSupplier", fields: [supplier_id], references: [id], onDelete: Restrict)
+  status                   PurchaseOrderStatus @default(DRAFT)
+  requested_delivery_date  DateTime?           @db.Date
+  confirmed_delivery_date  DateTime?           @db.Date
+  currency                 String              @default("USD")
+  created_at               DateTime            @default(now()) @db.Timestamptz(0)
+  updated_at               DateTime            @updatedAt @db.Timestamptz(0)
+  creator_id               String
+  creator                  user                @relation("PurchaseOrderCreator", fields: [creator_id], references: [id])
+  updater_id               String
+  updater                  user                @relation("PurchaseOrderUpdater", fields: [updater_id], references: [id])
+
+  purchase_order_lines purchase_order_line[] @relation("PurchaseOrderLinePurchaseOrder")
+
+  @@index([creator_id])
+  @@index([updater_id])
+  @@index([supplier_id])
+}
+
+model purchase_order_line {
+  id                      String                  @id @default(cuid())
+  purchase_order_id       String
+  purchase_order          purchase_order          @relation("PurchaseOrderLinePurchaseOrder", fields: [purchase_order_id], references: [id], onDelete: Cascade)
+  item_id                 String
+  item                    item                    @relation("PurchaseOrderLineItem", fields: [item_id], references: [id], onDelete: Restrict)
+  quantity_ordered        Int
+  unit_of_measure_id      String
+  unit_of_measure         unit_of_measure         @relation("PurchaseOrderLineUnitOfMeasure", fields: [unit_of_measure_id], references: [id], onDelete: Restrict)
+  // Minor currency units (e.g. cents) — see the Decimal note at the top of this section.
+  unit_price              Int
+  requested_delivery_date DateTime?               @db.Date
+  status                  PurchaseOrderLineStatus @default(OPEN)
+  created_at              DateTime                @default(now()) @db.Timestamptz(0)
+  updated_at              DateTime                @updatedAt @db.Timestamptz(0)
+  creator_id              String
+  creator                 user                    @relation("PurchaseOrderLineCreator", fields: [creator_id], references: [id])
+  updater_id              String
+  updater                 user                    @relation("PurchaseOrderLineUpdater", fields: [updater_id], references: [id])
+
+  asn_lines           asn_line[]           @relation("AsnLinePurchaseOrderLine")
+  goods_receipt_lines goods_receipt_line[] @relation("GoodsReceiptLinePurchaseOrderLine")
+
+  @@index([creator_id])
+  @@index([updater_id])
+  @@index([purchase_order_id])
+  @@index([item_id])
+  @@index([unit_of_measure_id])
+}
+
+model asn {
+  id                 String    @id @default(cuid())
+  asn_number         String    @unique
+  name               String
+  supplier_id        String
+  supplier           supplier  @relation("AsnSupplier", fields: [supplier_id], references: [id], onDelete: Restrict)
+  carrier            String?
+  tracking_number    String?
+  shipped_at         DateTime? @db.Timestamptz(0)
+  expected_arrival_at DateTime? @db.Timestamptz(0)
+  status             AsnStatus @default(PENDING)
+  created_at         DateTime  @default(now()) @db.Timestamptz(0)
+  updated_at         DateTime  @updatedAt @db.Timestamptz(0)
+  creator_id         String
+  creator            user      @relation("AsnCreator", fields: [creator_id], references: [id])
+  updater_id         String
+  updater            user      @relation("AsnUpdater", fields: [updater_id], references: [id])
+
+  asn_lines asn_line[] @relation("AsnLineAsn")
+
+  @@index([creator_id])
+  @@index([updater_id])
+  @@index([supplier_id])
+}
+
+model asn_line {
+  id                     String              @id @default(cuid())
+  asn_id                 String
+  asn                    asn                 @relation("AsnLineAsn", fields: [asn_id], references: [id], onDelete: Cascade)
+  purchase_order_line_id String
+  purchase_order_line    purchase_order_line @relation("AsnLinePurchaseOrderLine", fields: [purchase_order_line_id], references: [id], onDelete: Restrict)
+  item_id                String
+  item                   item                @relation("AsnLineItem", fields: [item_id], references: [id], onDelete: Restrict)
+  quantity_shipped       Int
+  unit_of_measure_id     String
+  unit_of_measure        unit_of_measure     @relation("AsnLineUnitOfMeasure", fields: [unit_of_measure_id], references: [id], onDelete: Restrict)
+  lot_number             String?
+  expiry_date            DateTime?           @db.Date
+  created_at             DateTime            @default(now()) @db.Timestamptz(0)
+  updated_at             DateTime            @updatedAt @db.Timestamptz(0)
+  creator_id             String
+  creator                user                @relation("AsnLineCreator", fields: [creator_id], references: [id])
+  updater_id             String
+  updater                user                @relation("AsnLineUpdater", fields: [updater_id], references: [id])
+
+  goods_receipt_lines goods_receipt_line[] @relation("GoodsReceiptLineAsnLine")
+
+  @@index([creator_id])
+  @@index([updater_id])
+  @@index([asn_id])
+  @@index([purchase_order_line_id])
+  @@index([item_id])
+  @@index([unit_of_measure_id])
+}
+
+model goods_receipt {
+  id              String             @id @default(cuid())
+  receipt_number  String             @unique
+  name            String
+  supplier_id     String
+  supplier        supplier           @relation("GoodsReceiptSupplier", fields: [supplier_id], references: [id], onDelete: Restrict)
+  location_id     String
+  location        location           @relation("GoodsReceiptLocation", fields: [location_id], references: [id], onDelete: Restrict)
+  received_at     DateTime           @db.Timestamptz(0)
+  status          GoodsReceiptStatus @default(DRAFT)
+  notes           String?
+  created_at      DateTime           @default(now()) @db.Timestamptz(0)
+  updated_at      DateTime           @updatedAt @db.Timestamptz(0)
+  creator_id      String
+  creator         user               @relation("GoodsReceiptCreator", fields: [creator_id], references: [id])
+  updater_id      String
+  updater         user               @relation("GoodsReceiptUpdater", fields: [updater_id], references: [id])
+
+  goods_receipt_lines    goods_receipt_line[]    @relation("GoodsReceiptLineGoodsReceipt")
+  inventory_transactions inventory_transaction[] @relation("InventoryTransactionGoodsReceipt")
+
+  @@index([creator_id])
+  @@index([updater_id])
+  @@index([supplier_id])
+  @@index([location_id])
+}
+
+model goods_receipt_line {
+  id                     String                 @id @default(cuid())
+  goods_receipt_id       String
+  goods_receipt          goods_receipt          @relation("GoodsReceiptLineGoodsReceipt", fields: [goods_receipt_id], references: [id], onDelete: Cascade)
+  purchase_order_line_id String?
+  purchase_order_line    purchase_order_line?   @relation("GoodsReceiptLinePurchaseOrderLine", fields: [purchase_order_line_id], references: [id], onDelete: SetNull)
+  asn_line_id            String?
+  asn_line               asn_line?              @relation("GoodsReceiptLineAsnLine", fields: [asn_line_id], references: [id], onDelete: SetNull)
+  item_id                String
+  item                   item                   @relation("GoodsReceiptLineItem", fields: [item_id], references: [id], onDelete: Restrict)
+  quantity_received      Int
+  unit_of_measure_id     String
+  unit_of_measure        unit_of_measure        @relation("GoodsReceiptLineUnitOfMeasure", fields: [unit_of_measure_id], references: [id], onDelete: Restrict)
+  lot_number             String?
+  expiry_date            DateTime?              @db.Date
+  destination_bin_id     String?
+  destination_bin        bin?                   @relation("GoodsReceiptLineDestinationBin", fields: [destination_bin_id], references: [id], onDelete: SetNull)
+  status                 GoodsReceiptLineStatus @default(RECEIVED)
+  discrepancy_reason     String?
+  created_at             DateTime               @default(now()) @db.Timestamptz(0)
+  updated_at             DateTime               @updatedAt @db.Timestamptz(0)
+  creator_id             String
+  creator                user                   @relation("GoodsReceiptLineCreator", fields: [creator_id], references: [id])
+  updater_id             String
+  updater                user                   @relation("GoodsReceiptLineUpdater", fields: [updater_id], references: [id])
+
+  inventory_transactions inventory_transaction[] @relation("InventoryTransactionGoodsReceiptLine")
+
+  @@index([creator_id])
+  @@index([updater_id])
+  @@index([goods_receipt_id])
+  @@index([purchase_order_line_id])
+  @@index([asn_line_id])
+  @@index([item_id])
+  @@index([unit_of_measure_id])
+  @@index([destination_bin_id])
+}
+
+model inventory_transaction {
+  id                     String                   @id @default(cuid())
+  item_id                String
+  item                   item                     @relation("InventoryTransactionItem", fields: [item_id], references: [id], onDelete: Restrict)
+  location_id            String
+  location               location                 @relation("InventoryTransactionLocation", fields: [location_id], references: [id], onDelete: Restrict)
+  bin_id                 String?
+  bin                    bin?                     @relation("InventoryTransactionBin", fields: [bin_id], references: [id], onDelete: SetNull)
+  // Signed: positive = stock in, negative = stock out. Whole stock-keeping units.
+  quantity_change        Int
+  transaction_type       InventoryTransactionType @default(RECEIPT)
+  reason                 String?
+  lot_number             String?
+  serial_number          String?
+  expiry_date            DateTime?                @db.Date
+  // Concrete source-document links for receipt-generated movements.
+  goods_receipt_id       String?
+  goods_receipt          goods_receipt?           @relation("InventoryTransactionGoodsReceipt", fields: [goods_receipt_id], references: [id], onDelete: SetNull)
+  goods_receipt_line_id  String?
+  goods_receipt_line     goods_receipt_line?      @relation("InventoryTransactionGoodsReceiptLine", fields: [goods_receipt_line_id], references: [id], onDelete: SetNull)
+  // Free-form polymorphic source reference for movements originating outside
+  // the receiving flow (issues, adjustments, write-offs, returns).
+  source_document_type   String?
+  source_document_ref    String?
+  occurred_at            DateTime                 @db.Timestamptz(0)
+  created_at             DateTime                 @default(now()) @db.Timestamptz(0)
+  updated_at             DateTime                 @updatedAt @db.Timestamptz(0)
+  creator_id             String
+  creator                user                     @relation("InventoryTransactionCreator", fields: [creator_id], references: [id])
+  updater_id             String
+  updater                user                     @relation("InventoryTransactionUpdater", fields: [updater_id], references: [id])
+
+  @@index([creator_id])
+  @@index([updater_id])
+  @@index([item_id])
+  @@index([location_id])
+  @@index([bin_id])
+  @@index([goods_receipt_id])
+  @@index([goods_receipt_line_id])
+  @@index([item_id, location_id, occurred_at])
 }
