@@ -70,3 +70,15 @@ the user follows up with adjustments after reviewing the generated application.
 - Schema syntax reference: `app-generator/docs/knowledge/schema-yaml-configuration.md`
 - After creating or updating a schema, run `npm run generate-code` to regenerate code.
 - Do **not** edit anything inside `app-generator/`.
+
+## Completion gate
+
+Run in this order (mirrors `app-generator/.claude/commands/generate-schema.md §Completion gate`):
+
+1. `npm run test:e2e:build`  — prj:sync + docker:up:test + generate-code + db:push + db:generate + db:seed-tenant + build
+2. `npm --prefix app-generator run check:generated` — generated code matches templates/schema
+3. `npm run test:e2e:cy:api` — API Cypress specs only
+4. `npm run lint`
+5. `npm --prefix app-generator audit --omit=dev --audit-level=high`
+
+(`npm --prefix app-generator run test:pytest` and `npm --prefix app-generator run test` are skipped — Python generators and component code unchanged.)
