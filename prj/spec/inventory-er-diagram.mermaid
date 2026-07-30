@@ -1,0 +1,170 @@
+erDiagram
+    Item ||--o{ PurchaseOrderLine : "ordered as"
+    Item ||--o{ AsnLine : "shipped as"
+    Item ||--o{ GoodsReceiptLine : "received as"
+    Item ||--o{ InventoryTransaction : "moves"
+    Item }o--|| UnitOfMeasure : "measured in"
+
+    Location ||--o{ GoodsReceipt : "receives at"
+    Location ||--o{ InventoryTransaction : "occurs at"
+    Location ||--o{ Bin : "contains"
+    Bin ||--o{ GoodsReceiptLine : "put away to"
+    Bin ||--o{ InventoryTransaction : "specific to"
+
+    Supplier ||--o{ PurchaseOrder : "supplies"
+    Supplier ||--o{ Asn : "ships"
+    Supplier ||--o{ GoodsReceipt : "delivers"
+
+    User ||--o{ PurchaseOrder : "created by"
+    User ||--o{ GoodsReceipt : "received by"
+    User ||--o{ InventoryTransaction : "recorded by"
+
+    PurchaseOrder ||--|{ PurchaseOrderLine : "has"
+    Asn ||--|{ AsnLine : "has"
+    GoodsReceipt ||--|{ GoodsReceiptLine : "has"
+
+    PurchaseOrderLine ||--o{ AsnLine : "fulfilled by"
+    PurchaseOrderLine ||--o{ GoodsReceiptLine : "received against"
+    AsnLine ||--o{ GoodsReceiptLine : "received against"
+
+    GoodsReceipt ||--o{ InventoryTransaction : "generates"
+    GoodsReceiptLine ||--o{ InventoryTransaction : "generates"
+
+    Item {
+        string id PK
+        string sku UK
+        string name
+        string description
+        string unitOfMeasureId FK
+        boolean isLotTracked
+        boolean isSerialTracked
+        int shelfLifeDays
+        datetime createdAt
+        datetime updatedAt
+    }
+
+    UnitOfMeasure {
+        string id PK
+        string code
+        string name
+    }
+
+    Location {
+        string id PK
+        string code UK
+        string name
+        string type "WAREHOUSE, STORE, etc."
+    }
+
+    Bin {
+        string id PK
+        string locationId FK
+        string code
+        string zone "RECEIVING, STORAGE, QUARANTINE, etc."
+    }
+
+    Supplier {
+        string id PK
+        string code UK
+        string name
+    }
+
+    User {
+        string id PK
+        string email UK
+        string name
+    }
+
+    PurchaseOrder {
+        string id PK
+        string poNumber UK
+        string supplierId FK
+        string createdById FK
+        string status "DRAFT, APPROVED, SENT, ACKNOWLEDGED, PARTIALLY_RECEIVED, CLOSED, CANCELLED"
+        date requestedDeliveryDate
+        date confirmedDeliveryDate
+        string currency
+        datetime createdAt
+        datetime updatedAt
+    }
+
+    PurchaseOrderLine {
+        string id PK
+        string purchaseOrderId FK
+        string itemId FK
+        decimal quantityOrdered
+        string unitOfMeasureId FK
+        decimal unitPrice
+        date requestedDeliveryDate
+        string status "OPEN, PARTIALLY_RECEIVED, FULFILLED, CANCELLED"
+    }
+
+    Asn {
+        string id PK
+        string asnNumber UK
+        string supplierId FK
+        string carrier
+        string trackingNumber
+        datetime shippedAt
+        datetime expectedArrivalAt
+        string status "PENDING, SHIPPED, IN_TRANSIT, ARRIVED, RECEIVED, CANCELLED"
+        datetime createdAt
+        datetime updatedAt
+    }
+
+    AsnLine {
+        string id PK
+        string asnId FK
+        string purchaseOrderLineId FK
+        string itemId FK
+        decimal quantityShipped
+        string unitOfMeasureId FK
+        string lotNumber
+        date expiryDate
+    }
+
+    GoodsReceipt {
+        string id PK
+        string receiptNumber UK
+        string supplierId FK
+        string locationId FK
+        string receivedById FK
+        datetime receivedAt
+        string status "DRAFT, POSTED, COMPLETED, CANCELLED"
+        string notes
+        datetime createdAt
+        datetime updatedAt
+    }
+
+    GoodsReceiptLine {
+        string id PK
+        string goodsReceiptId FK
+        string purchaseOrderLineId FK "nullable"
+        string asnLineId FK "nullable"
+        string itemId FK
+        decimal quantityReceived
+        string unitOfMeasureId FK
+        string lotNumber "nullable"
+        date expiryDate "nullable"
+        string destinationBinId FK "nullable"
+        string status "RECEIVED, INSPECTING, ACCEPTED, REJECTED, PUT_AWAY"
+        string discrepancyReason "nullable"
+    }
+
+    InventoryTransaction {
+        string id PK
+        string itemId FK
+        string locationId FK
+        string binId FK "nullable"
+        decimal quantityChange "signed +/-"
+        string transactionType "RECEIPT, ISSUE, TRANSFER_IN, TRANSFER_OUT, ADJUSTMENT, WRITE_OFF, RETURN"
+        string reason "nullable, for adjustments"
+        string lotNumber "nullable"
+        string serialNumber "nullable"
+        date expiryDate "nullable"
+        string sourceDocumentType "polymorphic ref"
+        string sourceDocumentId "polymorphic ref"
+        datetime occurredAt
+        datetime recordedAt
+        string createdById FK
+    }
