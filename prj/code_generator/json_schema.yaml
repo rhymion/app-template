@@ -356,12 +356,12 @@ definitions:
         x-relationship:
           labelField: [entity_name, approver_role.name]
       status:
-        default: Pending
+        default: pending
         enum:
-          - Pending
-          - Approved
-          - Rejected
-          - TerminalRejected
+          - pending
+          - approved
+          - rejected
+          - terminal_rejected
 
   approvable:
     x-generate:
@@ -417,11 +417,11 @@ definitions:
     fields:
       type:
         enum:
-          - Like
-          - Love
-          - Laugh
-          - Surprised
-          - Sad
+          - like
+          - love
+          - laugh
+          - surprised
+          - sad
       user_id:
         x-relationship: {}
       comment_id:
@@ -1044,13 +1044,13 @@ definitions:
         x-relationship: {}
       day_of_week:
         enum:
-          - Sunday
-          - Monday
-          - Tuesday
-          - Wednesday
-          - Thursday
-          - Friday
-          - Saturday
+          - sunday
+          - monday
+          - tuesday
+          - wednesday
+          - thursday
+          - friday
+          - saturday
       start_time:
         format: time
       end_time:
@@ -1091,9 +1091,9 @@ definitions:
       end_time: {}
       status:
         enum:
-          - Scheduled
-          - Approved
-          - Cancelled
+          - scheduled
+          - approved
+          - cancelled
 
     required:
       - user

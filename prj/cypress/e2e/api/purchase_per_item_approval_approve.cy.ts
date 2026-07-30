@@ -50,7 +50,7 @@ describe('API: Purchase Per Item — Approve / Ship (cmd_309 item3)', () => {
               })
               .then((approveRes) => {
                 expect(approveRes.status).to.eq(200);
-                expect(approveRes.body.status).to.eq('Approved'); // approved
+                expect(approveRes.body.status).to.eq('approved');
                 return cy.wrap({ item, orderId });
               });
           });
