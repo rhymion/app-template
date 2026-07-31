@@ -582,6 +582,16 @@ echo "[Step 2] Injecting environment variables..."
 vercel_env_inject production
 vercel_env_inject preview
 
+# Remove any stale PRISMA_DATABASE_URL (Accelerate era) from Vercel project env.
+# Root cause (subtask_440a): a leftover .env.production.local PRISMA_DATABASE_URL
+# forces lib/prisma.ts onto the dead Accelerate/db.prisma.io branch, hiding the
+# Neon DATABASE_URL injected above. `.vercelignore` (subtask_440) stops new local
+# files from being uploaded, but this cleanup is what removes an already-set
+# Vercel project env var on repeated vercel-setup.sh runs — idempotent via
+# `|| true` since `vercel env rm` errors when the var is already absent.
+run vercel env rm PRISMA_DATABASE_URL production --yes 2>/dev/null || true
+run vercel env rm PRISMA_DATABASE_URL preview --yes 2>/dev/null || true
+
 # ── Step 3: First-time migration against production DB ─────────────────────
 # Deliberately NOT part of vercel.json buildCommand (see
 # docs/vercel-automation-design.md §3): a failed migration on every build
@@ -636,6 +646,23 @@ else
   DATABASE_URL="${DATABASE_URL_UNPOOLED_STAGING}" npm --prefix "${ROOT}/app-generator" run migrate:deploy
 fi
 echo "  OK: migration complete."
+
+# ── Step 5.5: Seed staging DB (bootstrap tenant/admin for preview environment) ─
+# Same rationale as Step 4 but for the staging/preview branch. Without this,
+# the first preview deploy hits an empty staging DB with no default tenant or
+# admin user, making the app unusable for manual preview testing.
+# Uses unpooled endpoint (same rationale as Steps 3/4/5: pgBouncer transaction
+# mode does not support Prisma seed's multi-statement patterns).
+# db:seed-tenant is idempotent (upsert on unique keys) — safe to re-run.
+echo ""
+echo "[Step 5.5] Seeding staging DB (db:seed-tenant)..."
+if [[ "$DRY_RUN" == "true" ]]; then
+  echo "[DRY-RUN] DATABASE_URL=<redacted> npm --prefix ${ROOT}/app-generator run db:seed-tenant"
+else
+  : "${DATABASE_URL_UNPOOLED_STAGING:?DATABASE_URL_UNPOOLED_STAGING is required in .env.production.local}"
+  DATABASE_URL="${DATABASE_URL_UNPOOLED_STAGING}" npm --prefix "${ROOT}/app-generator" run db:seed-tenant
+fi
+echo "  OK: staging seed complete."
 
 echo ""
 echo "================================================================="
