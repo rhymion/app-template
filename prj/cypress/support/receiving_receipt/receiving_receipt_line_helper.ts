@@ -106,7 +106,7 @@ export async function populateReceivingReceiptLineSingleApproval(
   const approvalRequests = [];
   for (const flowId of approvalFlowIds) {
     const ar = await prisma.approval_request.create({
-      data: { approvable_id: approvableItem.id, approval_flow_id: flowId, status: 'Pending' },
+      data: { approvable_id: approvableItem.id, approval_flow_id: flowId, status: 'pending' },
     });
     approvalRequests.push(ar);
   }

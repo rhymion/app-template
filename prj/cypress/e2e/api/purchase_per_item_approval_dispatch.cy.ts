@@ -55,7 +55,7 @@ describe('API: Purchase Per Item — Terminal Reject Reservation Release (cmd_30
                 })
                 .then((rejectRes) => {
                   expect(rejectRes.status).to.eq(200);
-                  expect(rejectRes.body.status).to.eq('TerminalRejected'); // terminal_rejected
+                  expect(rejectRes.body.status).to.eq('terminal_rejected');
                   return cy.wrap({ item, orderId });
                 });
             });
@@ -176,7 +176,7 @@ describe('API: Purchase Per Item — Terminal Reject Reservation Release (cmd_30
                     url: `/api/approval_request/${ar.id}/reject`,
                   }).then((rejectRes) => {
                     expect(rejectRes.status).to.eq(200);
-                    expect(rejectRes.body.status).to.eq('TerminalRejected');
+                    expect(rejectRes.body.status).to.eq('terminal_rejected');
 
                     cy.task<any>('db:getInventoryTransactionsByBridge', {
                       inventory_transactionable_id: child.inventory_transactionable_id,

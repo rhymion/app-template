@@ -270,10 +270,10 @@ model approval_flow {
 }
 
 enum ApprovalRequestStatus {
-  Pending
-  Approved
-  Rejected
-  TerminalRejected
+  pending
+  approved
+  rejected
+  terminal_rejected
 }
 
 model approval_request {
@@ -282,7 +282,7 @@ model approval_request {
   approvable         approvable         @relation(fields: [approvable_id], references: [id], onDelete: Cascade)
   approval_flow_id   String
   approval_flow      approval_flow      @relation(fields: [approval_flow_id], references: [id])
-  status             ApprovalRequestStatus @default(Pending)
+  status             ApprovalRequestStatus @default(pending)
   approval_histories approval_history[]
   created_at         DateTime           @default(now()) @db.Timestamptz(0)
   updated_at         DateTime           @updatedAt @db.Timestamptz(0)
@@ -428,11 +428,11 @@ model comment {
 }
 
 enum ReactionType {
-  Like
-  Love
-  Laugh
-  Surprised
-  Sad
+  like
+  love
+  laugh
+  surprised
+  sad
 }
 
 model reaction {
@@ -873,13 +873,13 @@ model booking {
 }
 
 enum DayOfWeek {
-  Sunday
-  Monday
-  Tuesday
-  Wednesday
-  Thursday
-  Friday
-  Saturday
+  sunday
+  monday
+  tuesday
+  wednesday
+  thursday
+  friday
+  saturday
 }
 
 model shift_template {
@@ -902,9 +902,9 @@ model shift_template {
 }
 
 enum ShiftStatus {
-  Scheduled
-  Approved
-  Cancelled
+  scheduled
+  approved
+  cancelled
 }
 
 model shift {
