@@ -181,6 +181,16 @@ AI が行う処理:
 > **注意:** 生成・編集されるファイルはすべて `prj/` 配下に保存されます。
 > `app-generator/` サブモジュールは変更は一時的なものです。
 
+**Claude Code の権限設定:** 本リポジトリには上記のゲートコマンドに必要な
+`permissions.allow`/`deny` 規則を含む `.claude/settings.json` を同梱しています。
+`app-generator/` は本チェックアウト内にネストされていますが、その
+`.claude/settings.json` はここでは**適用されません**——Claude Code は起動した
+ディレクトリの設定のみを読み込み、`app-generator/` は別のgitリポジトリ
+(submodule) だからです。詳細は
+[`app-generator/docs/knowledge/claude-code-settings-consumer-side.md`](app-generator/docs/knowledge/claude-code-settings-consumer-side.md)
+を参照してください(`bypassPermissions` 等、自分自身の権限モードを個人用の
+gitignore対象`.claude/settings.local.json`へ設定する方法も記載しています)。
+
 ---
 
 ## ベースプロジェクトとしての使い方

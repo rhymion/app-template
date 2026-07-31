@@ -181,6 +181,17 @@ The AI will:
 > **Note:** All generated and edited files are saved under `prj/`. The change in 
 > `app-generator/`submodule is temporary.
 
+**Claude Code permissions:** this repo ships a `.claude/settings.json` with
+the `permissions.allow`/`deny` rules needed for the gate commands above.
+`app-generator/`'s own `.claude/settings.json` does **not** apply here even
+though it's nested inside this checkout — Claude Code only reads settings
+from the directory you launched it from, and `app-generator/` is a separate
+git repository (a submodule). See
+[`app-generator/docs/knowledge/claude-code-settings-consumer-side.md`](app-generator/docs/knowledge/claude-code-settings-consumer-side.md)
+for the full explanation, including how to set your own permission mode
+(e.g. `bypassPermissions`) in a personal, gitignored
+`.claude/settings.local.json`.
+
 ---
 
 ## Usage as a Base Project
