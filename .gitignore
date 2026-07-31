@@ -9,6 +9,10 @@ package-lock.json
 # testing
 /coverage
 
+# Claude Code: personal, machine-specific permission overrides (defaultMode,
+# extra allow/deny rules). Never shared — see app-generator/docs/knowledge/claude-code-settings-consumer-side.md
+.claude/settings.local.json
+
 # next.js
 /.next/
 /out/
