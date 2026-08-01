@@ -555,11 +555,11 @@ definitions:
       name: {}
       type:
         enum:
-          - WAREHOUSE
-          - STORE
-          - DISTRIBUTION_CENTER
-          - SUPPLIER_SITE
-        default: WAREHOUSE
+          - warehouse
+          - store
+          - distribution_center
+          - supplier_site
+        default: warehouse
     required:
       - bins
     properties:
@@ -585,23 +585,20 @@ definitions:
         - code:
             primary: true
             width: 140
-        - name:
-            width: 200
         - location:
             width: 180
         - zone:
             width: 160
     fields:
       code: {}
-      name: {}
       zone:
         enum:
-          - RECEIVING
-          - STORAGE
-          - PICKING
-          - QUARANTINE
-          - SHIPPING
-        default: STORAGE
+          - receiving
+          - storage
+          - picking
+          - quarantine
+          - shipping
+        default: storage
     properties:
       location:
         $ref: "#/definitions/location"
@@ -651,8 +648,6 @@ definitions:
         - po_number:
             primary: true
             width: 160
-        - name:
-            width: 220
         - supplier:
             width: 190
         - status:
@@ -662,17 +657,16 @@ definitions:
       dashboard: true
     fields:
       po_number: {}
-      name: {}
       status:
         enum:
-          - DRAFT
-          - APPROVED
-          - SENT
-          - ACKNOWLEDGED
-          - PARTIALLY_RECEIVED
-          - CLOSED
-          - CANCELLED
-        default: DRAFT
+          - draft
+          - approved
+          - sent
+          - acknowledged
+          - partially_received
+          - closed
+          - cancelled
+        default: draft
       requested_delivery_date:
         format: date
       confirmed_delivery_date:
@@ -695,8 +689,8 @@ definitions:
       list: true
       view: true
       new: true
-      edit: true
-      delete: true
+      edit: false
+      delete: false
       invalidate: false
       api: true
       test: true
@@ -721,11 +715,11 @@ definitions:
         format: date
       status:
         enum:
-          - OPEN
-          - PARTIALLY_RECEIVED
-          - FULFILLED
-          - CANCELLED
-        default: OPEN
+          - open
+          - partially_received
+          - fulfilled
+          - cancelled
+        default: open
       purchase_order_id:
         x-relationship:
           labelField: po_number
@@ -780,13 +774,13 @@ definitions:
       expected_arrival_at: {}
       status:
         enum:
-          - PENDING
-          - SHIPPED
-          - IN_TRANSIT
-          - ARRIVED
-          - RECEIVED
-          - CANCELLED
-        default: PENDING
+          - pending
+          - shipped
+          - in_transit
+          - arrived
+          - received
+          - cancelled
+        default: pending
     required:
       - asn_lines
     properties:
@@ -803,8 +797,8 @@ definitions:
       list: true
       view: true
       new: true
-      edit: true
-      delete: true
+      edit: false
+      delete: false
       invalidate: false
       api: true
       test: true
@@ -885,11 +879,11 @@ definitions:
       received_at: {}
       status:
         enum:
-          - DRAFT
-          - POSTED
-          - COMPLETED
-          - CANCELLED
-        default: DRAFT
+          - draft
+          - posted
+          - completed
+          - cancelled
+        default: draft
       notes:
         x-ui:
           rows: 3
@@ -937,12 +931,12 @@ definitions:
         format: date
       status:
         enum:
-          - RECEIVED
-          - INSPECTING
-          - ACCEPTED
-          - REJECTED
-          - PUT_AWAY
-        default: RECEIVED
+          - received
+          - inspecting
+          - accepted
+          - rejected
+          - put_away
+        default: received
       discrepancy_reason: {}
       goods_receipt_id:
         x-relationship:
@@ -1006,14 +1000,14 @@ definitions:
       quantity_change: {}
       transaction_type:
         enum:
-          - RECEIPT
-          - ISSUE
-          - TRANSFER_IN
-          - TRANSFER_OUT
-          - ADJUSTMENT
-          - WRITE_OFF
-          - RETURN
-        default: RECEIPT
+          - receipt
+          - issue
+          - transfer_in
+          - transfer_out
+          - adjustment
+          - write_off
+          - return
+        default: receipt
       reason: {}
       lot_number: {}
       serial_number: {}

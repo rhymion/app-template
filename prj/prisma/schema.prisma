@@ -237,7 +237,7 @@ model approval_request {
   approvable       approvable @relation(fields: [approvable_id], references: [id], onDelete: Cascade)
   approval_flow_id String
   approval_flow    approval_flow @relation(fields: [approval_flow_id], references: [id])
-  status           ApprovalRequestStatus @default(Pending)
+  status           ApprovalRequestStatus @default(pending)
   approval_histories approval_history[]
   created_at       DateTime @default(now()) @db.Timestamptz(0)
   updated_at       DateTime @updatedAt @db.Timestamptz(0)
@@ -524,69 +524,69 @@ model VerificationToken {
 //     a second FK to `user`; likewise `recordedAt` maps onto `created_at`.
 
 enum LocationType {
-  WAREHOUSE
-  STORE
-  DISTRIBUTION_CENTER
-  SUPPLIER_SITE
+  warehouse
+  store
+  distribution_center
+  supplier_site
 }
 
 enum BinZone {
-  RECEIVING
-  STORAGE
-  PICKING
-  QUARANTINE
-  SHIPPING
+  receiving
+  storage
+  picking
+  quarantine
+  shipping
 }
 
 enum PurchaseOrderStatus {
-  DRAFT
-  APPROVED
-  SENT
-  ACKNOWLEDGED
-  PARTIALLY_RECEIVED
-  CLOSED
-  CANCELLED
+  draft
+  approved
+  sent
+  acknowledged
+  partially_received
+  closed
+  cancelled
 }
 
 enum PurchaseOrderLineStatus {
-  OPEN
-  PARTIALLY_RECEIVED
-  FULFILLED
-  CANCELLED
+  open
+  partially_received
+  fulfilled
+  cancelled
 }
 
 enum AsnStatus {
-  PENDING
-  SHIPPED
-  IN_TRANSIT
-  ARRIVED
-  RECEIVED
-  CANCELLED
+  pending
+  shipped
+  in_transit
+  arrived
+  received
+  cancelled
 }
 
 enum GoodsReceiptStatus {
-  DRAFT
-  POSTED
-  COMPLETED
-  CANCELLED
+  draft
+  posted
+  completed
+  cancelled
 }
 
 enum GoodsReceiptLineStatus {
-  RECEIVED
-  INSPECTING
-  ACCEPTED
-  REJECTED
-  PUT_AWAY
+  received
+  inspecting
+  accepted
+  rejected
+  put_away
 }
 
 enum InventoryTransactionType {
-  RECEIPT
-  ISSUE
-  TRANSFER_IN
-  TRANSFER_OUT
-  ADJUSTMENT
-  WRITE_OFF
-  RETURN
+  receipt
+  issue
+  transfer_in
+  transfer_out
+  adjustment
+  write_off
+  return
 }
 
 model unit_of_measure {
@@ -640,7 +640,7 @@ model location {
   id         String       @id @default(cuid())
   code       String       @unique
   name       String
-  type       LocationType @default(WAREHOUSE)
+  type       LocationType @default(warehouse)
   created_at DateTime     @default(now()) @db.Timestamptz(0)
   updated_at DateTime     @updatedAt @db.Timestamptz(0)
   creator_id String
@@ -661,8 +661,7 @@ model bin {
   location_id String
   location    location @relation("BinLocation", fields: [location_id], references: [id], onDelete: Cascade)
   code        String
-  name        String
-  zone        BinZone  @default(STORAGE)
+  zone        BinZone  @default(storage)
   created_at  DateTime @default(now()) @db.Timestamptz(0)
   updated_at  DateTime @updatedAt @db.Timestamptz(0)
   creator_id  String
@@ -701,10 +700,9 @@ model supplier {
 model purchase_order {
   id                       String              @id @default(cuid())
   po_number                String              @unique
-  name                     String
   supplier_id              String
   supplier                 supplier            @relation("PurchaseOrderSupplier", fields: [supplier_id], references: [id], onDelete: Restrict)
-  status                   PurchaseOrderStatus @default(DRAFT)
+  status                   PurchaseOrderStatus @default(draft)
   requested_delivery_date  DateTime?           @db.Date
   confirmed_delivery_date  DateTime?           @db.Date
   currency                 String              @default("USD")
@@ -734,7 +732,7 @@ model purchase_order_line {
   // Minor currency units (e.g. cents) — see the Decimal note at the top of this section.
   unit_price              Int
   requested_delivery_date DateTime?               @db.Date
-  status                  PurchaseOrderLineStatus @default(OPEN)
+  status                  PurchaseOrderLineStatus @default(open)
   created_at              DateTime                @default(now()) @db.Timestamptz(0)
   updated_at              DateTime                @updatedAt @db.Timestamptz(0)
   creator_id              String
@@ -762,7 +760,7 @@ model asn {
   tracking_number    String?
   shipped_at         DateTime? @db.Timestamptz(0)
   expected_arrival_at DateTime? @db.Timestamptz(0)
-  status             AsnStatus @default(PENDING)
+  status             AsnStatus @default(pending)
   created_at         DateTime  @default(now()) @db.Timestamptz(0)
   updated_at         DateTime  @updatedAt @db.Timestamptz(0)
   creator_id         String
@@ -816,7 +814,7 @@ model goods_receipt {
   location_id     String
   location        location           @relation("GoodsReceiptLocation", fields: [location_id], references: [id], onDelete: Restrict)
   received_at     DateTime           @db.Timestamptz(0)
-  status          GoodsReceiptStatus @default(DRAFT)
+  status          GoodsReceiptStatus @default(draft)
   notes           String?
   created_at      DateTime           @default(now()) @db.Timestamptz(0)
   updated_at      DateTime           @updatedAt @db.Timestamptz(0)
@@ -851,7 +849,7 @@ model goods_receipt_line {
   expiry_date            DateTime?              @db.Date
   destination_bin_id     String?
   destination_bin        bin?                   @relation("GoodsReceiptLineDestinationBin", fields: [destination_bin_id], references: [id], onDelete: SetNull)
-  status                 GoodsReceiptLineStatus @default(RECEIVED)
+  status                 GoodsReceiptLineStatus @default(received)
   discrepancy_reason     String?
   created_at             DateTime               @default(now()) @db.Timestamptz(0)
   updated_at             DateTime               @updatedAt @db.Timestamptz(0)
@@ -882,7 +880,7 @@ model inventory_transaction {
   bin                    bin?                     @relation("InventoryTransactionBin", fields: [bin_id], references: [id], onDelete: SetNull)
   // Signed: positive = stock in, negative = stock out. Whole stock-keeping units.
   quantity_change        Int
-  transaction_type       InventoryTransactionType @default(RECEIPT)
+  transaction_type       InventoryTransactionType @default(receipt)
   reason                 String?
   lot_number             String?
   serial_number          String?
