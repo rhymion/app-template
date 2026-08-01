@@ -753,7 +753,6 @@ model purchase_order_line {
 model asn {
   id                 String    @id @default(cuid())
   asn_number         String    @unique
-  name               String
   supplier_id        String
   supplier           supplier  @relation("AsnSupplier", fields: [supplier_id], references: [id], onDelete: Restrict)
   carrier            String?
@@ -808,7 +807,6 @@ model asn_line {
 model goods_receipt {
   id              String             @id @default(cuid())
   receipt_number  String             @unique
-  name            String
   supplier_id     String
   supplier        supplier           @relation("GoodsReceiptSupplier", fields: [supplier_id], references: [id], onDelete: Restrict)
   location_id     String

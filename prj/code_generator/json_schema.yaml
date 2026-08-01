@@ -758,8 +758,6 @@ definitions:
         - asn_number:
             primary: true
             width: 160
-        - name:
-            width: 220
         - supplier:
             width: 190
         - status:
@@ -769,7 +767,6 @@ definitions:
       dashboard: true
     fields:
       asn_number: {}
-      name: {}
       carrier: {}
       tracking_number: {}
       shipped_at: {}
@@ -866,8 +863,6 @@ definitions:
         - receipt_number:
             primary: true
             width: 170
-        - name:
-            width: 220
         - supplier:
             width: 180
         - location:
@@ -879,7 +874,6 @@ definitions:
       dashboard: true
     fields:
       receipt_number: {}
-      name: {}
       received_at: {}
       status:
         enum:
