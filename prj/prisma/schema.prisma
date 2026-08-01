@@ -40,6 +40,7 @@ model tenant {
   users      user[]   @relation("UserTenant")
 
   @@index([creator_id])
+  @@index([updater_id])
 }
 
 model user {
@@ -109,10 +110,13 @@ model user {
   updated_products          product[]           @relation("ProductUpdater")
   created_inventories       inventory[]         @relation("InventoryCreator")
   updated_inventories       inventory[]         @relation("InventoryUpdater")
-  created_inventory_allocations inventory_allocation[] @relation("InventoryAllocationCreator")
-  updated_inventory_allocations inventory_allocation[] @relation("InventoryAllocationUpdater")
+  created_by_inventory_transactions inventory_transaction[] @relation("InventoryTransactionCreatedBy")
+  created_inventory_transactions inventory_transaction[] @relation("InventoryTransactionCreator")
+  updated_inventory_transactions inventory_transaction[] @relation("InventoryTransactionUpdater")
   created_purchase_orders   purchase_order[]    @relation("PurchaseOrderCreator")
   updated_purchase_orders   purchase_order[]    @relation("PurchaseOrderUpdater")
+  created_purchase_per_items   purchase_per_item[]    @relation("PurchasePerItemCreator")
+  updated_purchase_per_items   purchase_per_item[]    @relation("PurchasePerItemUpdater")
   created_comments          comment[]           @relation("CommentCreator")
   reactions                 reaction[]          @relation("ReactionUser")
   created_notes             note[]              @relation("NoteCreator")
@@ -120,6 +124,7 @@ model user {
   leave_requests            leave_request[]     @relation("LeaveRequestUser")
   created_leave_requests    leave_request[]     @relation("LeaveRequestCreator")
   updated_leave_requests    leave_request[]     @relation("LeaveRequestUpdater")
+  assigned_leave_requests   leave_request[]     @relation("LeaveRequestAssignee")
   created_approval_flows    approval_flow[]     @relation("ApprovalFlowCreator")
   updated_approval_flows    approval_flow[]     @relation("ApprovalFlowUpdater")
   created_approval_historys approval_history[]  @relation("ApprovalHistoryCreator")
@@ -134,14 +139,33 @@ model user {
   updated_supply_requests       supply_request[]    @relation("SupplyRequestUpdater")
   created_room_types            room_type[]         @relation("RoomTypeCreator")
   updated_room_types            room_type[]         @relation("RoomTypeUpdater")
+  created_locations              location[]         @relation("LocationCreator")
+  updated_locations              location[]         @relation("LocationUpdater")
   created_rooms                 room[]              @relation("RoomCreator")
   updated_rooms                 room[]              @relation("RoomUpdater")
   created_room_reservations             room_reservation[]         @relation("RoomReservationCreator")
   updated_room_reservations             room_reservation[]         @relation("RoomReservationUpdater")
+  created_receiving_purchase_orders     receiving_purchase_order[] @relation("ReceivingPurchaseOrderCreator")
+  updated_receiving_purchase_orders     receiving_purchase_order[] @relation("ReceivingPurchaseOrderUpdater")
+  created_receiving_asns                receiving_asn[]            @relation("ReceivingAsnCreator")
+  updated_receiving_asns                receiving_asn[]            @relation("ReceivingAsnUpdater")
+  created_receiving_receipts            receiving_receipt[]        @relation("ReceivingReceiptCreator")
+  updated_receiving_receipts            receiving_receipt[]        @relation("ReceivingReceiptUpdater")
+  created_receiving_receipt_lines       receiving_receipt_line[]   @relation("ReceivingReceiptLineCreator")
+  updated_receiving_receipt_lines       receiving_receipt_line[]   @relation("ReceivingReceiptLineUpdater")
+  assigned_receiving_receipt_lines      receiving_receipt_line[]   @relation("ReceivingReceiptLineAssignee")
+  created_inventory_movements           inventory_movement[]       @relation("InventoryMovementCreator")
+  updated_inventory_movements           inventory_movement[]       @relation("InventoryMovementUpdater")
+  created_inventory_adjustments         inventory_adjustment[]     @relation("InventoryAdjustmentCreator")
+  updated_inventory_adjustments         inventory_adjustment[]     @relation("InventoryAdjustmentUpdater")
+  audit_logs                audit_log[]
+  anonymized_at             DateTime?            // Timestamp when PII was scrubbed (GDPR anonymization)
+  notifications             notification[]       @relation("NotificationUser")
 
   @@index([api_key])
   @@index([creator_id])
   @@index([tenant_id])
+  @@index([updater_id])
 }
 
 model role {
@@ -160,6 +184,7 @@ model role {
   approver_approval_flows  approval_flow[] @relation("ApprovalFlowApproverRole")
 
   @@index([creator_id])
+  @@index([updater_id])
 }
 
 model organization {
@@ -178,6 +203,7 @@ model organization {
   notes       note[]
 
   @@index([creator_id])
+  @@index([updater_id])
 }
 
 model permission {
@@ -189,6 +215,7 @@ model permission {
   read       Boolean
   update     Boolean
   delete     Boolean
+  import     Boolean @default(false)
   created_at DateTime @default(now()) @db.Timestamptz(0)
   updated_at DateTime @updatedAt @db.Timestamptz(0)
   creator_id String
@@ -198,6 +225,8 @@ model permission {
 
   @@unique([name, role_id])
   @@index([creator_id])
+  @@index([role_id])
+  @@index([updater_id])
 }
 
 model approvable {
@@ -206,7 +235,12 @@ model approvable {
   creator           user?              @relation("ApprovableCreator", fields: [creator_id], references: [id])
   approval_requests approval_request[]
   leave_request     leave_request?
+  purchase_per_item purchase_per_item?
+  receiving_receipt_line receiving_receipt_line?
+  inventory_movement   inventory_movement?
+  inventory_adjustment inventory_adjustment?
   approved_at       DateTime?          @db.Timestamptz(0)
+  rejection_reason  String?
 
   @@index([creator_id])
 }
@@ -228,7 +262,18 @@ model approval_flow {
   updater_id        String
   updater           user               @relation("ApprovalFlowUpdater", fields: [updater_id], references: [id])
 
+  @@unique([entity_name, approver_role_id])
   @@index([creator_id])
+  @@index([approver_role_id])
+  @@index([requestor_role_id])
+  @@index([updater_id])
+}
+
+enum ApprovalRequestStatus {
+  pending
+  approved
+  rejected
+  terminal_rejected
 }
 
 model approval_request {
@@ -237,10 +282,12 @@ model approval_request {
   approvable         approvable         @relation(fields: [approvable_id], references: [id], onDelete: Cascade)
   approval_flow_id   String
   approval_flow      approval_flow      @relation(fields: [approval_flow_id], references: [id])
-  status             Int                @default(0)
+  status             ApprovalRequestStatus @default(pending)
   approval_histories approval_history[]
   created_at         DateTime           @default(now()) @db.Timestamptz(0)
   updated_at         DateTime           @updatedAt @db.Timestamptz(0)
+  @@index([approvable_id])
+  @@index([approval_flow_id])
 }
 
 model approval_history {
@@ -250,18 +297,119 @@ model approval_history {
   pre_status          Int
   post_status         Int
   message             String?
+  reason_kind         Int?             // 0=Customer 1=Internal
   created_at          DateTime         @default(now()) @db.Timestamptz(0)
   updated_at          DateTime         @updatedAt @db.Timestamptz(0)
   creator_id          String
   creator             user             @relation("ApprovalHistoryCreator", fields: [creator_id], references: [id])
 
   @@index([creator_id])
+  @@index([approval_request_id])
 }
 
 model commentable {
   id       String    @id @default(cuid())
   comments comment[]
   db_table db_table?
+}
+
+model inventory_transactionable {
+  id                     String                  @id @default(cuid())
+  purchase_per_item      purchase_per_item?
+  receiving_receipt_line receiving_receipt_line?
+  inventory_movement     inventory_movement?
+  inventory_adjustment   inventory_adjustment?
+  inventory_transactions inventory_transaction[]
+}
+
+enum InventoryTransactionEventType {
+  reserve
+  ship
+  receive
+  release
+  cancel
+  move
+  adjust
+}
+
+model inventory_transaction {
+  id                            String                    @id @default(cuid())
+  inventory_transactionable_id  String
+  inventory_transactionable     inventory_transactionable @relation(fields: [inventory_transactionable_id], references: [id])
+  event_type                    InventoryTransactionEventType
+  quantity_delta                Int
+  reserved_delta                Int
+  product_id                    String
+  location                      String
+  lot_number                    String?
+  expiration_date               DateTime?                 @db.Timestamptz(0)
+  approved_via                  String?
+  created_at                    DateTime                  @default(now()) @db.Timestamptz(0)
+  updated_at                    DateTime                  @updatedAt @db.Timestamptz(0)
+  created_by_id                 String
+  created_by                    user                      @relation("InventoryTransactionCreatedBy", fields: [created_by_id], references: [id])
+  creator_id                    String
+  creator                       user                      @relation("InventoryTransactionCreator", fields: [creator_id], references: [id])
+  updater_id                    String
+  updater                       user                      @relation("InventoryTransactionUpdater", fields: [updater_id], references: [id])
+
+  @@index([inventory_transactionable_id])
+  @@index([created_by_id])
+  @@index([creator_id])
+  @@index([updater_id])
+}
+
+model inventory_movement {
+  id                           String                     @id @default(cuid())
+  from_inventory_id            String
+  from_inventory               inventory                  @relation("InventoryMovementFrom", fields: [from_inventory_id], references: [id])
+  to_inventory_id               String
+  to_inventory                  inventory                  @relation("InventoryMovementTo", fields: [to_inventory_id], references: [id])
+  quantity                     Int
+  status                       String                     @default("pending")
+  approvable_id                String                     @unique
+  approvable                   approvable                 @relation(fields: [approvable_id], references: [id])
+  inventory_transactionable_id String?                    @unique
+  inventory_transactionable    inventory_transactionable? @relation(fields: [inventory_transactionable_id], references: [id])
+  created_at                   DateTime                   @default(now()) @db.Timestamptz(0)
+  updated_at                   DateTime                   @updatedAt @db.Timestamptz(0)
+  creator_id                   String?
+  creator                      user?                      @relation("InventoryMovementCreator", fields: [creator_id], references: [id])
+  updater_id                   String?
+  updater                      user?                      @relation("InventoryMovementUpdater", fields: [updater_id], references: [id])
+
+  @@index([from_inventory_id])
+  @@index([to_inventory_id])
+  @@index([creator_id])
+  @@index([updater_id])
+}
+
+enum InventoryAdjustmentStatus {
+  pending
+  rejected
+}
+
+model inventory_adjustment {
+  id                           String                     @id @default(cuid())
+  inventory_id                 String
+  inventory                    inventory                  @relation(fields: [inventory_id], references: [id])
+  quantity_delta               Int
+  reason                       String?
+  status                       InventoryAdjustmentStatus @default(pending)
+  approvable_id                String                     @unique
+  approvable                   approvable                 @relation(fields: [approvable_id], references: [id])
+  inventory_transactionable_id String?                    @unique
+  inventory_transactionable    inventory_transactionable? @relation(fields: [inventory_transactionable_id], references: [id])
+  created_at                   DateTime                   @default(now()) @db.Timestamptz(0)
+  updated_at                   DateTime                   @updatedAt @db.Timestamptz(0)
+  creator_id                   String?
+  creator                      user?                      @relation("InventoryAdjustmentCreator", fields: [creator_id], references: [id])
+  updater_id                   String?
+  updater                      user?                      @relation("InventoryAdjustmentUpdater", fields: [updater_id], references: [id])
+
+  @@index([inventory_id])
+  @@index([creator_id])
+  @@index([updater_id])
 }
 
 model comment {
@@ -276,11 +424,20 @@ model comment {
   creator        user        @relation("CommentCreator", fields: [creator_id], references: [id])
 
   @@index([creator_id])
+  @@index([commentable_id])
+}
+
+enum ReactionType {
+  like
+  love
+  laugh
+  surprised
+  sad
 }
 
 model reaction {
-  id         String   @id @default(cuid())
-  type       Int
+  id         String       @id @default(cuid())
+  type       ReactionType
   comment_id String
   comment    comment  @relation(fields: [comment_id], references: [id], onDelete: Cascade)
   user_id    String
@@ -307,6 +464,7 @@ model note {
 
   @@index([organization_id])
   @@index([creator_id])
+  @@index([updater_id])
 }
 
 model attachable {
@@ -316,16 +474,26 @@ model attachable {
   product     product?
 }
 
+enum AttachmentType {
+  image
+  file
+  video
+  audio
+}
+
 model attachment {
-  id            String     @id @default(cuid())
-  type          Int        @default(0)
-  order         Int        @default(0)
-  name          String
-  path          String
-  attachable_id String
-  attachable    attachable @relation(fields: [attachable_id], references: [id], onDelete: Cascade)
-  created_at    DateTime   @default(now()) @db.Timestamptz(0)
-  updated_at    DateTime   @updatedAt @db.Timestamptz(0)
+  id                      String     @id @default(cuid())
+  type                    AttachmentType @default(image)
+  order                   Int        @default(0)
+  name                    String
+  path                    String
+  encrypted_original_name String?
+  name_iv                 String?
+  attachable_id           String
+  attachable              attachable @relation(fields: [attachable_id], references: [id], onDelete: Cascade)
+  created_at              DateTime   @default(now()) @db.Timestamptz(0)
+  updated_at              DateTime   @updatedAt @db.Timestamptz(0)
+  @@index([attachable_id])
 }
 
 model dashboard {
@@ -340,6 +508,28 @@ model dashboard {
   updater    user               @relation("DashboardUpdater", fields: [updater_id], references: [id])
 
   @@index([creator_id])
+  @@index([updater_id])
+}
+
+enum DashboardWidgetChartType {
+  pie
+  column
+  bar
+  line
+}
+
+enum DashboardWidgetStackMode {
+  grouped
+  stacked
+  standardized
+}
+
+enum DashboardWidgetGroupByBucket {
+  day
+  week
+  month
+  quarter
+  year
 }
 
 model dashboard_widget {
@@ -348,16 +538,17 @@ model dashboard_widget {
   dashboard      dashboard @relation(fields: [dashboard_id], references: [id], onDelete: Cascade)
   name            String
   entity_name     String
-  chart_type      Int
+  chart_type      DashboardWidgetChartType
   group_by_field  String
-  stack_mode      Int?
+  stack_mode      DashboardWidgetStackMode?
   series_field    String?
-  group_by_bucket Int?
+  group_by_bucket DashboardWidgetGroupByBucket?
   filter_field    String?
   filter_value    String?
   order          Int       @default(0)
   created_at     DateTime  @default(now()) @db.Timestamptz(0)
   updated_at     DateTime  @updatedAt @db.Timestamptz(0)
+  @@index([dashboard_id])
 }
 
 // Append-only audit trail for security-relevant events: auth lifecycle
@@ -370,6 +561,7 @@ model dashboard_widget {
 model audit_log {
   id            String   @id @default(cuid())
   actor_user_id String?
+  actor_user    user?    @relation(fields: [actor_user_id], references: [id], onDelete: Restrict)
   action        String
   target_table  String?
   target_id     String?
@@ -438,6 +630,7 @@ model Account {
   user              user    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
+  @@index([userId])
 }
 
 model Session {
@@ -446,6 +639,7 @@ model Session {
   userId       String
   expires      DateTime
   user         user     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId])
 }
 
 model VerificationToken {
@@ -472,12 +666,20 @@ model db_table {
   referenced_by  field[]     @relation("ReferenceTable")
 
   @@index([creator_id])
+  @@index([updater_id])
+}
+
+enum FieldType {
+  string
+  number
+  boolean
+  date
 }
 
 model field {
   id           String    @id @default(cuid())
   name         String
-  type         String
+  type         FieldType
   db_table_id  String
   db_table     db_table  @relation("ParentTable", fields: [db_table_id], references: [id], onDelete: Cascade)
   reference_id String?
@@ -488,6 +690,8 @@ model field {
   required     Boolean   @default(true)
   created_at   DateTime  @default(now()) @db.Timestamptz(0)
   updated_at   DateTime  @updatedAt @db.Timestamptz(0)
+  @@index([db_table_id])
+  @@index([reference_id])
 }
 
 model xxxxx_xxxxx {
@@ -504,12 +708,13 @@ model xxxxx_xxxxx {
   yyyyy_yyyyys yyyyy_yyyyy[]
 
   @@index([creator_id])
+  @@index([updater_id])
 }
 
 model yyyyy_yyyyy {
   id             String      @id @default(cuid())
   name           String
-  type           String
+  type           FieldType
   xxxxx_xxxxx_id String
   xxxxx_xxxxx    xxxxx_xxxxx @relation(fields: [xxxxx_xxxxx_id], references: [id], onDelete: Cascade)
   max_length     Int?
@@ -519,6 +724,7 @@ model yyyyy_yyyyy {
   written_by     String
   created_at     DateTime    @default(now()) @db.Timestamptz(0)
   updated_at     DateTime    @updatedAt @db.Timestamptz(0)
+  @@index([xxxxx_xxxxx_id])
 }
 
 model parent1 {
@@ -542,13 +748,14 @@ model parent1 {
 
   @@index([creator_id])
   @@index([organization_id])
+  @@index([updater_id])
 }
 
 model parent1_child1 {
   id         String   @id @default(cuid())
   order      Int      @default(0)
   name       String
-  type       String
+  type       FieldType
   parent1_id String
   parent1    parent1  @relation(fields: [parent1_id], references: [id], onDelete: Cascade)
   max_length Int?
@@ -558,6 +765,7 @@ model parent1_child1 {
   written_by String
   created_at DateTime @default(now()) @db.Timestamptz(0)
   updated_at DateTime @updatedAt @db.Timestamptz(0)
+  @@index([parent1_id])
 }
 
 model parent1_child2 {
@@ -570,6 +778,7 @@ model parent1_child2 {
   end_date   DateTime  @db.Timestamptz(0)
   created_at DateTime  @default(now()) @db.Timestamptz(0)
   updated_at DateTime  @updatedAt @db.Timestamptz(0)
+  @@index([parent1_id])
 }
 
 model parent1_list {
@@ -579,6 +788,7 @@ model parent1_list {
   updated_at DateTime @updatedAt @db.Timestamptz(0)
   parent1_id String
   parent1    parent1  @relation(fields: [parent1_id], references: [id], onDelete: Cascade)
+  @@index([parent1_id])
 }
 
 model parent_only {
@@ -595,6 +805,7 @@ model parent_only {
   updater     user      @relation("ParentOnlyUpdater", fields: [updater_id], references: [id])
 
   @@index([creator_id])
+  @@index([updater_id])
 }
 
 model procedure {
@@ -617,6 +828,8 @@ model procedure {
 
   @@index([creator_id])
   @@index([assignee_id])
+  @@index([parent_id])
+  @@index([updater_id])
 }
 
 model resource {
@@ -637,6 +850,7 @@ model resource {
 
   @@index([creator_id])
   @@index([organization_id])
+  @@index([updater_id])
 }
 
 model booking {
@@ -654,13 +868,25 @@ model booking {
   updater     user     @relation("BookingUpdater", fields: [updater_id], references: [id])
 
   @@index([creator_id])
+  @@index([resource_id])
+  @@index([updater_id])
+}
+
+enum DayOfWeek {
+  sunday
+  monday
+  tuesday
+  wednesday
+  thursday
+  friday
+  saturday
 }
 
 model shift_template {
   id          String   @id @default(cuid())
   user_id     String
   user        user     @relation("ShiftTemplateUser", fields: [user_id], references: [id])
-  day_of_week Int
+  day_of_week DayOfWeek
   start_time  DateTime @db.Timetz(0)
   end_time    DateTime @db.Timetz(0)
   created_at  DateTime @default(now()) @db.Timestamptz(0)
@@ -671,6 +897,14 @@ model shift_template {
   updater     user     @relation("ShiftTemplateUpdater", fields: [updater_id], references: [id])
 
   @@index([creator_id])
+  @@index([updater_id])
+  @@index([user_id])
+}
+
+enum ShiftStatus {
+  scheduled
+  approved
+  cancelled
 }
 
 model shift {
@@ -679,7 +913,7 @@ model shift {
   user       user     @relation("ShiftUser", fields: [user_id], references: [id])
   start_time DateTime @db.Timestamptz(0)
   end_time   DateTime @db.Timestamptz(0)
-  status     Int
+  status     ShiftStatus
   created_at DateTime @default(now()) @db.Timestamptz(0)
   updated_at DateTime @updatedAt @db.Timestamptz(0)
   creator_id String
@@ -688,6 +922,8 @@ model shift {
   updater    user     @relation("ShiftUpdater", fields: [updater_id], references: [id])
 
   @@index([creator_id])
+  @@index([updater_id])
+  @@index([user_id])
 }
 
 model product {
@@ -700,6 +936,9 @@ model product {
   attachable         attachable          @relation(fields: [attachable_id], references: [id])
   inventories                    inventory[]
   purchase_per_items             purchase_per_item[]
+  receiving_purchase_order_lines receiving_purchase_order_line[]
+  receiving_asn_lines            receiving_asn_line[]
+  receiving_receipt_lines        receiving_receipt_line[]
   created_at                     DateTime                        @default(now()) @db.Timestamptz(0)
   updated_at         DateTime            @updatedAt @db.Timestamptz(0)
   creator_id         String
@@ -708,6 +947,7 @@ model product {
   updater            user                @relation("ProductUpdater", fields: [updater_id], references: [id])
 
   @@index([creator_id])
+  @@index([updater_id])
 }
 
 model inventory {
@@ -716,7 +956,8 @@ model inventory {
   product           product   @relation(fields: [product_id], references: [id], onDelete: Cascade)
   quantity          Int
   reserved_quantity Int       @default(0)
-  location          String?
+  location_id       String?
+  location          location? @relation(fields: [location_id], references: [id])
   lot_number        String?
   expiration_date   DateTime?
   created_at        DateTime  @default(now()) @db.Timestamptz(0)
@@ -725,9 +966,31 @@ model inventory {
   creator           user      @relation("InventoryCreator", fields: [creator_id], references: [id])
   updater_id        String
   updater           user      @relation("InventoryUpdater", fields: [updater_id], references: [id])
-  inventory_allocations inventory_allocation[]
+  receiving_receipt_lines receiving_receipt_line[] @relation("ReceiptLineInventory")
+  purchase_per_items purchase_per_item[]
+  movements_from    inventory_movement[]   @relation("InventoryMovementFrom")
+  movements_to      inventory_movement[]   @relation("InventoryMovementTo")
+  adjustments       inventory_adjustment[]
 
   @@index([creator_id])
+  @@index([location_id])
+  @@index([product_id])
+  @@index([updater_id])
+}
+
+model location {
+  id          String      @id @default(cuid())
+  name        String
+  inventories inventory[]
+  created_at  DateTime    @default(now()) @db.Timestamptz(0)
+  updated_at  DateTime    @updatedAt @db.Timestamptz(0)
+  creator_id  String
+  creator     user        @relation("LocationCreator", fields: [creator_id], references: [id])
+  updater_id  String
+  updater     user        @relation("LocationUpdater", fields: [updater_id], references: [id])
+
+  @@index([creator_id])
+  @@index([updater_id])
 }
 
 model purchase_order {
@@ -742,9 +1005,16 @@ model purchase_order {
   creator     user                @relation("PurchaseOrderCreator", fields: [creator_id], references: [id])
   updater_id  String
   updater     user                @relation("PurchaseOrderUpdater", fields: [updater_id], references: [id])
-  inventory_allocations inventory_allocation[]
 
   @@index([creator_id])
+  @@index([customer_id])
+  @@index([updater_id])
+}
+
+enum PurchasePerItemStatus {
+  pending
+  split
+  rejected
 }
 
 model purchase_per_item {
@@ -754,31 +1024,36 @@ model purchase_per_item {
   product_id            String
   product               product                @relation(fields: [product_id], references: [id], onDelete: Cascade)
   quantity              Int
+  status                PurchasePerItemStatus  @default(pending)
   price                 Int?
-  inventory_allocations inventory_allocation[]
-  created_at            DateTime               @default(now()) @db.Timestamptz(0)
-  updated_at            DateTime               @updatedAt @db.Timestamptz(0)
-}
-
-model inventory_allocation {
-  id                   String            @id @default(cuid())
-  purchase_order_id    String
-  purchase_order       purchase_order    @relation(fields: [purchase_order_id], references: [id], onDelete: Cascade)
-  purchase_per_item_id String
-  purchase_per_item    purchase_per_item @relation(fields: [purchase_per_item_id], references: [id], onDelete: Cascade)
-  inventory_id         String
-  inventory            inventory         @relation(fields: [inventory_id], references: [id], onDelete: Cascade)
-  quantity             Int
+  approvable_id                 String                    @unique
+  approvable                    approvable                @relation(fields: [approvable_id], references: [id])
+  inventory_transactionable_id  String?                    @unique
+  inventory_transactionable     inventory_transactionable? @relation(fields: [inventory_transactionable_id], references: [id])
+  parent_id            String?
+  parent               purchase_per_item?   @relation("PurchasePerItemSplit", fields: [parent_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  children             purchase_per_item[]  @relation("PurchasePerItemSplit")
+  inventory_id         String?
+  inventory            inventory?        @relation(fields: [inventory_id], references: [id])
   created_at           DateTime          @default(now()) @db.Timestamptz(0)
   updated_at           DateTime          @updatedAt @db.Timestamptz(0)
-  creator_id           String
-  creator              user              @relation("InventoryAllocationCreator", fields: [creator_id], references: [id])
-  updater_id           String
-  updater              user              @relation("InventoryAllocationUpdater", fields: [updater_id], references: [id])
+  creator_id           String?
+  creator              user?             @relation("PurchasePerItemCreator", fields: [creator_id], references: [id])
+  updater_id           String?
+  updater              user?             @relation("PurchasePerItemUpdater", fields: [updater_id], references: [id])
 
-  @@index([purchase_order_id])
-  @@index([inventory_id])
   @@index([creator_id])
+  @@index([inventory_id])
+  @@index([parent_id])
+  @@index([product_id])
+  @@index([purchase_order_id])
+  @@index([updater_id])
+}
+
+enum LeaveRequestStatus {
+  pending
+  approved
+  rejected
 }
 
 model leave_request {
@@ -788,7 +1063,7 @@ model leave_request {
   start_date    DateTime   @db.Timestamptz(0)
   end_date      DateTime   @db.Timestamptz(0)
   reason        String
-  status        Int     @default(0)
+  status        LeaveRequestStatus @default(pending)
   approvable_id String     @unique
   approvable    approvable @relation(fields: [approvable_id], references: [id])
   created_at    DateTime   @default(now()) @db.Timestamptz(0)
@@ -797,8 +1072,13 @@ model leave_request {
   creator       user       @relation("LeaveRequestCreator", fields: [creator_id], references: [id])
   updater_id    String
   updater       user       @relation("LeaveRequestUpdater", fields: [updater_id], references: [id])
+  assignee_id   String?
+  assignee      user?      @relation("LeaveRequestAssignee", fields: [assignee_id], references: [id])
 
   @@index([creator_id])
+  @@index([assignee_id])
+  @@index([updater_id])
+  @@index([user_id])
 }
 
 // ============================================================
@@ -820,6 +1100,7 @@ model supply_pool {
   updater            user                @relation("SupplyPoolUpdater", fields: [updater_id], references: [id])
 
   @@index([creator_id])
+  @@index([updater_id])
 }
 
 model supply_request {
@@ -836,6 +1117,7 @@ model supply_request {
   updater            user                @relation("SupplyRequestUpdater", fields: [updater_id], references: [id])
 
   @@index([creator_id])
+  @@index([updater_id])
 }
 
 model supply_allocation {
@@ -870,6 +1152,12 @@ model room_type {
   updater           user               @relation("RoomTypeUpdater", fields: [updater_id], references: [id])
 
   @@index([creator_id])
+  @@index([updater_id])
+}
+
+enum RoomStatus {
+  available
+  maintenance
 }
 
 model room {
@@ -878,7 +1166,7 @@ model room {
   room_type_id      String
   room_type         room_type          @relation(fields: [room_type_id], references: [id], onDelete: Cascade)
   floor             Int?
-  status            Int                @default(0)
+  status            RoomStatus         @default(available)
   room_reservations room_reservation[]
   created_at        DateTime           @default(now()) @db.Timestamptz(0)
   updated_at        DateTime           @updatedAt @db.Timestamptz(0)
@@ -888,6 +1176,8 @@ model room {
   updater           user               @relation("RoomUpdater", fields: [updater_id], references: [id])
 
   @@index([creator_id])
+  @@index([room_type_id])
+  @@index([updater_id])
 }
 
 model room_reservation {
@@ -907,4 +1197,199 @@ model room_reservation {
   updater      user      @relation("RoomReservationUpdater", fields: [updater_id], references: [id])
 
   @@index([creator_id])
+  @@index([room_id])
+  @@index([room_type_id])
+  @@index([updater_id])
+}
+
+// ============================================================
+// x-receiving: Receiving lifecycle (PO / ASN / Receipt)
+// ============================================================
+
+enum ReceivingPurchaseOrderStatus {
+  draft
+  issued
+  partially_received
+  received
+  cancelled
+}
+
+model receiving_purchase_order {
+  id                             String                           @id @default(cuid())
+  order_no                       String
+  status                         ReceivingPurchaseOrderStatus     @default(draft)
+  lines                          receiving_purchase_order_line[]
+  receiving_asns                 receiving_asn[]
+  receiving_receipts             receiving_receipt[]
+  created_at                     DateTime                         @default(now()) @db.Timestamptz(0)
+  updated_at                     DateTime                         @updatedAt @db.Timestamptz(0)
+  creator_id                     String
+  creator                        user                             @relation("ReceivingPurchaseOrderCreator", fields: [creator_id], references: [id])
+  updater_id                     String
+  updater                        user                             @relation("ReceivingPurchaseOrderUpdater", fields: [updater_id], references: [id])
+
+  @@index([creator_id])
+  @@index([updater_id])
+}
+
+enum ReceivingPurchaseOrderLineStatus {
+  outstanding
+  partially_received
+  fully_received
+  cancelled
+}
+
+model receiving_purchase_order_line {
+  id                          String                   @id @default(cuid())
+  receiving_purchase_order_id String
+  receiving_purchase_order    receiving_purchase_order @relation(fields: [receiving_purchase_order_id], references: [id], onDelete: Cascade)
+  product_id                  String
+  product                     product                  @relation(fields: [product_id], references: [id], onDelete: Cascade)
+  ordered_quantity            Int
+  done_quantity               Int                      @default(0)
+  cancelled_quantity          Int                      @default(0)
+  outstanding_quantity        Int                      @default(0)
+  status                      ReceivingPurchaseOrderLineStatus @default(outstanding)
+  created_at                  DateTime                 @default(now()) @db.Timestamptz(0)
+  updated_at                  DateTime                 @updatedAt @db.Timestamptz(0)
+
+  @@index([receiving_purchase_order_id])
+  @@index([product_id])
+}
+
+enum ReceivingAsnStatus {
+  draft
+  sent
+  partially_matched
+  matched
+  cancelled
+}
+
+model receiving_asn {
+  id                 String                    @id @default(cuid())
+  asn_no             String
+  purchase_order_id  String?
+  purchase_order     receiving_purchase_order? @relation(fields: [purchase_order_id], references: [id])
+  status             ReceivingAsnStatus        @default(draft)
+  lines              receiving_asn_line[]
+  receiving_receipts receiving_receipt[]
+  created_at         DateTime                  @default(now()) @db.Timestamptz(0)
+  updated_at         DateTime                  @updatedAt @db.Timestamptz(0)
+  creator_id         String
+  creator            user                      @relation("ReceivingAsnCreator", fields: [creator_id], references: [id])
+  updater_id         String
+  updater            user                      @relation("ReceivingAsnUpdater", fields: [updater_id], references: [id])
+
+  @@index([creator_id])
+  @@index([purchase_order_id])
+  @@index([updater_id])
+}
+
+enum ReceivingAsnLineStatus {
+  outstanding
+  partially_matched
+  fully_matched
+  cancelled
+}
+
+model receiving_asn_line {
+  id                   String        @id @default(cuid())
+  receiving_asn_id     String
+  receiving_asn        receiving_asn @relation(fields: [receiving_asn_id], references: [id], onDelete: Cascade)
+  product_id           String
+  product              product       @relation(fields: [product_id], references: [id], onDelete: Cascade)
+  shipped_quantity     Int
+  done_quantity        Int           @default(0)
+  cancelled_quantity   Int           @default(0)
+  outstanding_quantity Int           @default(0)
+  status               ReceivingAsnLineStatus @default(outstanding)
+  created_at           DateTime      @default(now()) @db.Timestamptz(0)
+  updated_at           DateTime      @updatedAt @db.Timestamptz(0)
+
+  @@index([receiving_asn_id])
+  @@index([product_id])
+}
+
+enum ReceivingReceiptStatus {
+  draft
+  confirmed
+  cancelled
+}
+
+model receiving_receipt {
+  id                String                    @id @default(cuid())
+  receipt_no        String
+  purchase_order_id String?
+  purchase_order    receiving_purchase_order? @relation(fields: [purchase_order_id], references: [id])
+  asn_id            String?
+  asn               receiving_asn?            @relation(fields: [asn_id], references: [id])
+  status            ReceivingReceiptStatus    @default(draft)
+  confirmed_at      DateTime?                 @db.Timestamptz(0)
+  lines             receiving_receipt_line[]
+  created_at        DateTime                  @default(now()) @db.Timestamptz(0)
+  updated_at        DateTime                  @updatedAt @db.Timestamptz(0)
+  creator_id        String
+  creator           user                      @relation("ReceivingReceiptCreator", fields: [creator_id], references: [id])
+  updater_id        String
+  updater           user                      @relation("ReceivingReceiptUpdater", fields: [updater_id], references: [id])
+
+  @@index([creator_id])
+  @@index([purchase_order_id])
+  @@index([asn_id])
+  @@index([updater_id])
+}
+
+enum ReceivingReceiptLineStatus {
+  pending
+  split
+  rejected
+}
+
+model receiving_receipt_line {
+  id                   String            @id @default(cuid())
+  receiving_receipt_id String
+  receiving_receipt    receiving_receipt @relation(fields: [receiving_receipt_id], references: [id], onDelete: Cascade)
+  product_id           String
+  product              product           @relation(fields: [product_id], references: [id], onDelete: Cascade)
+  receipt_quantity     Int
+  status               ReceivingReceiptLineStatus @default(pending)
+  inventory_id         String?
+  inventory            inventory?        @relation("ReceiptLineInventory", fields: [inventory_id], references: [id])
+  approvable_id        String           @unique
+  approvable           approvable       @relation(fields: [approvable_id], references: [id])
+  parent_id            String?
+  parent               receiving_receipt_line?   @relation("ReceiptLineSplit", fields: [parent_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  children             receiving_receipt_line[]  @relation("ReceiptLineSplit")
+  is_split_result      Boolean           @default(false)
+  inventory_transactionable_id String?                     @unique
+  inventory_transactionable    inventory_transactionable? @relation(fields: [inventory_transactionable_id], references: [id])
+  created_at           DateTime          @default(now()) @db.Timestamptz(0)
+  updated_at           DateTime          @updatedAt @db.Timestamptz(0)
+  creator_id           String?
+  creator              user?             @relation("ReceivingReceiptLineCreator", fields: [creator_id], references: [id])
+  updater_id           String?
+  updater              user?             @relation("ReceivingReceiptLineUpdater", fields: [updater_id], references: [id])
+  assignee_id          String?
+  assignee             user?             @relation("ReceivingReceiptLineAssignee", fields: [assignee_id], references: [id])
+
+  @@index([receiving_receipt_id])
+  @@index([inventory_id])
+  @@index([parent_id])
+  @@index([creator_id])
+  @@index([assignee_id])
+  @@index([product_id])
+  @@index([updater_id])
+}
+
+model notification {
+  id         String   @id @default(cuid())
+  user_id    String
+  user       user     @relation("NotificationUser", fields: [user_id], references: [id], onDelete: Cascade)
+  type       String
+  payload    Json
+  read       Boolean  @default(false)
+  created_at DateTime @default(now()) @db.Timestamptz(0)
+
+  @@index([user_id, read])
+  @@index([user_id, created_at(sort: Desc)])
 }

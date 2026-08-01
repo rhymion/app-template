@@ -27,4 +27,4 @@ Only these four task types are in scope for this project:
 
 1. Read `./app-generator/AGENTS.md` before starting any task.
 2. Read the relevant `app-generator/docs/knowledge/` files for your task type.
-3. All completion gates are defined in the prompt for each task type.
+3. All completion gates are defined in `app-generator/.claude/commands/<task_type>.md §Completion gate`.

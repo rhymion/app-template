@@ -70,3 +70,22 @@ the user follows up with adjustments after reviewing the generated application.
 - Schema syntax reference: `app-generator/docs/knowledge/schema-yaml-configuration.md`
 - After creating or updating a schema, run `npm run generate-code` to regenerate code.
 - Do **not** edit anything inside `app-generator/`.
+
+## Completion gate
+
+Run in this order (mirrors `app-generator/.claude/commands/generate-schema.md §Completion gate`):
+
+1. `npm --prefix app-generator run test:pytest` — Python unit tests for code generator
+2. `npm --prefix app-generator run test:vitest` — vitest unit/component tests
+3. `npm run test:e2e:build`  — prj:sync + docker:up:test + generate-code + db:push + db:generate + db:seed-tenant + build
+4. `npm --prefix app-generator run check:generated` — generated code matches templates/schema
+5. `npm run test:e2e:cy:api` — API Cypress specs only
+6. `npm run lint`
+7. `npm --prefix app-generator audit --omit=dev --audit-level=high`
+
+Steps 1 and 2 run unconditionally rather than relying on a prose "unchanged"
+exemption with no mechanism to verify it — see
+`app-generator/docs/knowledge/gate-exemption-must-be-machine-checkable.md`
+(cmd_498). This task type's own scope rule already forbids touching
+`app-generator/`, so in practice these two steps are cheap confirmations
+that the rule was actually followed, not a source of new failures.

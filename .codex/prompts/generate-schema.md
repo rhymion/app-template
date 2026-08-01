@@ -1,6 +1,6 @@
 This is a **generate-schema** task for app-template. Read AGENTS.md and `app-generator/AGENTS.md` before starting.
 
-See also: `app-generator/.codex/prompts/generate-schema.md` for the full rules and completion gate.
+For the completion gate, see `app-generator/.claude/commands/generate-schema.md §Completion gate` — that file is the source of truth. See also `app-generator/.codex/prompts/generate-schema.md` for the full rules.
 
 ## Scenario & Confirmation Protocol
 
@@ -67,7 +67,7 @@ the user follows up with adjustments after reviewing the generated application.
 
 1. Create or update schema YAML in `prj/code_generator/json_schema.yaml`.
 2. Run `generate-code` scoped to `prj/` output.
-3. Run completion gate (see `app-generator/.codex/prompts/generate-schema.md`).
+3. Run completion gate (see `app-generator/.claude/commands/generate-schema.md §Completion gate`).
 
 ## Input
 $ARGUMENTS

@@ -5,9 +5,9 @@
   "description": "Template repository for the Rhymion App Generator. Edit prj/, then deploy.",
   "scripts": {
     "setup": "bash scripts/setup.sh",
-    "sync": "bash scripts/sync-prj.sh",
-    "dev": "bash scripts/sync-prj.sh && npm --prefix app-generator run dev:full",
-    "build": "bash scripts/sync-prj.sh && npm --prefix app-generator run build:full",
+    "sync": "npm --prefix app-generator run prj:sync",
+    "dev": "npm --prefix app-generator run prj:sync && npm --prefix app-generator run dev:full",
+    "build": "npm --prefix app-generator run prj:sync && npm --prefix app-generator run build:full",
     "start": "npm --prefix app-generator run start",
     "test:e2e:build": "npm --prefix app-generator run prj:sync && npm --prefix app-generator run test:e2e:build",
     "test:e2e:cy:start": "npm --prefix app-generator run test:e2e:cy:start",
@@ -15,5 +15,8 @@
     "lint": "npm --prefix app-generator run lint",
     "generate-code": "npm --prefix app-generator run prj:sync && npm --prefix app-generator run generate-code",
     "cleanup": "npm --prefix app-generator run cleanup:all"
+  },
+  "devDependencies": {
+    "neonctl": "2.30.1"
   }
 }
