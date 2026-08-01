@@ -723,9 +723,11 @@ definitions:
       purchase_order_id:
         x-relationship:
           labelField: po_number
+          searchField: po_number
       item_id:
         x-relationship:
           labelField: sku
+          searchField: sku
     properties:
       purchase_order:
         $ref: "#/definitions/purchase_order"
@@ -822,6 +824,7 @@ definitions:
       asn_id:
         x-relationship:
           labelField: asn_number
+          searchField: asn_number
       purchase_order_line_id:
         x-relationship:
           labelField:
@@ -830,6 +833,7 @@ definitions:
       item_id:
         x-relationship:
           labelField: sku
+          searchField: sku
     properties:
       asn:
         $ref: "#/definitions/asn"
@@ -941,6 +945,7 @@ definitions:
       goods_receipt_id:
         x-relationship:
           labelField: receipt_number
+          searchField: receipt_number
       purchase_order_line_id:
         x-relationship:
           labelField:
@@ -954,6 +959,7 @@ definitions:
       item_id:
         x-relationship:
           labelField: sku
+          searchField: sku
       destination_bin_id:
         x-relationship:
           labelField: code
