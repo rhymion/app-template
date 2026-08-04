@@ -131,8 +131,13 @@ model user {
   updated_goods_receipts         goods_receipt[]         @relation("GoodsReceiptUpdater")
   created_goods_receipt_lines    goods_receipt_line[]    @relation("GoodsReceiptLineCreator")
   updated_goods_receipt_lines    goods_receipt_line[]    @relation("GoodsReceiptLineUpdater")
+  created_inventories            inventory[]             @relation("InventoryCreator")
+  updated_inventories            inventory[]             @relation("InventoryUpdater")
   created_inventory_transactions inventory_transaction[] @relation("InventoryTransactionCreator")
   updated_inventory_transactions inventory_transaction[] @relation("InventoryTransactionUpdater")
+  // inventory_transaction.created_by_id — the actor the ledger write is
+  // attributed to (set by the generated afterApprove ledger write).
+  ledger_writes                  inventory_transaction[] @relation("InventoryTransactionCreatedBy")
 
   @@index([api_key])
   @@index([creator_id])
@@ -204,6 +209,9 @@ model approvable {
   approval_requests approval_request[]
   approved_at       DateTime?          @db.Timestamptz(0)
   rejection_reason  String?
+  // Owner back-relations (one per entity carrying a one-to-one_bridge FK to
+  // approvable). Required by Prisma: a one-to-one relation needs both sides.
+  goods_receipt_line goods_receipt_line?
 
   @@index([creator_id])
 }
@@ -508,26 +516,44 @@ model VerificationToken {
 
   @@unique([identifier, token])
 }
-
 // ============================================================
 // Inventory management models (procure-to-receive)
 // ============================================================
-// Derived from prj/spec/inventory-er-diagram.mermaid.
+// Derived from prj/spec/inventory-er-diagram.mermaid, then wired into the
+// generator's ledger primitives (x-ledger-entities / x-ledger-source /
+// x-splittable / x-approval — see
+// docs/knowledge/appendix/inventory-domain-generalization-design.md and
+// appendix/inventory-reservation-split.md).
 //
-// Two deliberate deviations from the ER diagram, both forced by / preferred
-// because of framework constraints:
+// Deviations from the ER diagram, and why:
 //
-//  1. `decimal` → `Int`.  The generator's Prisma→JSON scalar derivation
-//     (`code_generator/schema_deriver.py` `_SCALAR_JSON_TYPE`) supports only
-//     String / Boolean / Int / DateTime / native enums; a `Decimal` column
-//     aborts `generate-code` with `SchemaDivergenceError`.  Quantities are
-//     therefore whole stock-keeping units and `unit_price` is stored in
+//  1. `decimal` -> `Int`.  code_generator/schema_deriver.py's `_SCALAR_JSON_TYPE`
+//     supports only String / Boolean / Int / DateTime / native enums; a
+//     `Decimal` column aborts generate-code with SchemaDivergenceError.
+//     Quantities are whole stock-keeping units; `unit_price` is stored in
 //     minor currency units (e.g. cents), not major units.
 //
-//  2. The diagram's `createdById` (purchase_order), `receivedById`
-//     (goods_receipt) and `recordedById` (inventory_transaction) columns all
-//     map onto the framework's built-in `creator_id` audit column instead of
-//     a second FK to `user`; likewise `recordedAt` maps onto `created_at`.
+//  2. The diagram's `createdById` / `receivedById` / `recordedById` all map onto
+//     the framework's built-in `creator_id` audit column, and `recordedAt` onto
+//     `created_at`, instead of second FKs to `user`.
+//
+//  3. The diagram has no stock-on-hand table — it models only documents and a
+//     movement log.  `inventory` (the ledger *pool*) and `inventory_transactionable`
+//     (the ledger *bridge*) are added here because the generator's ledger
+//     primitives require a pool/ledger/transactionable triple; see the
+//     x-ledger-entities block in json_schema.yaml.
+//
+//  4. `inventory_transaction`'s column vocabulary (`event_type`,
+//     `quantity_delta`, `reserved_delta`, `product_id`, `location`,
+//     `lot_number`, `expiration_date`, `approved_via`, `created_by_id`) and
+//     `inventory`'s (`product_id`, `location_id`, `lot_number`,
+//     `expiration_date`, `quantity`, `reserved_quantity`) are fixed by
+//     code_generator/templates/ledger_write_stub.ts.jinja2, which writes those
+//     names literally.  `product_id` therefore points at `item` — the diagram's
+//     name for the catalog entity — via a relation field named `product`.
+//
+// nativeEnum members are lowercase snake_case, enforced by validate.py
+// (docs/knowledge/enum-member-naming.md).
 
 enum LocationType {
   warehouse
@@ -577,22 +603,30 @@ enum GoodsReceiptStatus {
   cancelled
 }
 
+// `pending`, `split` and `rejected` are required members:
+// split_action_route.ts.jinja2 compares the row's status against SPLIT_STATUS /
+// REJECTED_STATUS and creates every split child with `status: 'pending'`.
 enum GoodsReceiptLineStatus {
+  pending
   received
   inspecting
   accepted
   rejected
   put_away
+  split
 }
 
-enum InventoryTransactionType {
-  receipt
-  issue
-  transfer_in
-  transfer_out
-  adjustment
+// Ledger event vocabulary. `receive` is written by goods_receipt_line's
+// x-ledger-source; the rest are available to hand-written ledger writes.
+enum InventoryEventType {
+  receive
+  ship
+  reserve
+  release
+  adjust
+  move
   write_off
-  return
+  return_to_supplier
 }
 
 model unit_of_measure {
@@ -635,7 +669,8 @@ model item {
   purchase_order_lines   purchase_order_line[]   @relation("PurchaseOrderLineItem")
   asn_lines              asn_line[]              @relation("AsnLineItem")
   goods_receipt_lines    goods_receipt_line[]    @relation("GoodsReceiptLineItem")
-  inventory_transactions inventory_transaction[] @relation("InventoryTransactionItem")
+  inventories            inventory[]             @relation("InventoryProduct")
+  inventory_transactions inventory_transaction[] @relation("InventoryTransactionProduct")
 
   @@index([creator_id])
   @@index([updater_id])
@@ -654,9 +689,9 @@ model location {
   updater_id String
   updater    user         @relation("LocationUpdater", fields: [updater_id], references: [id])
 
-  bins                   bin[]                   @relation("BinLocation")
-  goods_receipts         goods_receipt[]         @relation("GoodsReceiptLocation")
-  inventory_transactions inventory_transaction[] @relation("InventoryTransactionLocation")
+  bins           bin[]           @relation("BinLocation")
+  goods_receipts goods_receipt[] @relation("GoodsReceiptLocation")
+  inventories    inventory[]     @relation("InventoryLocation")
 
   @@index([creator_id])
   @@index([updater_id])
@@ -704,20 +739,20 @@ model supplier {
 }
 
 model purchase_order {
-  id                       String              @id @default(cuid())
-  po_number                String              @unique
-  supplier_id              String
-  supplier                 supplier            @relation("PurchaseOrderSupplier", fields: [supplier_id], references: [id], onDelete: Restrict)
-  status                   PurchaseOrderStatus @default(draft)
-  requested_delivery_date  DateTime?           @db.Date
-  confirmed_delivery_date  DateTime?           @db.Date
-  currency                 String              @default("USD")
-  created_at               DateTime            @default(now()) @db.Timestamptz(0)
-  updated_at               DateTime            @updatedAt @db.Timestamptz(0)
-  creator_id               String
-  creator                  user                @relation("PurchaseOrderCreator", fields: [creator_id], references: [id])
-  updater_id               String
-  updater                  user                @relation("PurchaseOrderUpdater", fields: [updater_id], references: [id])
+  id                      String              @id @default(cuid())
+  po_number               String              @unique
+  supplier_id             String
+  supplier                supplier            @relation("PurchaseOrderSupplier", fields: [supplier_id], references: [id], onDelete: Restrict)
+  status                  PurchaseOrderStatus @default(draft)
+  requested_delivery_date DateTime?           @db.Date
+  confirmed_delivery_date DateTime?           @db.Date
+  currency                String              @default("USD")
+  created_at              DateTime            @default(now()) @db.Timestamptz(0)
+  updated_at              DateTime            @updatedAt @db.Timestamptz(0)
+  creator_id              String
+  creator                 user                @relation("PurchaseOrderCreator", fields: [creator_id], references: [id])
+  updater_id              String
+  updater                 user                @relation("PurchaseOrderUpdater", fields: [updater_id], references: [id])
 
   purchase_order_lines purchase_order_line[] @relation("PurchaseOrderLinePurchaseOrder")
 
@@ -749,6 +784,7 @@ model purchase_order_line {
   asn_lines           asn_line[]           @relation("AsnLinePurchaseOrderLine")
   goods_receipt_lines goods_receipt_line[] @relation("GoodsReceiptLinePurchaseOrderLine")
 
+  @@unique([purchase_order_id, item_id])
   @@index([creator_id])
   @@index([updater_id])
   @@index([purchase_order_id])
@@ -757,21 +793,21 @@ model purchase_order_line {
 }
 
 model asn {
-  id                 String    @id @default(cuid())
-  asn_number         String    @unique
-  supplier_id        String
-  supplier           supplier  @relation("AsnSupplier", fields: [supplier_id], references: [id], onDelete: Restrict)
-  carrier            String?
-  tracking_number    String?
-  shipped_at         DateTime? @db.Timestamptz(0)
+  id                  String    @id @default(cuid())
+  asn_number          String    @unique
+  supplier_id         String
+  supplier            supplier  @relation("AsnSupplier", fields: [supplier_id], references: [id], onDelete: Restrict)
+  carrier             String?
+  tracking_number     String?
+  shipped_at          DateTime? @db.Timestamptz(0)
   expected_arrival_at DateTime? @db.Timestamptz(0)
-  status             AsnStatus @default(pending)
-  created_at         DateTime  @default(now()) @db.Timestamptz(0)
-  updated_at         DateTime  @updatedAt @db.Timestamptz(0)
-  creator_id         String
-  creator            user      @relation("AsnCreator", fields: [creator_id], references: [id])
-  updater_id         String
-  updater            user      @relation("AsnUpdater", fields: [updater_id], references: [id])
+  status              AsnStatus @default(pending)
+  created_at          DateTime  @default(now()) @db.Timestamptz(0)
+  updated_at          DateTime  @updatedAt @db.Timestamptz(0)
+  creator_id          String
+  creator             user      @relation("AsnCreator", fields: [creator_id], references: [id])
+  updater_id          String
+  updater             user      @relation("AsnUpdater", fields: [updater_id], references: [id])
 
   asn_lines asn_line[] @relation("AsnLineAsn")
 
@@ -802,6 +838,7 @@ model asn_line {
 
   goods_receipt_lines goods_receipt_line[] @relation("GoodsReceiptLineAsnLine")
 
+  @@unique([asn_id, item_id])
   @@index([creator_id])
   @@index([updater_id])
   @@index([asn_id])
@@ -811,24 +848,23 @@ model asn_line {
 }
 
 model goods_receipt {
-  id              String             @id @default(cuid())
-  receipt_number  String             @unique
-  supplier_id     String
-  supplier        supplier           @relation("GoodsReceiptSupplier", fields: [supplier_id], references: [id], onDelete: Restrict)
-  location_id     String
-  location        location           @relation("GoodsReceiptLocation", fields: [location_id], references: [id], onDelete: Restrict)
-  received_at     DateTime           @db.Timestamptz(0)
-  status          GoodsReceiptStatus @default(draft)
-  notes           String?
-  created_at      DateTime           @default(now()) @db.Timestamptz(0)
-  updated_at      DateTime           @updatedAt @db.Timestamptz(0)
-  creator_id      String
-  creator         user               @relation("GoodsReceiptCreator", fields: [creator_id], references: [id])
-  updater_id      String
-  updater         user               @relation("GoodsReceiptUpdater", fields: [updater_id], references: [id])
+  id             String             @id @default(cuid())
+  receipt_number String             @unique
+  supplier_id    String
+  supplier       supplier           @relation("GoodsReceiptSupplier", fields: [supplier_id], references: [id], onDelete: Restrict)
+  location_id    String
+  location       location           @relation("GoodsReceiptLocation", fields: [location_id], references: [id], onDelete: Restrict)
+  received_at    DateTime           @db.Timestamptz(0)
+  status         GoodsReceiptStatus @default(draft)
+  notes          String?
+  created_at     DateTime           @default(now()) @db.Timestamptz(0)
+  updated_at     DateTime           @updatedAt @db.Timestamptz(0)
+  creator_id     String
+  creator        user               @relation("GoodsReceiptCreator", fields: [creator_id], references: [id])
+  updater_id     String
+  updater        user               @relation("GoodsReceiptUpdater", fields: [updater_id], references: [id])
 
-  goods_receipt_lines    goods_receipt_line[]    @relation("GoodsReceiptLineGoodsReceipt")
-  inventory_transactions inventory_transaction[] @relation("InventoryTransactionGoodsReceipt")
+  goods_receipt_lines goods_receipt_line[] @relation("GoodsReceiptLineGoodsReceipt")
 
   @@index([creator_id])
   @@index([updater_id])
@@ -836,33 +872,53 @@ model goods_receipt {
   @@index([location_id])
 }
 
+// The receiving line is the ledger source: approving it writes the `receive`
+// row into inventory_transaction and increments the inventory pool
+// (x-ledger-source + x-approval.on_approved.emit_hook).  It is also
+// x-splittable, so one received line can be divided across several lots/bins,
+// each split part carrying its own approvable and its own ledger bridge.
 model goods_receipt_line {
-  id                     String                 @id @default(cuid())
-  goods_receipt_id       String
-  goods_receipt          goods_receipt          @relation("GoodsReceiptLineGoodsReceipt", fields: [goods_receipt_id], references: [id], onDelete: Cascade)
-  purchase_order_line_id String?
-  purchase_order_line    purchase_order_line?   @relation("GoodsReceiptLinePurchaseOrderLine", fields: [purchase_order_line_id], references: [id], onDelete: SetNull)
-  asn_line_id            String?
-  asn_line               asn_line?              @relation("GoodsReceiptLineAsnLine", fields: [asn_line_id], references: [id], onDelete: SetNull)
-  item_id                String
-  item                   item                   @relation("GoodsReceiptLineItem", fields: [item_id], references: [id], onDelete: Restrict)
-  quantity_received      Int
-  unit_of_measure_id     String
-  unit_of_measure        unit_of_measure        @relation("GoodsReceiptLineUnitOfMeasure", fields: [unit_of_measure_id], references: [id], onDelete: Restrict)
-  lot_number             String?
-  expiry_date            DateTime?              @db.Date
-  destination_bin_id     String?
-  destination_bin        bin?                   @relation("GoodsReceiptLineDestinationBin", fields: [destination_bin_id], references: [id], onDelete: SetNull)
-  status                 GoodsReceiptLineStatus @default(received)
-  discrepancy_reason     String?
-  created_at             DateTime               @default(now()) @db.Timestamptz(0)
-  updated_at             DateTime               @updatedAt @db.Timestamptz(0)
-  creator_id             String
-  creator                user                   @relation("GoodsReceiptLineCreator", fields: [creator_id], references: [id])
-  updater_id             String
-  updater                user                   @relation("GoodsReceiptLineUpdater", fields: [updater_id], references: [id])
-
-  inventory_transactions inventory_transaction[] @relation("InventoryTransactionGoodsReceiptLine")
+  id                           String                     @id @default(cuid())
+  goods_receipt_id             String
+  goods_receipt                goods_receipt              @relation("GoodsReceiptLineGoodsReceipt", fields: [goods_receipt_id], references: [id], onDelete: Cascade)
+  purchase_order_line_id       String?
+  purchase_order_line          purchase_order_line?       @relation("GoodsReceiptLinePurchaseOrderLine", fields: [purchase_order_line_id], references: [id], onDelete: SetNull)
+  asn_line_id                  String?
+  asn_line                     asn_line?                  @relation("GoodsReceiptLineAsnLine", fields: [asn_line_id], references: [id], onDelete: SetNull)
+  item_id                      String
+  item                         item                       @relation("GoodsReceiptLineItem", fields: [item_id], references: [id], onDelete: Restrict)
+  quantity_received            Int
+  unit_of_measure_id           String
+  unit_of_measure              unit_of_measure            @relation("GoodsReceiptLineUnitOfMeasure", fields: [unit_of_measure_id], references: [id], onDelete: Restrict)
+  lot_number                   String?
+  expiry_date                  DateTime?                  @db.Date
+  destination_bin_id           String?
+  destination_bin              bin?                       @relation("GoodsReceiptLineDestinationBin", fields: [destination_bin_id], references: [id], onDelete: SetNull)
+  status                       GoodsReceiptLineStatus     @default(pending)
+  discrepancy_reason           String?
+  // x-ledger-source.poolIdField — which stock lot this line lands in. Nullable:
+  // the lot is chosen at receiving/split time, not at line creation.
+  inventory_id                 String?
+  inventory                    inventory?                 @relation("GoodsReceiptLineInventory", fields: [inventory_id], references: [id], onDelete: SetNull)
+  // x-splittable.bridgeField — per-row ledger bridge; each split part gets its own.
+  inventory_transactionable_id String?
+  inventory_transactionable    inventory_transactionable? @relation(fields: [inventory_transactionable_id], references: [id], onDelete: SetNull)
+  // Approval bridge (mandatory per cmd_296: never nulled, never deleted).
+  approvable_id                String                     @unique
+  approvable                   approvable                 @relation(fields: [approvable_id], references: [id])
+  // x-splittable.parentField — self-referential split lineage.
+  parent_goods_receipt_line_id String?
+  parent_goods_receipt_line    goods_receipt_line?        @relation("GoodsReceiptLineSplit", fields: [parent_goods_receipt_line_id], references: [id], onDelete: SetNull)
+  split_goods_receipt_lines    goods_receipt_line[]       @relation("GoodsReceiptLineSplit")
+  created_at                   DateTime                   @default(now()) @db.Timestamptz(0)
+  updated_at                   DateTime                   @updatedAt @db.Timestamptz(0)
+  // Nullable, unlike every other model here: split_action_route.ts.jinja2
+  // creates split children without writing creator_id/updater_id, so a
+  // non-nullable column fails the generated create at type-check time.
+  creator_id                   String?
+  creator                      user?                      @relation("GoodsReceiptLineCreator", fields: [creator_id], references: [id])
+  updater_id                   String?
+  updater                      user?                      @relation("GoodsReceiptLineUpdater", fields: [updater_id], references: [id])
 
   @@index([creator_id])
   @@index([updater_id])
@@ -872,46 +928,93 @@ model goods_receipt_line {
   @@index([item_id])
   @@index([unit_of_measure_id])
   @@index([destination_bin_id])
+  @@index([inventory_id])
+  @@index([inventory_transactionable_id])
+  @@index([parent_goods_receipt_line_id])
 }
 
+// ---- Ledger domain: pool / ledger / transactionable -------------------------
+// Declared as an aggregate under x-ledger-entities.inventory_domain in
+// json_schema.yaml. Column names below are the vocabulary
+// ledger_write_stub.ts.jinja2 writes literally — do not rename them.
+
+// Pool: materialized stock-on-hand per (product, location, lot, expiry).
+model inventory {
+  id                String    @id @default(cuid())
+  product_id        String
+  product           item      @relation("InventoryProduct", fields: [product_id], references: [id], onDelete: Restrict)
+  location_id       String?
+  location          location? @relation("InventoryLocation", fields: [location_id], references: [id], onDelete: SetNull)
+  lot_number        String?
+  expiration_date   DateTime? @db.Date
+  quantity          Int       @default(0)
+  reserved_quantity Int       @default(0)
+  created_at        DateTime  @default(now()) @db.Timestamptz(0)
+  updated_at        DateTime  @updatedAt @db.Timestamptz(0)
+  creator_id        String
+  creator           user      @relation("InventoryCreator", fields: [creator_id], references: [id])
+  updater_id        String
+  updater           user      @relation("InventoryUpdater", fields: [updater_id], references: [id])
+
+  goods_receipt_lines goods_receipt_line[] @relation("GoodsReceiptLineInventory")
+
+  @@unique([product_id, location_id, lot_number, expiration_date])
+  @@index([creator_id])
+  @@index([updater_id])
+  @@index([product_id])
+  @@index([location_id])
+}
+
+// Transactionable: internal one-to-many bridge tying a source row (a
+// goods_receipt_line, or a split part of one) to the ledger rows it produced.
+// No pages, no API — the generator manages it.
+model inventory_transactionable {
+  id                     String                  @id @default(cuid())
+  inventory_transactions inventory_transaction[]
+  goods_receipt_lines    goods_receipt_line[]
+}
+
+// Ledger: append-oriented movement log. `quantity_delta` moves physical stock,
+// `reserved_delta` moves the reservation counter; `product_id` / `location` /
+// `lot_number` / `expiration_date` are the O-6 denormalized pool identity.
 model inventory_transaction {
-  id                     String                   @id @default(cuid())
-  item_id                String
-  item                   item                     @relation("InventoryTransactionItem", fields: [item_id], references: [id], onDelete: Restrict)
-  location_id            String
-  location               location                 @relation("InventoryTransactionLocation", fields: [location_id], references: [id], onDelete: Restrict)
-  bin_id                 String?
-  bin                    bin?                     @relation("InventoryTransactionBin", fields: [bin_id], references: [id], onDelete: SetNull)
-  // Signed: positive = stock in, negative = stock out. Whole stock-keeping units.
-  quantity_change        Int
-  transaction_type       InventoryTransactionType @default(receipt)
-  reason                 String?
-  lot_number             String?
-  serial_number          String?
-  expiry_date            DateTime?                @db.Date
-  // Concrete source-document links for receipt-generated movements.
-  goods_receipt_id       String?
-  goods_receipt          goods_receipt?           @relation("InventoryTransactionGoodsReceipt", fields: [goods_receipt_id], references: [id], onDelete: SetNull)
-  goods_receipt_line_id  String?
-  goods_receipt_line     goods_receipt_line?      @relation("InventoryTransactionGoodsReceiptLine", fields: [goods_receipt_line_id], references: [id], onDelete: SetNull)
-  // Free-form polymorphic source reference for movements originating outside
-  // the receiving flow (issues, adjustments, write-offs, returns).
-  source_document_type   String?
-  source_document_ref    String?
-  occurred_at            DateTime                 @db.Timestamptz(0)
-  created_at             DateTime                 @default(now()) @db.Timestamptz(0)
-  updated_at             DateTime                 @updatedAt @db.Timestamptz(0)
-  creator_id             String
-  creator                user                     @relation("InventoryTransactionCreator", fields: [creator_id], references: [id])
-  updater_id             String
-  updater                user                     @relation("InventoryTransactionUpdater", fields: [updater_id], references: [id])
+  id                           String                     @id @default(cuid())
+  inventory_transactionable_id String?
+  inventory_transactionable    inventory_transactionable? @relation(fields: [inventory_transactionable_id], references: [id], onDelete: SetNull)
+  event_type                   InventoryEventType
+  quantity_delta               Int                        @default(0)
+  reserved_delta               Int                        @default(0)
+  product_id                   String
+  product                      item                       @relation("InventoryTransactionProduct", fields: [product_id], references: [id], onDelete: Restrict)
+  // Denormalized location *name* (O-6), '' when the lot has no location.
+  location                     String                     @default("")
+  lot_number                   String?
+  expiration_date              DateTime?                  @db.Date
+  // approval_request/approvable id this write was authorized by (R2 audit trail).
+  approved_via                 String?
+  created_by_id                String
+  created_by                   user                       @relation("InventoryTransactionCreatedBy", fields: [created_by_id], references: [id])
+  bin_id                       String?
+  bin                          bin?                       @relation("InventoryTransactionBin", fields: [bin_id], references: [id], onDelete: SetNull)
+  reason                       String?
+  serial_number                String?
+  // Free-form source reference for movements originating outside the
+  // receiving flow (issues, adjustments, write-offs, returns).
+  source_document_type         String?
+  source_document_ref          String?
+  occurred_at                  DateTime                   @default(now()) @db.Timestamptz(0)
+  created_at                   DateTime                   @default(now()) @db.Timestamptz(0)
+  updated_at                   DateTime                   @updatedAt @db.Timestamptz(0)
+  creator_id                   String
+  creator                      user                       @relation("InventoryTransactionCreator", fields: [creator_id], references: [id])
+  updater_id                   String
+  updater                      user                       @relation("InventoryTransactionUpdater", fields: [updater_id], references: [id])
 
   @@index([creator_id])
   @@index([updater_id])
-  @@index([item_id])
-  @@index([location_id])
+  @@index([created_by_id])
+  @@index([product_id])
   @@index([bin_id])
-  @@index([goods_receipt_id])
-  @@index([goods_receipt_line_id])
-  @@index([item_id, location_id, occurred_at])
+  @@index([inventory_transactionable_id])
+  @@index([product_id, occurred_at])
 }

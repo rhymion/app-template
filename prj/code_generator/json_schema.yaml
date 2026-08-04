@@ -68,6 +68,23 @@ x-import-key:
     Dotted FK path for Phase 2: [name, role.name] (role_id resolved via role.name)
     Entities without x-import-key: export-only in Phase 1; import blocked in Phase 2.
 
+# Ledger domain aggregates (OD-1). Each named entry declares one independent
+# inventory-like aggregate as a triple of entity names, and x-reservation /
+# x-ledger-source reference it by key via `ledgerDomain` instead of assuming
+# literal model names. Resolved by helpers/schema_helpers.py's
+# resolve_ledger_domain(); all three keys are required (no defaults).
+#
+#   pool            — materialized stock-on-hand rows (quantity / reserved_quantity)
+#   ledger          — append-oriented movement rows (quantity_delta / reserved_delta)
+#   transactionable — internal bridge tying a source row to the rows it produced
+#
+# See docs/knowledge/appendix/inventory-domain-generalization-design.md §2.
+x-ledger-entities:
+  inventory_domain:
+    pool: inventory
+    ledger: inventory_transaction
+    transactionable: inventory_transactionable
+
 definitions:
   user:
     x-generate:
@@ -448,19 +465,25 @@ definitions:
         items:
           $ref: "#/definitions/dashboard_widget"
 
+
   # ============================================================
   # Inventory management (procure-to-receive)
   # ============================================================
-  # Derived from prj/spec/inventory-er-diagram.mermaid. See the matching
-  # section at the bottom of prj/prisma/schema.prisma for the two deliberate
-  # deviations from the diagram (decimal -> Int, and createdById /
-  # receivedById / recordedById folded into the built-in creator_id).
+  # Derived from prj/spec/inventory-er-diagram.mermaid, then wired into the
+  # generator's ledger primitives. See the matching section at the bottom of
+  # prj/prisma/schema.prisma for the deviations from the diagram (decimal -> Int,
+  # createdById/receivedById/recordedById folded into creator_id, and the added
+  # pool/transactionable entities the ledger aggregate requires).
   #
-  # Line entities (purchase_order_line, asn_line, goods_receipt_line) carry
-  # their own x-generate because other entities reference them by FK, and
-  # schema-yaml-configuration.md §15.9 forbids a FK targeting an embedded
-  # child. Consequence (§7.3 Rule 1): a header's line list renders read-only
-  # on the header page; lines are created and edited on their own pages.
+  # Line entities (purchase_order_line, asn_line, goods_receipt_line) carry their
+  # own x-generate because other entities reference them by FK, and
+  # schema-yaml-configuration.md §15.9 forbids a FK targeting an embedded child.
+  # Consequence (§7.3 Rule 1): a header's line list renders read-only on the
+  # header page; lines are created and edited on their own pages. Each of them
+  # declares a composite dotted x-import-key so they are CSV-importable.
+  #
+  # nativeEnum members are lowercase snake_case — enforced by validate.py
+  # (docs/knowledge/enum-member-naming.md).
 
   unit_of_measure:
     x-generate:
@@ -586,9 +609,9 @@ definitions:
             primary: true
             width: 140
         - location:
-            width: 180
+            width: 200
         - zone:
-            width: 160
+            width: 180
     fields:
       code: {}
       zone:
@@ -649,9 +672,9 @@ definitions:
             primary: true
             width: 160
         - supplier:
-            width: 190
+            width: 200
         - status:
-            width: 170
+            width: 180
         - requested_delivery_date:
             width: 170
       dashboard: true
@@ -689,12 +712,16 @@ definitions:
       list: true
       view: true
       new: true
-      edit: false
-      delete: false
+      edit: true
+      delete: true
       invalidate: false
       api: true
       test: true
       search: false
+    # Dotted composite natural key: the PO number plus the ordered item.
+    # Both FK labelFields are plain strings, so both display columns
+    # (purchase_order_po_number / item_sku) appear in the CSV export.
+    x-import-key: [purchase_order.po_number, item.sku]
     x-display:
       table:
         - item:
@@ -723,11 +750,9 @@ definitions:
       purchase_order_id:
         x-relationship:
           labelField: po_number
-          searchField: po_number
       item_id:
         x-relationship:
           labelField: sku
-          searchField: sku
     properties:
       purchase_order:
         $ref: "#/definitions/purchase_order"
@@ -759,7 +784,7 @@ definitions:
             primary: true
             width: 160
         - supplier:
-            width: 190
+            width: 200
         - status:
             width: 160
         - expected_arrival_at:
@@ -796,12 +821,13 @@ definitions:
       list: true
       view: true
       new: true
-      edit: false
-      delete: false
+      edit: true
+      delete: true
       invalidate: false
       api: true
       test: true
       search: false
+    x-import-key: [asn.asn_number, item.sku]
     x-display:
       table:
         - item:
@@ -821,16 +847,17 @@ definitions:
       asn_id:
         x-relationship:
           labelField: asn_number
-          searchField: asn_number
+      # labelField must be a PLAIN single field, not a composite list: a
+      # composite exports as an unresolvable `<rel>_name` column, which the
+      # generated import route rejects with UNIMPORTABLE_COLUMN (cmd_530).
+      # purchase_order_line has no unique single natural label, so `id` it is —
+      # the same pattern the default schema uses for approval_request.approvable_id.
       purchase_order_line_id:
         x-relationship:
-          labelField:
-            - purchase_order.po_number
-            - item.sku
+          labelField: id
       item_id:
         x-relationship:
           labelField: sku
-          searchField: sku
     properties:
       asn:
         $ref: "#/definitions/asn"
@@ -864,11 +891,11 @@ definitions:
             primary: true
             width: 170
         - supplier:
-            width: 180
+            width: 190
         - location:
-            width: 170
+            width: 180
         - status:
-            width: 150
+            width: 160
         - received_at:
             width: 190
       dashboard: true
@@ -898,6 +925,19 @@ definitions:
         items:
           $ref: "#/definitions/goods_receipt_line"
 
+  # The receiving line drives the inventory ledger.
+  #
+  #  * x-approval        — each line is approved on its own; approval is the
+  #                        moment stock actually lands. Rejection is terminal:
+  #                        re-assigning quantity to another lot goes through
+  #                        split, not through a resubmit loop.
+  #  * x-ledger-source   — on approval, emit_hook generates
+  #                        lib/goods_receipt_line/service_after_approve.ts,
+  #                        which writes the `receive` ledger row and increments
+  #                        the pool row named by poolIdField.
+  #  * x-splittable      — one received line can be divided across lots/bins;
+  #                        each part gets its own approvable and its own ledger
+  #                        bridge, so each part is approved (and posted) alone.
   goods_receipt_line:
     x-generate:
       list: true
@@ -909,6 +949,38 @@ definitions:
       api: true
       test: true
       search: false
+    x-import-key: [goods_receipt.receipt_number, item.sku]
+    x-approval:
+      on_approved:
+        emit_hook: true
+        # Mapping of field -> value (generate.py's _resolve_set_fields iterates
+        # .items()). The list-of-{field,value} form in appendix/approval-flow.md
+        # §16.9 is stale and raises AttributeError.
+        set_fields:
+          status: accepted
+      on_rejected:
+        terminal: true
+        set_fields:
+          status: rejected
+    x-ledger-source:
+      ledgerDomain: inventory_domain
+      event_type: receive
+      quantity_delta_field: quantity_received
+      poolIdField: inventory_id
+    x-splittable:
+      quantityField: quantity_received
+      parentField: parent_goods_receipt_line_id
+      perPartRequired:
+        - inventory_id
+      ledgerDomain: inventory_domain
+      poolIdField: inventory_id
+      bridgeField: inventory_transactionable_id
+    x-custom-components:
+      - name: ApprovalSection
+        path: "@/components/_standard/ApprovalSection"
+        target:
+          - view
+          - edit
     x-display:
       table:
         - item:
@@ -920,43 +992,59 @@ definitions:
             width: 160
         - status:
             width: 170
-        - destination_bin:
-            width: 160
+        - inventory:
+            width: 200
     fields:
       quantity_received: {}
       lot_number: {}
       expiry_date:
         format: date
+      # `pending`, `split` and `rejected` are required members — the generated
+      # split route creates every split child with status 'pending' and
+      # compares against SPLIT_STATUS / REJECTED_STATUS.
       status:
         enum:
+          - pending
           - received
           - inspecting
           - accepted
           - rejected
           - put_away
-        default: received
+          - split
+        default: pending
       discrepancy_reason: {}
       goods_receipt_id:
         x-relationship:
           labelField: receipt_number
-          searchField: receipt_number
+      # Plain single-field labelFields (see the note on asn_line): every FK
+      # display column on an importable entity must be resolvable back to a row.
       purchase_order_line_id:
         x-relationship:
-          labelField:
-            - purchase_order.po_number
-            - item.sku
+          labelField: id
       asn_line_id:
         x-relationship:
-          labelField:
-            - asn.asn_number
-            - item.sku
+          labelField: id
       item_id:
         x-relationship:
           labelField: sku
-          searchField: sku
       destination_bin_id:
         x-relationship:
           labelField: code
+      inventory_id:
+        x-relationship:
+          labelField: id
+      # Server-managed plumbing, hidden from forms and list columns:
+      # approvable_id is the approval bridge, inventory_transactionable_id the
+      # ledger bridge (auto-detected by the '*able_id' naming convention).
+      approvable_id:
+        x-relationship:
+          type: one-to-one_bridge
+          target: approvable
+          labelField: id
+      inventory_transactionable_id: {}
+      parent_goods_receipt_line_id:
+        x-relationship:
+          labelField: id
     properties:
       goods_receipt:
         $ref: "#/definitions/goods_receipt"
@@ -970,7 +1058,81 @@ definitions:
         $ref: "#/definitions/unit_of_measure"
       destination_bin:
         $ref: "#/definitions/bin"
+      inventory:
+        $ref: "#/definitions/inventory"
+      approvable:
+        $ref: "#/definitions/approvable"
 
+  # ---- Ledger domain: pool / ledger / transactionable ------------------------
+  # Declared together as the `inventory_domain` aggregate in x-ledger-entities
+  # at the top of this file.
+
+  # Pool — materialized stock-on-hand per (product, location, lot, expiry).
+  # Column names are fixed by ledger_write_stub.ts.jinja2; `product_id` points
+  # at `item` through a relation field named `product`.
+  inventory:
+    x-generate:
+      list: true
+      view: true
+      new: true
+      edit: true
+      delete: true
+      invalidate: false
+      api: true
+      test: true
+      search: false
+    # No `primary: true`: the only required non-FK scalar candidates all carry
+    # Prisma defaults, and an FK primary whose relation name differs from its
+    # target entity name (product -> item) makes generators_test.py's
+    # primary_fk_dep_target lookup miss, so the generated spec references a
+    # `deps.product2` the helper never creates.
+    x-display:
+      table:
+        - product:
+            width: 180
+        - location:
+            width: 170
+        - lot_number:
+            width: 150
+        - quantity:
+            width: 130
+        - reserved_quantity:
+            width: 150
+      dashboard: true
+    fields:
+      lot_number: {}
+      expiration_date:
+        format: date
+      quantity:
+        default: 0
+      reserved_quantity:
+        default: 0
+      product_id:
+        x-relationship:
+          labelField: sku
+    properties:
+      product:
+        $ref: "#/definitions/item"
+      location:
+        $ref: "#/definitions/location"
+
+  # Transactionable — internal bridge; no pages, no API. Mirrors the shape of
+  # the framework's own approvable/commentable/attachable stubs.
+  inventory_transactionable:
+    x-generate:
+      list: false
+      view: false
+      new: false
+      edit: false
+      delete: false
+      invalidate: false
+      api: false
+      test: false
+      search: false
+
+  # Ledger — append-oriented movement rows. `quantity_delta` moves physical
+  # stock, `reserved_delta` the reservation counter; product/location/lot/expiry
+  # are the denormalized pool identity (O-6) captured at write time.
   inventory_transaction:
     x-generate:
       list: true
@@ -982,63 +1144,68 @@ definitions:
       api: true
       test: true
       search: false
+    # Primary is the required non-FK `event_type`, not `product`: see the note
+    # on `inventory` for why an aliased FK primary breaks the generated spec.
     x-display:
       table:
-        - item:
+        - event_type:
             primary: true
+            width: 160
+        - product:
             width: 180
-        - location:
-            width: 170
-        - transaction_type:
-            width: 180
-        - quantity_change:
-            width: 150
+        - quantity_delta:
+            width: 140
+        - reserved_delta:
+            width: 140
         - occurred_at:
             width: 190
       dashboard: true
     fields:
-      quantity_change: {}
-      transaction_type:
+      event_type:
         enum:
-          - receipt
-          - issue
-          - transfer_in
-          - transfer_out
-          - adjustment
+          - receive
+          - ship
+          - reserve
+          - release
+          - adjust
+          - move
           - write_off
-          - return
-        default: receipt
-      reason: {}
+          - return_to_supplier
+        default: receive
+      quantity_delta:
+        default: 0
+      reserved_delta:
+        default: 0
+      # Explicit `default:` is required, not cosmetic: a Prisma-defaulted
+      # non-nullable scalar without one is typed `string | null` on the entity
+      # type while FormViewProps keeps the non-null `string`, and the two
+      # disagree at the FormUpsert call site.
+      location:
+        default: ""
       lot_number: {}
-      serial_number: {}
-      expiry_date:
+      expiration_date:
         format: date
+      approved_via: {}
+      reason: {}
+      serial_number: {}
       source_document_type: {}
       source_document_ref: {}
       occurred_at: {}
-      item_id:
+      product_id:
         x-relationship:
           labelField: sku
       bin_id:
         x-relationship:
           labelField: code
-      goods_receipt_id:
+      created_by_id:
         x-relationship:
-          labelField: receipt_number
-      goods_receipt_line_id:
-        x-relationship:
-          labelField:
-            - goods_receipt.receipt_number
-            - item.sku
+          target: user
+          labelField: name
+      inventory_transactionable_id: {}
     properties:
-      item:
+      product:
         $ref: "#/definitions/item"
-      location:
-        $ref: "#/definitions/location"
       bin:
         $ref: "#/definitions/bin"
-      goods_receipt:
-        $ref: "#/definitions/goods_receipt"
-      goods_receipt_line:
-        $ref: "#/definitions/goods_receipt_line"
-
+      created_by:
+        $ref: "#/definitions/user"
