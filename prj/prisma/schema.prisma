@@ -170,6 +170,8 @@ model user {
   // `user`, not new from this cmd's own location opt-in).
   invalidated_at             DateTime?
   notifications             notification[]       @relation("NotificationUser")
+  created_personal_notes    personal_note[]      @relation("PersonalNoteCreator")
+  updated_personal_notes    personal_note[]      @relation("PersonalNoteUpdater")
 
   @@index([api_key])
   @@index([creator_id])
@@ -1386,4 +1388,26 @@ model notification {
 
   @@index([user_id, read])
   @@index([user_id, created_at(sort: Desc)])
+}
+
+// x-self-only entity (cmd_575): a private per-user note, relocated here from
+// the generator's default schema (app-generator/code_generator/json_schema.yaml)
+// because it existed only as a fixture for the generator's own regression
+// spec, not as a feature this project needs by default -- see
+// app-generator/docs/knowledge/self-only-entity.md "Sample entities" and
+// this project's own cmd_575 completion report. Kept here so the x-self-only
+// mechanism (creator_id-scoped access, audited admin_bypass) has a real
+// list:true entity exercising it end-to-end for this project's own CI.
+model personal_note {
+  id         String   @id @default(cuid())
+  title      String
+  content    String?
+  created_at DateTime @default(now()) @db.Timestamptz(0)
+  updated_at DateTime @updatedAt @db.Timestamptz(0)
+  creator_id String
+  creator    user     @relation("PersonalNoteCreator", fields: [creator_id], references: [id])
+  updater_id String
+  updater    user     @relation("PersonalNoteUpdater", fields: [updater_id], references: [id])
+  @@index([creator_id])
+  @@index([updater_id])
 }

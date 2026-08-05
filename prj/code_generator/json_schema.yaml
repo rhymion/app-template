@@ -174,6 +174,21 @@ definitions:
       roles:
         type: many-to-many
         target: role
+    # x-self-only (cmd_536, catch-up cmd_575): `setting` is a proxy view of
+    # the acting user's OWN `user` row — id === creator_id always holds for
+    # every real account, so creator_id is exactly the right unconditional
+    # ownership filter here, same as any other x-self-only entity.
+    # admin_bypass: true lets an Administrator read another user's settings
+    # for support purposes, but only with an audit row written for the
+    # access — this scope is entity-name-keyed (`setting`), so it applies
+    # ONLY to settings pages/routes/getters and never touches the `user`
+    # entity itself or any other entity's FK reference to `user` (mentions,
+    # comment creators, approvers, etc. all stay fully visible). This
+    # project's prj/ schema fork predated cmd_536 and never picked this up
+    # — see app-generator/docs/knowledge/self-only-entity.md and this
+    # project's own cmd_575 completion report.
+    x-self-only:
+      admin_bypass: true
     allOf:
       - $ref: "#/definitions/user"
       - type: object
@@ -2121,3 +2136,39 @@ definitions:
         $ref: "#/definitions/product"
       approvable:
         $ref: "#/definitions/approvable"
+
+  # x-self-only entity (cmd_575): a private per-user note. Only its creator
+  # can ever read/write it, regardless of any permission grant — see
+  # app-generator/docs/knowledge/self-only-entity.md. admin_bypass:true
+  # additionally lets a privileged (Administrator) role read across all
+  # users' notes, but only with an audit row written for the access — if
+  # that write fails, the bypass is denied (fail-closed). Relocated here
+  # from the generator's default schema (cmd_575): it existed there only as
+  # a fixture for the generator's own regression spec, not as a feature
+  # every consumer should inherit by default. This project keeps it because
+  # its own regression coverage (cypress/e2e/api/self_only_access_control.cy.ts)
+  # needs a real list:true x-self-only entity to exercise.
+  personal_note:
+    x-generate:
+      list: true
+      view: true
+      new: true
+      edit: true
+      delete: true
+      invalidate: false
+      api: true
+      test: true
+      search: false
+    x-self-only:
+      admin_bypass: true
+    x-import-key: [title]
+    x-display:
+      table:
+        - title:
+            primary: true
+            width: 200
+    fields:
+      title: {}
+      content:
+        x-ui:
+          width: 8
