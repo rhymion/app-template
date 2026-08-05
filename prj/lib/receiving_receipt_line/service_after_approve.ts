@@ -60,7 +60,6 @@ export async function afterApprove(
   // Step 3: Get inventory identity (O-6 non-normalized fields)
   const inventory = await tx.inventory.findUniqueOrThrow({
     where: { id: entity.inventory_id },
-    include: { location: true },
   });
 
   // Cross-product guard: inventory lot must belong to the same product as the line.
@@ -80,7 +79,7 @@ export async function afterApprove(
       quantity_delta: entity.receipt_quantity, // O-4
       reserved_delta: 0, // O-4
       product_id: inventory.product_id,    // O-6
-      location: inventory.location?.name ?? '',   // O-6
+      location_id: inventory.location_id,  // O-6, cmd_562: id-FK, not a name string
       lot_number: inventory.lot_number,     // O-6
       expiration_date: inventory.expiration_date, // O-6
       approved_via: approvableId,           // audit trail (R2)

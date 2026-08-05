@@ -15,7 +15,9 @@ import prisma from '@/lib/prisma';
  * O-4: neither the un-reserve nor the re-reserve step touches physical
  * `quantity`, only `reserved_quantity`.
  * O-6: inventory has no direct FK from inventory_transaction; lots are
- * re-identified via denormalized fields (product_id/location/lot_number/expiration_date).
+ * re-identified via denormalized fields (product_id/location_id/lot_number/expiration_date).
+ * cmd_562: location is an id-FK (location_id) on both pool and ledger — no more
+ * name string / reverse-lookup.
  * O-8: re-reservation may span multiple inventory lots — this is the native
  * multi-lot allocation loop, not a special case.
  */
@@ -98,15 +100,12 @@ export async function POST(req: NextRequest, { params }: Params) {
         // Step 1: Type2 move-cancel — un-reserve every active lot. Ledger-only;
         // approvable/approval_request are never touched (line stays pending).
         for (const reserve of activeReserves) {
-          // Phase4: inventory.location_id FK — denormalized name from the
-          // ledger needs to be reverse-looked-up to a location_id before
-          // re-identifying the inventory row.
+          // cmd_562: location_id is an id-FK on both pool and ledger —
+          // re-identify the inventory cache row directly, no reverse name
+          // lookup needed.
           const inventoryCache = await tx.inventory.findFirst({
             where: {
               product_id: reserve.product_id,
-              // O-6 denormalization writes location as '' for a null source
-              // location; undo that for the lookup (same P1 fix as
-              // service_after_reject.ts / service_after_approve.ts).
               location_id: reserve.location_id,
               lot_number: reserve.lot_number,
               expiration_date: reserve.expiration_date,
@@ -145,7 +144,6 @@ export async function POST(req: NextRequest, { params }: Params) {
         const availableInventories = await tx.inventory.findMany({
           where: { product_id: productId, quantity: { gt: 0 } },
           orderBy: [{ expiration_date: { sort: 'asc', nulls: 'last' } }, { lot_number: 'asc' }, { id: 'asc' }],
-          include: { location: true },
         });
 
         let remaining = totalQty;

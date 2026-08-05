@@ -121,7 +121,6 @@ async function main() {
       for (const alloc of allocations) {
         const inv = await tx.inventory.findUnique({
           where: { id: alloc.inventory_id },
-          include: { location: true },
         });
         if (!inv) {
           throw new Error(`inventory ${alloc.inventory_id} referenced by inventory_allocation ${alloc.id} not found`);
@@ -134,7 +133,8 @@ async function main() {
             quantity_delta: 0, // O-4: reserve never touches physical quantity
             reserved_delta: alloc.remaining_quantity, // outstanding amount only (see comment above)
             product_id: inv.product_id,
-            location: inv.location?.name ?? '',
+            // cmd_562: location_id is an id-FK, not a name string.
+            location_id: inv.location_id,
             lot_number: inv.lot_number,
             expiration_date: inv.expiration_date,
             created_by_id: alloc.creator_id,
@@ -172,7 +172,6 @@ async function main() {
   for (const [inventoryId, expectedSum] of expectedByInventoryId) {
     const inv = await prisma.inventory.findUnique({
       where: { id: inventoryId },
-      include: { location: true },
     });
     if (!inv) continue; // inventory row itself no longer exists — nothing to reconcile
     const agg = await prisma.inventory_transaction.aggregate({
@@ -180,12 +179,13 @@ async function main() {
       where: {
         event_type: 'reserve',
         product_id: inv.product_id,
-        location: inv.location?.name ?? '',
+        // cmd_562: location_id is an id-FK, not a name string.
+        location_id: inv.location_id,
         lot_number: inv.lot_number,
         expiration_date: inv.expiration_date,
       },
     });
-    const actualSum = agg._sum.reserved_delta ?? 0;
+    const actualSum = agg._sum?.reserved_delta ?? 0;
     if (actualSum !== expectedSum) {
       mismatches++;
       console.error(`SUM MISMATCH inventory=${inventoryId}: expected ${expectedSum}, got ${actualSum}`);

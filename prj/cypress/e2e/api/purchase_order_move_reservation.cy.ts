@@ -100,16 +100,15 @@ describe('moveReservation bespoke endpoint (B-5 Phase2d, G15)', () => {
                 expect(cancelTx).to.exist;
                 expect(cancelTx.reserved_delta).to.eq(-5);
                 expect(cancelTx.quantity_delta).to.eq(0);
-                // P1-bug regression: the denormalized cancel tx still carries the
-                // '' write for the null-location lot (proves the location-normalization
-                // fix in the cancel netting/lookup is in effect — see service_after_reject.ts).
-                expect(cancelTx.location).to.eq('');
+                // cmd_562: location is now an id-FK — the null-location lot's
+                // cancel tx carries location_id=null (was '' pre-migration).
+                expect(cancelTx.location_id).to.eq(null);
 
                 const newReserveTxs = newTxs.filter((t) => t.event_type === 'reserve');
                 expect(newReserveTxs.length).to.eq(2);
                 expect(newReserveTxs.every((t) => t.quantity_delta === 0)).to.be.true; // O-4
-                const byLot1 = newReserveTxs.filter((t) => t.location === '');
-                const byLot2 = newReserveTxs.filter((t) => t.location === 'LOT-B');
+                const byLot1 = newReserveTxs.filter((t) => t.location_id === null);
+                const byLot2 = newReserveTxs.filter((t) => t.location_id === lot2.location_id);
                 expect(byLot1.length).to.eq(1);
                 expect(byLot1[0].reserved_delta).to.eq(2);
                 expect(byLot2.length).to.eq(1);

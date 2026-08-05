@@ -177,17 +177,17 @@ export async function getInventoryAllocation(purchase_order_id: string) {
   // Net reserved_delta per inventory identity (O-6 denormalized fields; O-8 multi-lot).
   type NetEntry = {
     product_id: string;
-    location: string;
+    location_id: string | null;
     lot_number: string | null;
     expiration_date: Date | null;
     net: number;
   };
   const netByInv = new Map<string, NetEntry>();
   for (const t of txs) {
-    const key = `${t.product_id}|${t.location}|${t.lot_number ?? ''}|${t.expiration_date?.toISOString() ?? ''}`;
+    const key = `${t.product_id}|${t.location_id ?? ''}|${t.lot_number ?? ''}|${t.expiration_date?.toISOString() ?? ''}`;
     const existing = netByInv.get(key) ?? {
       product_id: t.product_id,
-      location: t.location,
+      location_id: t.location_id,
       lot_number: t.lot_number,
       expiration_date: t.expiration_date,
       net: 0,
@@ -201,13 +201,12 @@ export async function getInventoryAllocation(purchase_order_id: string) {
 
   const quantity = active.reduce((sum, r) => sum + r.net, 0);
   const first = active[0];
+  // cmd_562: location_id is an id-FK on both pool and ledger — re-identify
+  // the inventory cache row directly, no reverse name lookup needed.
   const inventoryCache = await prisma.inventory.findFirst({
     where: {
       product_id: first.product_id,
-      // O-6 denormalization writes location as '' when the source inventory's
-      // location is null (see lib/purchase_order/service.ts's `?? ''`); undo
-      // that here so the reverse lookup can still match the row.
-      location: first.location === '' ? null : first.location,
+      location_id: first.location_id,
       lot_number: first.lot_number,
       expiration_date: first.expiration_date,
     },
