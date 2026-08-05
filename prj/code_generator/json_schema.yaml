@@ -71,6 +71,14 @@ x-ledger-entities:
     pool: inventory
     ledger: inventory_transaction
     transactionable: inventory_transactionable
+    # cmd_546: required, no defaults (resolve_ledger_domain fail-closed).
+    # Values match the pool entity's own column names (inventory.product_id/
+    # location_id/lot_number/expiration_date), reused identically on the
+    # ledger side per cmd562-location-id-fk-consumer-migration.md.
+    itemField: product_id
+    locationField: location_id
+    lotField: lot_number
+    expirationField: expiration_date
 
 definitions:
   user:
@@ -1174,7 +1182,7 @@ definitions:
       product_id:
         pattern: "^c[a-z0-9]{24,}$"
         x-relationship:
-          searchField: name
+          labelField: name
       quantity:
         minimum: 0
         default: 0
@@ -1183,7 +1191,7 @@ definitions:
         default: 0
       location_id:
         x-relationship:
-          searchField: name
+          labelField: name
       lot_number: {}
       expiration_date:
         format: date
@@ -1200,9 +1208,20 @@ definitions:
       new: true
       edit: true
       delete: true
-      invalidate: false
+      invalidate:
+        enabled: true
+        module: lib/location/invalidate_location
+        # cmd_569: NOT invalidateLocation (the doc's literal example) — the
+        # generated wrapper in actions.ts is always named
+        # `invalidate{Entity}` and imports+calls this handler by name, so a
+        # same-named handler collides ("defined multiple times", caught by a
+        # real `next build`, not by any existing test). Handler name must
+        # differ from the entity's invalidate{Entity} wrapper name.
+        handler: doInvalidateLocation
       api: true
       test: false
+    # cmd_562: renames leave a record — audit_log row on update/delete.
+    x-audit: true
     x-display:
       table:
         - name:
@@ -1231,7 +1250,13 @@ definitions:
       quantity_delta: {}
       reserved_delta: {}
       product_id: {}
-      location: {}
+      # cmd_562: id-FK (was a bare denormalized string). See
+      # docs/knowledge/appendix/cmd562-location-id-fk-consumer-migration.md.
+      # Uses labelField (not the doc's searchField example) — searchField
+      # was retired by cmd_552, which landed before cmd_562 was written.
+      location_id:
+        x-relationship:
+          labelField: name
       lot_number: {}
       expiration_date:
         format: date
@@ -1239,6 +1264,9 @@ definitions:
       created_by_id:
         pattern: "^c[a-z0-9]{24,}$"
         x-relationship: {}
+    properties:
+      location:
+        $ref: "#/definitions/location"
   inventory_movement:
     x-generate:
       list: true

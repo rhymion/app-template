@@ -125,8 +125,6 @@ model user {
   updated_purchase_per_items   purchase_per_item[]    @relation("PurchasePerItemUpdater")
   created_comments          comment[]           @relation("CommentCreator")
   reactions                 reaction[]          @relation("ReactionUser")
-  created_notes             note[]              @relation("NoteCreator")
-  updated_notes             note[]              @relation("NoteUpdater")
   leave_requests            leave_request[]     @relation("LeaveRequestUser")
   created_leave_requests    leave_request[]     @relation("LeaveRequestCreator")
   updated_leave_requests    leave_request[]     @relation("LeaveRequestUpdater")
@@ -166,6 +164,11 @@ model user {
   updated_inventory_adjustments         inventory_adjustment[]     @relation("InventoryAdjustmentUpdater")
   audit_logs                audit_log[]
   anonymized_at             DateTime?            // Timestamp when PII was scrubbed (GDPR anonymization)
+  // cmd_564/cmd_569: generic invalidate mechanism co-set — anonymize_user.ts
+  // now unconditionally sets this alongside anonymized_at for any entity
+  // using the anonymizeUser handler (pre-existing x-generate.invalidate on
+  // `user`, not new from this cmd's own location opt-in).
+  invalidated_at             DateTime?
   notifications             notification[]       @relation("NotificationUser")
 
   @@index([api_key])
@@ -206,7 +209,6 @@ model organization {
   users       user[]     @relation("UserOrganizations")
   parent1s    parent1[]
   resources   resource[]
-  notes       note[]
 
   @@index([creator_id])
   @@index([updater_id])
@@ -346,7 +348,8 @@ model inventory_transaction {
   quantity_delta                Int
   reserved_delta                Int
   product_id                    String
-  location                      String
+  location_id                   String?
+  location                      location?                 @relation("InventoryTransactionLocation", fields: [location_id], references: [id], onDelete: Restrict)
   lot_number                    String?
   expiration_date               DateTime?                 @db.Timestamptz(0)
   approved_via                  String?
@@ -363,6 +366,7 @@ model inventory_transaction {
   @@index([created_by_id])
   @@index([creator_id])
   @@index([updater_id])
+  @@index([location_id])
 }
 
 model inventory_movement {
@@ -453,24 +457,6 @@ model reaction {
   @@unique([comment_id, user_id, type])
   @@index([comment_id])
   @@index([user_id])
-}
-
-model note {
-  id              String       @id @default(cuid())
-  title           String
-  description     String?
-  organization_id String
-  organization    organization @relation(fields: [organization_id], references: [id])
-  created_at      DateTime     @default(now()) @db.Timestamptz(0)
-  updated_at      DateTime     @updatedAt @db.Timestamptz(0)
-  creator_id      String
-  creator         user         @relation("NoteCreator", fields: [creator_id], references: [id])
-  updater_id      String
-  updater         user         @relation("NoteUpdater", fields: [updater_id], references: [id])
-
-  @@index([organization_id])
-  @@index([creator_id])
-  @@index([updater_id])
 }
 
 model attachable {
@@ -985,15 +971,17 @@ model inventory {
 }
 
 model location {
-  id          String      @id @default(cuid())
-  name        String
-  inventories inventory[]
-  created_at  DateTime    @default(now()) @db.Timestamptz(0)
-  updated_at  DateTime    @updatedAt @db.Timestamptz(0)
-  creator_id  String
-  creator     user        @relation("LocationCreator", fields: [creator_id], references: [id])
-  updater_id  String
-  updater     user        @relation("LocationUpdater", fields: [updater_id], references: [id])
+  id                     String                  @id @default(cuid())
+  name                   String
+  invalidated_at         DateTime?
+  inventories            inventory[]
+  inventory_transactions inventory_transaction[] @relation("InventoryTransactionLocation")
+  created_at             DateTime                @default(now()) @db.Timestamptz(0)
+  updated_at             DateTime                @updatedAt @db.Timestamptz(0)
+  creator_id             String
+  creator                user                    @relation("LocationCreator", fields: [creator_id], references: [id])
+  updater_id             String
+  updater                user                    @relation("LocationUpdater", fields: [updater_id], references: [id])
 
   @@index([creator_id])
   @@index([updater_id])
