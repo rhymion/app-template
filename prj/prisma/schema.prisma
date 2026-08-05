@@ -988,7 +988,7 @@ model inventory_transaction {
   id                           String                     @id @default(cuid())
   inventory_transactionable_id String?
   inventory_transactionable    inventory_transactionable? @relation(fields: [inventory_transactionable_id], references: [id], onDelete: SetNull)
-  event_type                   InventoryEventType
+  event_type                   InventoryEventType         @default(receive)
   quantity_delta               Int                        @default(0)
   reserved_delta               Int                        @default(0)
   product_id                   String

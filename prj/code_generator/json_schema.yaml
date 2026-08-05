@@ -1219,6 +1219,13 @@ definitions:
           - write_off
           - return_to_supplier
         default: receive
+        # cmd_574: adding @default(receive) in Prisma (to satisfy the new
+        # cross-schema default check) makes schema_deriver's Category A
+        # "required" derivation treat this as optional (has_default=True) --
+        # but it's still the list view's primary display column, which must
+        # stay required. Same escape hatch app-generator's own
+        # attachment.type uses for the identical situation.
+        _required: true
       quantity_delta:
         default: 0
       reserved_delta:
