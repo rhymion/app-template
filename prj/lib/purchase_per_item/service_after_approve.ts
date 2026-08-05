@@ -12,7 +12,9 @@ type Tx = Omit<PrismaClient, '$connect' | '$disconnect' | '$on' | '$transaction'
  * both `quantity` and `reserved_quantity` together (unlike reserve/cancel, which
  * only move `reserved_quantity`).
  * O-6: inventory has no direct FK from inventory_transaction; the cache row is
- * re-identified via denormalized fields (product_id/location/lot_number/expiration_date).
+ * re-identified via denormalized fields (product_id/location_id/lot_number/expiration_date).
+ * cmd_562: location is an id-FK (location_id) on both pool and ledger — no more
+ * name string / reverse-lookup.
  * O-8: a line's reservation may span multiple inventory lots, so outstanding
  * reserved quantity is netted per lot from the full transaction history before
  * writing the ship row(s) — symmetric to service_after_reject.ts's cancel netting.
@@ -44,17 +46,17 @@ export async function afterApprove(
   // Net reserved_delta per inventory identity (O-6 denormalized fields; O-8 multi-lot).
   type NetEntry = {
     product_id: string;
-    location: string;
+    location_id: string | null;
     lot_number: string | null;
     expiration_date: Date | null;
     net: number;
   };
   const netByInv = new Map<string, NetEntry>();
   for (const t of txs) {
-    const key = `${t.product_id}|${t.location}|${t.lot_number ?? ''}|${t.expiration_date?.toISOString() ?? ''}`;
+    const key = `${t.product_id}|${t.location_id ?? ''}|${t.lot_number ?? ''}|${t.expiration_date?.toISOString() ?? ''}`;
     const existing = netByInv.get(key) ?? {
       product_id: t.product_id,
-      location: t.location,
+      location_id: t.location_id,
       lot_number: t.lot_number,
       expiration_date: t.expiration_date,
       net: 0,
@@ -72,7 +74,7 @@ export async function afterApprove(
       (t) =>
         t.event_type === 'ship' &&
         t.product_id === reserve.product_id &&
-        t.location === reserve.location &&
+        t.location_id === reserve.location_id &&
         t.lot_number === reserve.lot_number &&
         (t.expiration_date?.getTime() ?? null) === (reserve.expiration_date?.getTime() ?? null),
     );
@@ -85,7 +87,7 @@ export async function afterApprove(
         quantity_delta: -reserve.net, // O-4: ship is the only path that decrements physical inventory
         reserved_delta: -reserve.net,
         product_id: reserve.product_id,
-        location: reserve.location,
+        location_id: reserve.location_id,
         lot_number: reserve.lot_number,
         expiration_date: reserve.expiration_date,
         created_by_id: approvedByUserId,
@@ -94,19 +96,12 @@ export async function afterApprove(
       },
     });
 
-    // Phase4: inventory.location_id FK — denormalized name from the ledger
-    // needs to be reverse-looked-up to a location_id before re-identifying.
-    const reserveLocName = reserve.location === '' ? null : reserve.location;
-    const reserveLoc = reserveLocName
-      ? await tx.location.findFirst({ where: { name: reserveLocName } })
-      : null;
+    // cmd_562: location_id is an id-FK on both pool and ledger — re-identify
+    // the inventory cache row directly, no reverse name lookup needed.
     const inventoryCache = await tx.inventory.findFirst({
       where: {
         product_id: reserve.product_id,
-        // O-6 denormalization writes location as '' when the source inventory's
-        // location is null (see lib/purchase_order/service.ts's `?? ''`); undo
-        // that here so the re-identification lookup matches the real row.
-        location_id: reserveLoc?.id ?? null,
+        location_id: reserve.location_id,
         lot_number: reserve.lot_number,
         expiration_date: reserve.expiration_date,
       },
