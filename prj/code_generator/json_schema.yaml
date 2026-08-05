@@ -84,6 +84,14 @@ x-ledger-entities:
     pool: inventory
     ledger: inventory_transaction
     transactionable: inventory_transactionable
+    # cmd_546: required, no defaults (resolve_ledger_domain fail-closed).
+    # Values match the pool entity's own column names (inventory.product_id/
+    # location_id/lot_number/expiration_date), reused identically on the
+    # ledger side per cmd562-location-id-fk-consumer-migration.md.
+    itemField: product_id
+    locationField: location_id
+    lotField: lot_number
+    expirationField: expiration_date
 
 definitions:
   user:
@@ -283,6 +291,34 @@ definitions:
     properties:
       role:
         $ref: "#/definitions/role"
+
+  # cmd_569: was referenced (fields.approvable_id.x-relationship.target on
+  # approval_request below) but never declared — a schema gap current
+  # validate.py doesn't catch (its target-existence check only scans
+  # `properties`, not `fields`, so a fields-level x-relationship target typo
+  # or omission is silently unvalidated). Declared explicitly for schema
+  # correctness, matching the framework-standard shape (see proj_c's
+  # equivalent definitions.approvable block).
+  approvable:
+    x-generate:
+      list: false
+      view: false
+      new: false
+      edit: false
+      delete: false
+      invalidate: false
+      api: false
+      test: false
+    fields:
+      rejection_reason: {}
+    required:
+      - approval_requests
+    properties:
+      approval_requests:
+        type: array
+        x-outputType: list
+        items:
+          $ref: "#/definitions/approval_request"
 
   approval_flow:
     x-generate:
@@ -554,10 +590,21 @@ definitions:
       new: true
       edit: true
       delete: true
-      invalidate: false
+      invalidate:
+        enabled: true
+        module: lib/location/invalidate_location
+        # cmd_569: NOT invalidateLocation (the doc's literal example) — the
+        # generated wrapper in actions.ts is always named
+        # `invalidate{Entity}` and imports+calls this handler by name, so a
+        # same-named handler collides ("defined multiple times", caught by a
+        # real `next build`, not by any existing test). Handler name must
+        # differ from the entity's invalidate{Entity} wrapper name.
+        handler: doInvalidateLocation
       api: true
       test: true
       search: true
+    # cmd_562: renames leave a record — audit_log row on update/delete.
+    x-audit: true
     x-import-key: [code]
     x-relationships:
       bins:
@@ -1176,12 +1223,13 @@ definitions:
         default: 0
       reserved_delta:
         default: 0
-      # Explicit `default:` is required, not cosmetic: a Prisma-defaulted
-      # non-nullable scalar without one is typed `string | null` on the entity
-      # type while FormViewProps keeps the non-null `string`, and the two
-      # disagree at the FormUpsert call site.
-      location:
-        default: ""
+      # cmd_562: id-FK (was a denormalized display-string snapshot with a
+      # Prisma default; nullable now, so the old FormViewProps type-mismatch
+      # note no longer applies). See
+      # docs/knowledge/appendix/cmd562-location-id-fk-consumer-migration.md.
+      location_id:
+        x-relationship:
+          labelField: name
       lot_number: {}
       expiration_date:
         format: date
@@ -1209,3 +1257,5 @@ definitions:
         $ref: "#/definitions/bin"
       created_by:
         $ref: "#/definitions/user"
+      location:
+        $ref: "#/definitions/location"

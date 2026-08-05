@@ -107,6 +107,11 @@ model user {
   audit_logs                audit_log[]
   notifications             notification[]      @relation("NotificationUser")
   anonymized_at             DateTime?            // Timestamp when PII was scrubbed (GDPR anonymization)
+  // cmd_564/cmd_569: generic invalidate mechanism co-set — anonymize_user.ts
+  // now unconditionally sets this alongside anonymized_at for any entity
+  // using the anonymizeUser handler (pre-existing x-generate.invalidate on
+  // `user`, not new from this cmd's own location opt-in).
+  invalidated_at             DateTime?
 
   // Inventory management (see "Inventory management models" at the end of this file)
   created_unit_of_measures       unit_of_measure[]       @relation("UnitOfMeasureCreator")
@@ -678,20 +683,22 @@ model item {
 }
 
 model location {
-  id         String       @id @default(cuid())
-  code       String       @unique
-  name       String
-  type       LocationType @default(warehouse)
-  created_at DateTime     @default(now()) @db.Timestamptz(0)
+  id             String       @id @default(cuid())
+  code           String       @unique
+  name           String
+  type           LocationType @default(warehouse)
+  invalidated_at DateTime?
+  created_at     DateTime     @default(now()) @db.Timestamptz(0)
   updated_at DateTime     @updatedAt @db.Timestamptz(0)
   creator_id String
   creator    user         @relation("LocationCreator", fields: [creator_id], references: [id])
   updater_id String
   updater    user         @relation("LocationUpdater", fields: [updater_id], references: [id])
 
-  bins           bin[]           @relation("BinLocation")
-  goods_receipts goods_receipt[] @relation("GoodsReceiptLocation")
-  inventories    inventory[]     @relation("InventoryLocation")
+  bins                   bin[]                   @relation("BinLocation")
+  goods_receipts         goods_receipt[]         @relation("GoodsReceiptLocation")
+  inventories            inventory[]             @relation("InventoryLocation")
+  inventory_transactions inventory_transaction[] @relation("InventoryTransactionLocation")
 
   @@index([creator_id])
   @@index([updater_id])
@@ -986,8 +993,8 @@ model inventory_transaction {
   reserved_delta               Int                        @default(0)
   product_id                   String
   product                      item                       @relation("InventoryTransactionProduct", fields: [product_id], references: [id], onDelete: Restrict)
-  // Denormalized location *name* (O-6), '' when the lot has no location.
-  location                     String                     @default("")
+  location_id                  String?
+  location                     location?                  @relation("InventoryTransactionLocation", fields: [location_id], references: [id], onDelete: Restrict)
   lot_number                   String?
   expiration_date              DateTime?                  @db.Date
   // approval_request/approvable id this write was authorized by (R2 audit trail).
@@ -1013,6 +1020,7 @@ model inventory_transaction {
   @@index([creator_id])
   @@index([updater_id])
   @@index([created_by_id])
+  @@index([location_id])
   @@index([product_id])
   @@index([bin_id])
   @@index([inventory_transactionable_id])
