@@ -348,8 +348,8 @@ model inventory_transaction {
   quantity_delta                Int
   reserved_delta                Int
   product_id                    String
-  location_id                   String?
-  location                      location?                 @relation("InventoryTransactionLocation", fields: [location_id], references: [id], onDelete: Restrict)
+  location_id                   String
+  location                      location                  @relation("InventoryTransactionLocation", fields: [location_id], references: [id], onDelete: Restrict)
   lot_number                    String?
   expiration_date               DateTime?                 @db.Timestamptz(0)
   approved_via                  String?
@@ -948,8 +948,8 @@ model inventory {
   product           product   @relation(fields: [product_id], references: [id], onDelete: Cascade)
   quantity          Int       @default(0)
   reserved_quantity Int       @default(0)
-  location_id       String?
-  location          location? @relation(fields: [location_id], references: [id])
+  location_id       String
+  location          location  @relation(fields: [location_id], references: [id])
   lot_number        String?
   expiration_date   DateTime?
   created_at        DateTime  @default(now()) @db.Timestamptz(0)

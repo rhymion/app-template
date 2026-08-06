@@ -46,14 +46,14 @@ export async function afterApprove(
   // Net reserved_delta per inventory identity (O-6 denormalized fields; O-8 multi-lot).
   type NetEntry = {
     product_id: string;
-    location_id: string | null;
+    location_id: string;
     lot_number: string | null;
     expiration_date: Date | null;
     net: number;
   };
   const netByInv = new Map<string, NetEntry>();
   for (const t of txs) {
-    const key = `${t.product_id}|${t.location_id ?? ''}|${t.lot_number ?? ''}|${t.expiration_date?.toISOString() ?? ''}`;
+    const key = `${t.product_id}|${t.location_id}|${t.lot_number ?? ''}|${t.expiration_date?.toISOString() ?? ''}`;
     const existing = netByInv.get(key) ?? {
       product_id: t.product_id,
       location_id: t.location_id,

@@ -1197,9 +1197,12 @@ definitions:
         format: date
     required:
       - product
+      - location
     properties:
       product:
         $ref: "#/definitions/product"
+      location:
+        $ref: "#/definitions/location"
 
   location:
     x-generate:
@@ -1207,7 +1210,7 @@ definitions:
       view: true
       new: true
       edit: true
-      delete: true
+      delete: false
       invalidate:
         enabled: true
         module: lib/location/invalidate_location
@@ -1228,7 +1231,9 @@ definitions:
             primary: true
     fields:
       name: {}
+
   inventory_transactionable: {}
+
   inventory_transaction:
     x-generate:
       new: false
