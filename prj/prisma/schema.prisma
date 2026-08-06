@@ -166,6 +166,7 @@ model user {
   updated_inventory_adjustments         inventory_adjustment[]     @relation("InventoryAdjustmentUpdater")
   audit_logs                audit_log[]
   anonymized_at             DateTime?            // Timestamp when PII was scrubbed (GDPR anonymization)
+  invalidated_at            DateTime?
   notifications             notification[]       @relation("NotificationUser")
 
   @@index([api_key])
@@ -994,6 +995,7 @@ model location {
   creator     user        @relation("LocationCreator", fields: [creator_id], references: [id])
   updater_id  String
   updater     user        @relation("LocationUpdater", fields: [updater_id], references: [id])
+  invalidated_at            DateTime?
 
   @@index([creator_id])
   @@index([updater_id])

@@ -1206,8 +1206,11 @@ definitions:
       view: true
       new: true
       edit: true
-      delete: true
-      invalidate: false
+      delete: false
+      invalidate:
+        enabled: true
+        module: lib/location/invalidate_location
+        handler: doInvalidateLocation
       api: true
       test: false
     x-display:
