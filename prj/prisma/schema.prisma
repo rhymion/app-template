@@ -960,7 +960,7 @@ model inventory {
   id                String    @id @default(cuid())
   product_id        String
   product           product   @relation(fields: [product_id], references: [id], onDelete: Cascade)
-  quantity          Int
+  quantity          Int       @default(0)
   reserved_quantity Int       @default(0)
   location_id       String?
   location          location? @relation(fields: [location_id], references: [id])
