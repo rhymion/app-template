@@ -1228,14 +1228,6 @@ definitions:
       delete: false
       invalidate:
         enabled: true
-        module: lib/location/invalidate_location
-        # cmd_569: NOT invalidateLocation (the doc's literal example) — the
-        # generated wrapper in actions.ts is always named
-        # `invalidate{Entity}` and imports+calls this handler by name, so a
-        # same-named handler collides ("defined multiple times", caught by a
-        # real `next build`, not by any existing test). Handler name must
-        # differ from the entity's invalidate{Entity} wrapper name.
-        handler: doInvalidateLocation
       api: true
       test: false
     # cmd_562: renames leave a record — audit_log row on update/delete.
