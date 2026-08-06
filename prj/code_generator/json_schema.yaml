@@ -1174,7 +1174,7 @@ definitions:
       product_id:
         pattern: "^c[a-z0-9]{24,}$"
         x-relationship:
-          searchField: name
+          labelField: name
       quantity:
         minimum: 0
         default: 0
@@ -1183,7 +1183,7 @@ definitions:
         default: 0
       location_id:
         x-relationship:
-          searchField: name
+          labelField: name
       lot_number: {}
       expiration_date:
         format: date
