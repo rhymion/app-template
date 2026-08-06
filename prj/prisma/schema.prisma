@@ -544,7 +544,7 @@ model dashboard_widget {
   dashboard      dashboard @relation(fields: [dashboard_id], references: [id], onDelete: Cascade)
   name            String
   entity_name     String
-  chart_type      DashboardWidgetChartType
+  chart_type      DashboardWidgetChartType @default(column)
   group_by_field  String
   stack_mode      DashboardWidgetStackMode?
   series_field    String?

@@ -480,7 +480,7 @@ definitions:
           - column
           - bar
           - line
-        default: 1
+        default: column
       stack_mode:
         enum:
           - grouped
