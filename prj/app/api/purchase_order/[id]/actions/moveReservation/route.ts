@@ -71,17 +71,17 @@ export async function POST(req: NextRequest, { params }: Params) {
         // service_after_approve.ts.
         type NetEntry = {
           product_id: string;
-          location: string;
+          location_id: string;
           lot_number: string | null;
           expiration_date: Date | null;
           net: number;
         };
         const netByInv = new Map<string, NetEntry>();
         for (const t of txs) {
-          const key = `${t.product_id}|${t.location}|${t.lot_number ?? ''}|${t.expiration_date?.toISOString() ?? ''}`;
+          const key = `${t.product_id}|${t.location_id}|${t.lot_number ?? ''}|${t.expiration_date?.toISOString() ?? ''}`;
           const existing = netByInv.get(key) ?? {
             product_id: t.product_id,
-            location: t.location,
+            location_id: t.location_id,
             lot_number: t.lot_number,
             expiration_date: t.expiration_date,
             net: 0,
@@ -101,17 +101,13 @@ export async function POST(req: NextRequest, { params }: Params) {
           // Phase4: inventory.location_id FK — denormalized name from the
           // ledger needs to be reverse-looked-up to a location_id before
           // re-identifying the inventory row.
-          const reserveLocName = reserve.location === '' ? null : reserve.location;
-          const reserveLoc = reserveLocName
-            ? await tx.location.findFirst({ where: { name: reserveLocName } })
-            : null;
           const inventoryCache = await tx.inventory.findFirst({
             where: {
               product_id: reserve.product_id,
               // O-6 denormalization writes location as '' for a null source
               // location; undo that for the lookup (same P1 fix as
               // service_after_reject.ts / service_after_approve.ts).
-              location_id: reserveLoc?.id ?? null,
+              location_id: reserve.location_id,
               lot_number: reserve.lot_number,
               expiration_date: reserve.expiration_date,
             },
@@ -123,7 +119,7 @@ export async function POST(req: NextRequest, { params }: Params) {
               quantity_delta: 0, // O-4: cancel never touches physical inventory
               reserved_delta: -reserve.net,
               product_id: reserve.product_id,
-              location: reserve.location,
+              location_id: reserve.location_id,
               lot_number: reserve.lot_number,
               expiration_date: reserve.expiration_date,
               created_by_id: actorId,
@@ -166,7 +162,7 @@ export async function POST(req: NextRequest, { params }: Params) {
               quantity_delta: 0, // O-4: reserve never touches physical inventory
               reserved_delta: allocQty,
               product_id: inv.product_id,
-              location: inv.location?.name ?? '',
+              location_id: inv.location_id,
               lot_number: inv.lot_number,
               expiration_date: inv.expiration_date,
               created_by_id: actorId,

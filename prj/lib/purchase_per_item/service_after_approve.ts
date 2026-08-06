@@ -51,7 +51,7 @@ export async function afterApprove(
   };
   const netByInv = new Map<string, NetEntry>();
   for (const t of txs) {
-    const key = `${t.product_id}|${t.location}|${t.lot_number ?? ''}|${t.expiration_date?.toISOString() ?? ''}`;
+    const key = `${t.product_id}|${t.location_id}|${t.lot_number ?? ''}|${t.expiration_date?.toISOString() ?? ''}`;
     const existing = netByInv.get(key) ?? {
       product_id: t.product_id,
       location: t.location,
