@@ -10,6 +10,30 @@ async function getTestUser() {
 }
 
 /**
+ * inventory.location_id is a required FK (cmd_562 id-FK migration) with no
+ * default — every inventory.create() call needs one. Find-or-create by name
+ * (same pattern as seedSecondInventoryLot below and the generated
+ * populatePurchaseOrderDependencies helper) so repeated calls within a test
+ * run reuse one row instead of piling up duplicates.
+ */
+async function getOrCreateDefaultLocation(testUser: { id: string }) {
+  let locationRecord = await prisma.location.findFirst({
+    where: { name: 'Reservation Test Location' },
+    orderBy: { created_at: 'asc' },
+  });
+  if (!locationRecord) {
+    locationRecord = await prisma.location.create({
+      data: {
+        name: 'Reservation Test Location',
+        creator_id: testUser.id,
+        updater_id: testUser.id,
+      },
+    });
+  }
+  return locationRecord;
+}
+
+/**
  * Seed a product + inventory row with a specific quantity, plus a customer.
  * Returns { product, inventory, customer } for use in reservation Cypress tests.
  */
@@ -34,12 +58,15 @@ export async function seedReservationInventory(quantity: number) {
     });
   }
 
+  const locationRecord = await getOrCreateDefaultLocation(testUser);
+
   // Always create a fresh inventory row with the requested quantity
   const inventoryRecord = await prisma.inventory.create({
     data: {
       product_id: productRecord.id,
       quantity,
       reserved_quantity: 0,
+      location_id: locationRecord.id,
       creator_id: testUser.id,
       updater_id: testUser.id,
     },
@@ -100,11 +127,14 @@ export async function seedSecondProduct(quantity: number) {
     },
   });
 
+  const locationRecord = await getOrCreateDefaultLocation(testUser);
+
   const inventoryRecord = await prisma.inventory.create({
     data: {
       product_id: productRecord.id,
       quantity,
       reserved_quantity: 0,
+      location_id: locationRecord.id,
       creator_id: testUser.id,
       updater_id: testUser.id,
     },

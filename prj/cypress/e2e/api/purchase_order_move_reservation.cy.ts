@@ -11,8 +11,10 @@ describe('moveReservation bespoke endpoint (B-5 Phase2d, G15)', () => {
   });
 
   it('O-8/O-4: moves a reservation off a depleted lot, spilling the re-reservation across two inventory lots', () => {
-    // Lot 1: default (null) location — quantity 5, so the initial order reserves
-    // the full quantity from this single lot (no other lot exists yet).
+    // Lot 1: default location (seedReservationInventory's shared "Reservation
+    // Test Location" — location_id is a required FK, cmd_562) — quantity 5,
+    // so the initial order reserves the full quantity from this single lot
+    // (no other lot exists yet).
     cy.task<any>('db:seedReservationInventory', { quantity: 5 }).then((seed) => {
       cy.request({
         method: 'POST',
@@ -84,8 +86,8 @@ describe('moveReservation bespoke endpoint (B-5 Phase2d, G15)', () => {
                 expect(lot2Res.body.reserved_quantity).to.eq(3);
               });
 
-              // Ledger proof: cancel(-5) on lot 1's original (null-location) reserve,
-              // plus reserve(+2) on lot 1 and reserve(+3) on lot 2 — net = +5 - 5 + 2 + 3 = 5.
+              // Ledger proof: cancel(-5) on lot 1's original reserve, plus
+              // reserve(+2) on lot 1 and reserve(+3) on lot 2 — net = +5 - 5 + 2 + 3 = 5.
               cy.task<any>('db:getInventoryTransactionsByBridge', {
                 inventory_transactionable_id: item.inventory_transactionable_id,
               }).then((allTxs: any[]) => {
@@ -100,14 +102,14 @@ describe('moveReservation bespoke endpoint (B-5 Phase2d, G15)', () => {
                 expect(cancelTx).to.exist;
                 expect(cancelTx.reserved_delta).to.eq(-5);
                 expect(cancelTx.quantity_delta).to.eq(0);
-                // cmd_562: location is now an id-FK — the null-location lot's
-                // cancel tx carries location_id=null (was '' pre-migration).
-                expect(cancelTx.location_id).to.eq(null);
+                // cmd_562: location is now a required id-FK — lot 1's cancel tx
+                // carries lot 1's real location_id (was null/'' pre-migration).
+                expect(cancelTx.location_id).to.eq(seed.inventory.location_id);
 
                 const newReserveTxs = newTxs.filter((t) => t.event_type === 'reserve');
                 expect(newReserveTxs.length).to.eq(2);
                 expect(newReserveTxs.every((t) => t.quantity_delta === 0)).to.be.true; // O-4
-                const byLot1 = newReserveTxs.filter((t) => t.location_id === null);
+                const byLot1 = newReserveTxs.filter((t) => t.location_id === seed.inventory.location_id);
                 const byLot2 = newReserveTxs.filter((t) => t.location_id === lot2.location_id);
                 expect(byLot1.length).to.eq(1);
                 expect(byLot1[0].reserved_delta).to.eq(2);
