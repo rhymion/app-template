@@ -83,40 +83,50 @@ Required, in this order:
 
 1. `npm run test:e2e:build` — prj:sync + docker:up:test + generate-code + db:push + db:generate + db:seed-tenant + build
 2. `npm --prefix app-generator run check:generated` — generated code matches templates/schema
-3. `npm run test:e2e:cy:api` — API Cypress specs only (mandatory dev-time gate)
-4. `npm --prefix app-generator audit --omit=dev --audit-level=high` — production-dependency vulnerability scan
+3. `npm run lint` — must run after step 1, not before (see below for why)
+4. `npm run test:e2e:cy:api` — API Cypress specs only (mandatory dev-time gate)
+5. `npm --prefix app-generator audit --omit=dev --audit-level=high` — production-dependency vulnerability scan
 
 Not a local step — enforced by CI instead:
 
-5. `npm run test:e2e:cy:start` — full Cypress suite including UI specs.
+6. `npm run test:e2e:cy:start` — full Cypress suite including UI specs.
    Runs automatically on push/PR to `develop`/`main` via this repo's own
    `.github/workflows/ci.yml` (`e2e-tests` job). Do not run this locally
    as a gate; it's covered before merge regardless.
 
-### Why pytest/vitest/lint are not required steps here
+### Why pytest and vitest are not required steps here
 
-`npm run test:pytest`, `npm run test:vitest`, and `npm run lint` (all
-three delegate to `app-generator/`) are **not** required steps for proj_c
-tasks. app-generator already runs all three against its own code in its
-own CI (`pytest`, `unit-tests`, `lint` jobs in
+`npm run test:pytest` and `npm run test:vitest` (both delegate to
+`app-generator/`) are **not** required steps for proj_c tasks.
+app-generator already runs both against its own code in its own CI
+(`pytest`, `unit-tests` jobs in
 `app-generator/.github/workflows/ci.yml`) — and this task type's own
 scope rule already forbids touching `app-generator/`, so re-running them
 here against unmodified app-generator content is redundant.
 
-This does **not** mean prj/-sourced hand-written code (copied into
-`app-generator/` by `prj:sync`, step 1 above) is covered by those
-app-generator CI jobs — it structurally isn't: app-generator's own CI
-checks out app-generator alone, with no `prj/` sibling directory, so
-those jobs never see prj/ content no matter what changes in this repo.
-`prj/` currently contains 32 TS/TSX files (16 Cypress spec/support files,
-16 application source files); **0 of them are ever exercised by any lint
-or vitest job in either repo's current CI configuration.** vitest
-specifically has nothing to run against `prj/` regardless of gate
-ordering — none of these files are named `*.test.ts`/`*.spec.ts`. lint is
-a different case: ESLint has no path restriction that would exclude these
-files, so a lint step scoped to `prj/` (run after `prj:sync`) would add
-real, currently-absent coverage. This gate does not require it — an open
-question for a future revision of this doc, not a settled "not needed".
+vitest specifically stays dropped even accounting for prj/-sourced
+content (see the lint section below for why lint is a different case):
+`prj/` currently contains 32 TS/TSX files (16 Cypress spec/support
+files, 16 application source files), and none of them is named
+`*.test.ts`/`*.spec.ts`. vitest's default test discovery has nothing new
+to execute against `prj/` regardless of gate ordering — it would only
+re-run app-generator's own existing suite, which is already covered by
+app-generator's own CI.
+
+### Why lint stays — and why step order matters
+
+Unlike pytest/vitest, `npm run lint` **is** retained as a required step —
+run at step 3, **after** step 1 (`test:e2e:build`, which performs
+`prj:sync`), not before. ESLint has no path-based include/exclude rule
+that would skip prj/-synced files, so running lint after prj:sync means
+it genuinely lints all 32 of `prj/`'s TS/TSX files at their synced
+destination paths inside `app-generator/`, not just app-generator's own
+templates. This is real coverage app-generator's own CI cannot provide:
+app-generator's own `lint`/`unit-tests` CI jobs check out app-generator
+alone with no `prj/` sibling directory, so they structurally never see
+this content, no matter what changes in this repo. **Do not reorder step
+3 ahead of step 1** — doing so silently drops prj/ lint coverage back to
+zero.
 
 ### npm audit — why it stays
 
