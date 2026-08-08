@@ -5,6 +5,22 @@ Detailed change history will begin from the first versioned release.
 
 ## [Unreleased]
 
+### Added
+- `parent1`'s `organization` relationship is now optional (was required) — `resource` stays
+  required, so the schema now covers both a required-org and an optional-org entity for exercising
+  CSV import organization isolation end to end. A migration
+  (`prj/prisma/migrations/20260808112800_parent1_organization_optional/migration.sql`) drops the
+  `NOT NULL` constraint; `onDelete` on the relation changed from `Cascade` to `SetNull` (deleting
+  an organization should orphan a now-optional `parent1` row, not destroy it).
+- `leave_request.user_id` now uses `x-server-value` delegation
+  (`{source: actor, override_permission: delete}`): the field defaults to the acting user, and an
+  actor holding delete permission on `leave_request` may explicitly file one on another user's
+  behalf. See `prj/cypress/e2e/api/leave_request_server_value_delegation.cy.ts` for both directions
+  proven end to end.
+- `resource` and `parent1` gained `x-import-key: [name]`, making both genuinely CSV-importable. New
+  spec `prj/cypress/e2e/api/org_isolation_csv_import.cy.ts` proves organization isolation on
+  import for both the required-org and optional-org path.
+
 ### BREAKING
 - **`ApprovalRequestStatus`, `ReactionType`, `ShiftStatus`, and `DayOfWeek` nativeEnum members are now lowercase snake_case** (e.g. `Pending` → `pending`, `Sunday` → `sunday`), matching app-generator's cmd_493 casing convention for the two inherited enums and extending it to app-template's own `ShiftStatus`/`DayOfWeek`. A migration (`prj/prisma/migrations/20260730221905_cmd499_enum_case_normalization/migration.sql`) rewrites existing rows losslessly; verified against a seeded isolated database (all pre-migration member values round-tripped with zero data loss, `prisma migrate diff` empty against the new schema). Any code or scripts outside this repo that compare against the old PascalCase literals (e.g. `'Scheduled'`, `'Sunday'`) must be updated to the lowercase form.
 
