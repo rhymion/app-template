@@ -27,11 +27,15 @@ Required, in this order:
 1. `npm run test:e2e:build` — prj:sync + docker:up:test + generate-code + db:push + db:generate + db:seed-tenant + build
 2. `npm run lint` — must run after step 1, not before (see below for why)
 3. `npm run test:e2e:cy:api` — API Cypress specs only (mandatory dev-time gate)
-4. `npm --prefix app-generator audit --omit=dev --audit-level=high` — production-dependency vulnerability scan
+4. Rerun any spec(s) that failed in this branch's most recent CI run —
+   **including UI specs**, which step 3 above does not otherwise cover
+   locally (see `app-generator/docs/knowledge/rerun-failed-ci-specs-gate.md`
+   for why and how)
+5. `npm --prefix app-generator audit --omit=dev --audit-level=high` — production-dependency vulnerability scan
 
 Not a local step — enforced by CI instead:
 
-5. `npm run test:e2e:cy:start` — full Cypress suite including UI specs.
+6. `npm run test:e2e:cy:start` — full Cypress suite including UI specs.
    Runs automatically on push/PR to `develop`/`main` via this repo's own
    `.github/workflows/ci.yml` (`e2e-tests` job). Do not run this locally
    as a gate; it's covered before merge regardless.
