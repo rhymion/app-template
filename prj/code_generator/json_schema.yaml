@@ -170,6 +170,17 @@ definitions:
       roles:
         type: many-to-many
         target: role
+    # x-self-only (cmd_631): `setting` is a proxy view of the acting
+    # user's OWN `user` row — id === creator_id always holds for every
+    # real account, so creator_id is exactly the right unconditional
+    # ownership filter here. admin_bypass: true lets an Administrator
+    # read another user's settings for support purposes, but only with
+    # an audit row written for the access (see lib/self_only.ts) — this
+    # scope is entity-name-keyed (`setting`), so it applies ONLY to
+    # settings pages/routes/getters and never touches the `user` entity
+    # itself or any other entity's FK reference to `user`.
+    x-self-only:
+      admin_bypass: true
     allOf:
       - $ref: "#/definitions/user"
       - type: object
