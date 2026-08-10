@@ -9,6 +9,29 @@
 // add its task registration here too.
 export function getProjectTasks(): Record<string, (...args: any[]) => any> {
   return {
+    // cmd_636: approval_flow was moved to x-generate.test: false — these task
+    // names match what the generator used to register (and what
+    // cypress/e2e/approval_flow.cy.ts, cypress/e2e/mobile/approval_flow.cy.ts,
+    // cypress/e2e/api/approval_flow.cy.ts, and
+    // cypress/e2e/approval_flow_same_entity_autocomplete_filter.cy.ts all
+    // call), so those hand-written specs keep working unchanged.
+    async 'db:resetApprovalFlowCallSeq'() {
+      const { _resetApprovalFlowCallSeq } = require('./approval_flow/helper');
+      _resetApprovalFlowCallSeq();
+      return null;
+    },
+    async 'db:populateApprovalFlow'(length: number) {
+      const { populateApprovalFlowData } = require('./approval_flow/helper');
+      return await populateApprovalFlowData(length);
+    },
+    async 'db:populateApprovalFlowFull'(length: number) {
+      const { populateApprovalFlowFullData } = require('./approval_flow/helper');
+      return await populateApprovalFlowFullData(length);
+    },
+    async 'db:populateApprovalFlowDependencies'() {
+      const { populateApprovalFlowDependencies } = require('./approval_flow/helper');
+      return await populateApprovalFlowDependencies();
+    },
     async 'db:getInventoryTransactionsByBridge'(params: { inventory_transactionable_id: string }) {
       const { getInventoryTransactionsByBridge } = require('./inventory_test_helpers');
       return await getInventoryTransactionsByBridge(params.inventory_transactionable_id);
