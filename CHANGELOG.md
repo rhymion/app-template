@@ -5,6 +5,9 @@ Detailed change history will begin from the first versioned release.
 
 ## [Unreleased]
 
+### Fixed
+- `approval_flow.preceded_by` / `.followed_by` used the legacy `labelField` + `secondaryLabelField` pair (`entity_name` + `approver_role.name`), a key the code generator no longer reads at all — the composite label silently degraded to a single field on the View/Edit pages instead of erroring, so the `approver_role` half of every Preceded By / Followed By entry's label was missing on screen. Replaced with the composite array form `labelField: [entity_name, approver_role.name]`. Confirmed the on-screen label actually changes (not just the schema key): before the fix, a linked predecessor's "Preceded By" entry rendered as just its role name (e.g. "Verify Predecessor Role"); after the fix it renders the full composite (e.g. "permission Verify Predecessor Role") — verified with a live Cypress run against a real Postgres-backed dev server, both before and after, not by reading source. Swept the rest of `prj/code_generator/json_schema.yaml` for `secondaryLabelField` — zero remaining occurrences.
+
 ### Internal
 - Set `x-generate.test: false` on `approval_flow` (cmd_661) — its generated CRUD Cypress specs (desktop/mobile/API) and support helper are being replaced by hand-written coverage placed in app-generator (submodule) so the coverage reaches every consumer through the submodule, rather than living only in this repo's `prj/`. Verified via `generate-code`: the three specs, `cypress/support/approval_flow/helper.ts`, and the task registry entry in `cypress/support/generated-tasks.ts` are no longer written (confirmed against `.generated-manifest.json`, which no longer lists them). The hand-written replacement is tracked separately, pending an app-generator submodule pointer update that brings in the entity_name filter/validation design (cmd_652) it needs to exercise.
 
