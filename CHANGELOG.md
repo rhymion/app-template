@@ -5,6 +5,9 @@ Detailed change history will begin from the first versioned release.
 
 ## [Unreleased]
 
+### Internal
+- `scripts/vercel-env.sh`'s `vercel_env_inject()` now also injects `DIRECT_URL` (Production and Preview), sourced from the unpooled Neon connection strings `vercel-setup.sh` already fetches and persists as `DATABASE_URL_UNPOOLED_PROD`/`DATABASE_URL_UNPOOLED_STAGING` — nothing new is fetched from Neon, only forwarded to Vercel (cmd_657 addendum). This is what `app-generator`'s `prisma.config.ts` (cmd_657) needs so that `prisma migrate deploy` (the DB-schema-change command, not a Vercel app deploy) stops running through the pooled connection during a Vercel deploy's build. Corrected a comment in `vercel-setup.sh` Step 3/5 that claimed `prisma migrate deploy` was "deliberately not part of vercel.json buildCommand" — traced via `git log` (not just today's `grep`): the comment was accurate when written (cmd_290, 2026-07-07, describing the then-operative root-level `vercel.json`, which never included it) and went stale after cmd_484 (2026-07-29) made `app-generator/vercel.json` — which had included it since 2026-05-24 — the operative buildCommand; the comment was never updated for that switch. See `docs/vercel-automation-design.md` §18.
+
 ### Security
 - The `setting` entity (the acting user's own profile/settings view) was missing the `x-self-only: { admin_bypass: true }` schema declaration that app-generator's own default schema already carries — a non-owner authenticated user could read another user's settings (`GET /api/setting/{id}` returned 200 instead of 404). Added the declaration to `prj/code_generator/json_schema.yaml` so `setting` gets the same creator-id-scoped ownership filter as app-generator's default, with an audited Administrator bypass (`self_only:admin_bypass` rows written to `audit_log`, see `lib/self_only.ts`). App-layer only — no `schema.prisma`/migration changes (verified byte-identical with and without the declaration).
 
