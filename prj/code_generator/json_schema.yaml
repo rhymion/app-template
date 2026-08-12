@@ -306,7 +306,7 @@ definitions:
       delete: true
       invalidate: false
       api: true
-      test: true
+      test: false
       import: true
     x-relationships:
       preceded_by:

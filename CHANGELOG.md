@@ -5,6 +5,9 @@ Detailed change history will begin from the first versioned release.
 
 ## [Unreleased]
 
+### Internal
+- Set `x-generate.test: false` on `approval_flow` (cmd_661) — its generated CRUD Cypress specs (desktop/mobile/API) and support helper are being replaced by hand-written coverage placed in app-generator (submodule) so the coverage reaches every consumer through the submodule, rather than living only in this repo's `prj/`. Verified via `generate-code`: the three specs, `cypress/support/approval_flow/helper.ts`, and the task registry entry in `cypress/support/generated-tasks.ts` are no longer written (confirmed against `.generated-manifest.json`, which no longer lists them). The hand-written replacement is tracked separately, pending an app-generator submodule pointer update that brings in the entity_name filter/validation design (cmd_652) it needs to exercise.
+
 ### Security
 - The `setting` entity (the acting user's own profile/settings view) was missing the `x-self-only: { admin_bypass: true }` schema declaration that app-generator's own default schema already carries — a non-owner authenticated user could read another user's settings (`GET /api/setting/{id}` returned 200 instead of 404). Added the declaration to `prj/code_generator/json_schema.yaml` so `setting` gets the same creator-id-scoped ownership filter as app-generator's default, with an audited Administrator bypass (`self_only:admin_bypass` rows written to `audit_log`, see `lib/self_only.ts`). App-layer only — no `schema.prisma`/migration changes (verified byte-identical with and without the declaration).
 
