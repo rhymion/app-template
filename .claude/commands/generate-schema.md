@@ -81,15 +81,23 @@ at merge time via CI.
 
 Required, in this order:
 
-1. `npm run test:e2e:build` — prj:sync + docker:up:test + generate-code + db:push + db:generate + db:seed-tenant + build
-2. `npm --prefix app-generator run check:generated` — generated code matches templates/schema
-3. `npm run lint` — must run after step 1, not before (see below for why)
-4. `npm run test:e2e:cy:api` — API Cypress specs only (mandatory dev-time gate)
-5. `npm --prefix app-generator audit --omit=dev --audit-level=high` — production-dependency vulnerability scan
+1. `npm run sync` — prj:sync only. Copies `prj/`'s tracked files into
+   `app-generator/` at their real destination paths. Does **not** run
+   `generate-code` — the template-generated application code (`lib/*/service.ts`
+   etc.) is not produced yet at this point.
+2. `npm run lint` — must run here, immediately after step 1 and before
+   step 3 (see below for why; this is not the same ordering as earlier
+   revisions of this doc — see cmd_682).
+3. `npm run test:e2e:build` — prj:sync (idempotent re-run; safe — step 1
+   already did the same copy) + docker:up:test + generate-code + db:push +
+   db:generate + db:seed-tenant + build
+4. `npm --prefix app-generator run check:generated` — generated code matches templates/schema
+5. `npm run test:e2e:cy:api` — API Cypress specs only (mandatory dev-time gate)
+6. `npm --prefix app-generator audit --omit=dev --audit-level=high` — production-dependency vulnerability scan
 
 Not a local step — enforced by CI instead:
 
-6. `npm run test:e2e:cy:start` — full Cypress suite including UI specs.
+7. `npm run test:e2e:cy:start` — full Cypress suite including UI specs.
    Runs automatically on push/PR to `develop`/`main` via this repo's own
    `.github/workflows/ci.yml` (`e2e-tests` job). Do not run this locally
    as a gate; it's covered before merge regardless.
@@ -115,18 +123,75 @@ app-generator's own CI.
 
 ### Why lint stays — and why step order matters
 
-Unlike pytest/vitest, `npm run lint` **is** retained as a required step —
-run at step 3, **after** step 1 (`test:e2e:build`, which performs
-`prj:sync`), not before. ESLint has no path-based include/exclude rule
-that would skip prj/-synced files, so running lint after prj:sync means
-it genuinely lints all 32 of `prj/`'s TS/TSX files at their synced
-destination paths inside `app-generator/`, not just app-generator's own
-templates. This is real coverage app-generator's own CI cannot provide:
-app-generator's own `lint`/`unit-tests` CI jobs check out app-generator
-alone with no `prj/` sibling directory, so they structurally never see
-this content, no matter what changes in this repo. **Do not reorder step
-3 ahead of step 1** — doing so silently drops prj/ lint coverage back to
-zero.
+Unlike pytest/vitest, `npm run lint` **is** retained as a required step,
+but its position is deliberate and has changed (cmd_682, 2026-08-13 —
+corrected from an earlier revision of this doc that got the ordering
+backwards; see "History of this section" below).
+
+`npm run lint` must run at **step 2** — after step 1 (`npm run sync`,
+prj:sync only) and **before** step 3 (`test:e2e:build`, which runs
+`generate-code`). ESLint has no path-based include/exclude rule that
+would skip prj/-synced files, so running lint right after `prj:sync`
+(before `generate-code`) already gives real coverage of `prj/`'s
+TS/TSX content at its synced destination paths inside `app-generator/` —
+this is coverage app-generator's own CI cannot provide, since
+app-generator's own `lint` CI job checks out app-generator alone with no
+`prj/` sibling, so it structurally never sees this content no matter what
+changes in this repo.
+
+**Do not move step 2 to after step 3.** Measured directly (cmd_682,
+isolated worktree, develop tip `27015f2`, same unmodified schema, `npm
+run lint` via `eslint --max-warnings 20`):
+
+| when `npm run lint` runs | population measured | result |
+|---|---|---|
+| after step 1 (`sync`), before `generate-code` — **this doc's order** | app-generator's own baseline (13 warnings) + prj/'s own 32 files (43 warnings) = 56 warnings, all traceable to either app-generator's pre-existing baseline or to `prj/`'s own tracked content | still over the inherited ceiling of 20 (see flagged item below) but a real, explainable population |
+| after step 3 (`test:e2e:build`, which runs `generate-code`) — **the old, wrong order** | the same 56, **plus 394 additional warnings from freshly-instantiated template output** (e.g. `lib/setting6/actions.ts`, `lib/setting8/service.ts` — per-entity `service.ts`/`actions.ts` files that exist only after `generate-code` expands the jinja2 templates for every entity in the schema) — **450 warnings total** | fails, for reasons that have nothing to do with the schema change under test |
+
+This is the mechanism behind a real, reproducible problem: content that
+app-generator's own gate treats as fine (13 warnings, passes at ceiling
+20, because app-generator's own repo only lints its committed templates,
+never an instantiated copy of them) gets rejected once a schema is
+created here and the old ordering measures the full generated output
+instead. app-generator's own gate never lints an instantiated copy of its
+templates across a real schema's worth of entities, because app-generator
+has no schema of its own to generate against. The old "lint after
+generate-code" ordering in this doc was the only place that population
+(394 extra warnings, 0 errors, entirely pre-existing generator template
+debt unrelated to any given schema edit) got measured — and it silently
+failed *any* schema-creation task in this repo, regardless of what was
+actually changed. Moving lint to before `generate-code` removes that
+false population from the gate.
+
+**Flagged, not resolved by the reordering above (needs a project-owner
+decision, not a silent patch)**: even with the corrected scope (56
+warnings: baseline 13 + prj/'s own 43), the gate is **still red** today,
+because the inherited `--max-warnings 20` ceiling (delegated verbatim
+from app-generator's own `package.json`, which calibrated it for
+app-generator's own ~13-15-warning template baseline) was never
+recalibrated for `prj/`'s own growing hand-written content. `prj/`'s own
+scoped warning count grew from 3 (2026-08-12, subtask_664b) to 43
+(2026-08-13, cmd_682) in one day, driven by genuine new hand-written
+Cypress specs (`no-unused-expressions` on chai-style assertions — the
+same warning class already present in app-generator's own 13-warning
+baseline). This is real, correctly-scoped signal, not an ordering
+artifact — do **not** raise the ceiling number to paper over it without
+that decision; that would repeat the "launder the threshold instead of
+fixing the population" mistake cmd_600 explicitly rejected. Tracked
+together with the prj/-lint-scope implementation decision (subtask_664b)
+that is pending the same decision.
+
+#### History of this section
+
+An earlier revision of this doc (through 2026-08-13) placed `npm run
+lint` after `test:e2e:build` on the stated rationale that `prj:sync`
+(bundled inside `test:e2e:build`) had to run first for lint to see
+`prj/`'s content at all. That reasoning about needing `prj:sync` first
+was correct; the mistake was placing lint after the **entire**
+`test:e2e:build` step (which also runs `generate-code`) instead of after
+just the `prj:sync` portion. This doc now separates `prj:sync` out as its
+own step (step 1, `npm run sync`) specifically so lint can run right
+after it without also picking up `generate-code`'s output.
 
 ### npm audit — why it stays
 
