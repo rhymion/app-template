@@ -5,6 +5,14 @@ Detailed change history will begin from the first versioned release.
 
 ## [Unreleased]
 
+### Internal
+- Set `x-generate.test: false` on `approval_flow` (cmd_661) — its generated CRUD Cypress specs (desktop/mobile/API)
+  and support helper are being replaced by hand-written coverage placed in app-generator (submodule) so the coverage
+  reaches every consumer through the submodule, rather than living only in this repo's `prj/`. Verified via
+  `generate-code`: the three specs, `cypress/support/approval_flow/helper.ts`, and the task registry entry in
+  `cypress/support/generated-tasks.ts` are no longer written (confirmed against `.generated-manifest.json`, 
+  which no longer lists them). The hand-written replacement is tracked separately, pending an app-generator submodule
+
 ### Fixed
 - **`approval_flow` predecessor/successor list showed a different label on the View page than on
   the Edit page for the same row**, and picking a predecessor/successor offered candidates from
