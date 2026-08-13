@@ -593,9 +593,24 @@ run vercel env rm PRISMA_DATABASE_URL production --yes 2>/dev/null || true
 run vercel env rm PRISMA_DATABASE_URL preview --yes 2>/dev/null || true
 
 # ── Step 3: First-time migration against production DB ─────────────────────
-# Deliberately NOT part of vercel.json buildCommand (see
-# docs/vercel-automation-design.md §3): a failed migration on every build
-# would block ALL deploys. Run once here, before the first deploy.
+# This one-time, local, unpooled `prisma migrate deploy` call is correct and
+# unchanged. What was wrong (cmd_657 correction) was the claim below it: this
+# comment used to say migration is "deliberately NOT part of vercel.json
+# buildCommand ... a failed migration on every build would block ALL
+# deploys." That was true when written (cmd_290, 2026-07-07) of the
+# then-current root-level `vercel.json`, whose buildCommand never included
+# `migrate:deploy` (confirmed via `git log -- vercel.json`). It went stale,
+# not wrong-from-the-start: cmd_484 (2026-07-29) deleted that root
+# `vercel.json` and made `app-generator/vercel.json` — whose buildCommand had
+# included `migrate:deploy` since 2026-05-24 (commit 74383f86), predating
+# even the comment above — the one Vercel actually reads (§17.5). The comment
+# was never updated for that switch. Concretely: `prisma migrate deploy` DOES
+# run on every Vercel deploy today, inside `vercel-build`, via the pooled
+# `DATABASE_URL` (this is the actual deviation cmd_657 exists to close —
+# see §18). This Step 3 call is still needed for a different, still-valid
+# reason: `db:seed-tenant` (Step 4) is not part of buildCommand and needs the
+# schema to already exist — this call, and the deploy that follows it, are
+# what create that schema before the very first `vercel-build` ever runs.
 echo ""
 echo "[Step 3] Running migrate:deploy against production DB..."
 if [[ "$DRY_RUN" == "true" ]]; then

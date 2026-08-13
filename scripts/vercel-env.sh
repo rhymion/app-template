@@ -5,9 +5,13 @@
 # Usage (direct run): bash scripts/vercel-env.sh inject <production|preview>
 #
 # Two-DB pattern (see docs/vercel-automation-design.md §7):
-#   inject production -> DATABASE_URL_PROD    is injected as DATABASE_URL
-#   inject preview    -> DATABASE_URL_STAGING is injected as DATABASE_URL
+#   inject production -> DATABASE_URL_PROD            is injected as DATABASE_URL (pooled)
+#                      -> DATABASE_URL_UNPOOLED_PROD    is injected as DIRECT_URL (unpooled)
+#   inject preview    -> DATABASE_URL_STAGING          is injected as DATABASE_URL (pooled)
+#                      -> DATABASE_URL_UNPOOLED_STAGING is injected as DIRECT_URL (unpooled)
 #   (all preview/staging deploys share one DB — deliberate, keeps DB count at 2)
+#   DIRECT_URL is what prisma.config.ts uses for `migrate:deploy` on Vercel —
+#   see cmd_657 / docs/knowledge/prisma-direct-vs-pooled-connection.md.
 set -euo pipefail
 
 _SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
@@ -129,23 +133,29 @@ inject_var() {
 # Usage: vercel_env_inject <production|preview>
 vercel_env_inject() {
   local target="${1:?Usage: vercel_env_inject <production|preview>}"
-  local db_url
+  local db_url direct_url
 
   case "$target" in
     production)
       if [[ "$DRY_RUN" == "true" ]]; then
         db_url="${DATABASE_URL_PROD:-<DRY_RUN_DATABASE_URL_PROD>}"
+        direct_url="${DATABASE_URL_UNPOOLED_PROD:-<DRY_RUN_DATABASE_URL_UNPOOLED_PROD>}"
       else
         : "${DATABASE_URL_PROD:?DATABASE_URL_PROD is required in .env.production.local for target=production}"
+        : "${DATABASE_URL_UNPOOLED_PROD:?DATABASE_URL_UNPOOLED_PROD is required in .env.production.local for target=production}"
         db_url="$DATABASE_URL_PROD"
+        direct_url="$DATABASE_URL_UNPOOLED_PROD"
       fi
       ;;
     preview)
       if [[ "$DRY_RUN" == "true" ]]; then
         db_url="${DATABASE_URL_STAGING:-<DRY_RUN_DATABASE_URL_STAGING>}"
+        direct_url="${DATABASE_URL_UNPOOLED_STAGING:-<DRY_RUN_DATABASE_URL_UNPOOLED_STAGING>}"
       else
         : "${DATABASE_URL_STAGING:?DATABASE_URL_STAGING is required in .env.production.local for target=preview}"
+        : "${DATABASE_URL_UNPOOLED_STAGING:?DATABASE_URL_UNPOOLED_STAGING is required in .env.production.local for target=preview}"
         db_url="$DATABASE_URL_STAGING"
+        direct_url="$DATABASE_URL_UNPOOLED_STAGING"
       fi
       ;;
     development)
@@ -160,6 +170,14 @@ vercel_env_inject() {
 
   echo "=== Injecting Vercel env vars: target=${target} ==="
   inject_var DATABASE_URL "$db_url" "$target"
+  # DIRECT_URL: the unpooled Neon endpoint, consumed by prisma.config.ts for
+  # `migrate:deploy` (both the one-time run in vercel-setup.sh Steps 3/5 and
+  # the migrate:deploy embedded in `vercel-build`, which runs on every Vercel
+  # build). Pooled DATABASE_URL cannot carry migrations reliably — PgBouncer
+  # transaction mode does not preserve the session-scoped advisory lock
+  # Prisma's migration engine takes. See
+  # docs/knowledge/prisma-direct-vs-pooled-connection.md.
+  inject_var DIRECT_URL "$direct_url" "$target"
   inject_var AUTH_SECRET "$AUTH_SECRET" "$target"
   inject_var REDIS_URL "$REDIS_URL" "$target"
   inject_var BLOB_READ_WRITE_TOKEN "$BLOB_READ_WRITE_TOKEN" "$target"
