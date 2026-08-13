@@ -803,3 +803,87 @@ the same change rather than kept "just in case."
 `prj:sync` requires Python 3 to run, but this introduces no new prerequisite:
 `test:e2e:build` and `generate-code` already required Python 3 before this
 change (see the Prerequisites table in `README.md`/`README_ja.md`).
+
+## 18. `DIRECT_URL` wired into Vercel (cmd_657 follow-up, 2026-08-12)
+
+### 18.1 What changed
+
+`scripts/vercel-env.sh`'s `vercel_env_inject()` now injects a `DIRECT_URL`
+Vercel env var (Production and Preview) alongside the existing `DATABASE_URL`,
+sourced from `DATABASE_URL_UNPOOLED_PROD` / `DATABASE_URL_UNPOOLED_STAGING`.
+Both values were already being fetched from Neon and persisted to
+`.env.production.local` by `vercel-setup.sh`'s `get_neon_connection_strings()`
+— nothing new is fetched. What was missing was forwarding the already-present
+unpooled value to Vercel. Re-running `vercel-setup.sh` (idempotent, same as
+every other var it injects) is sufficient to apply this — no manual Vercel
+dashboard step.
+
+This closes the gap `app-generator`'s `prisma.config.ts` (cmd_657,
+`docs/knowledge/prisma-direct-vs-pooled-connection.md` in that repo) depends
+on: on Vercel, that file now requires `DIRECT_URL` to be set and throws at
+config-load time if it isn't. Before this change, nothing set it on Vercel.
+
+**Naming decision:** the Vercel-side variable is named `DIRECT_URL` (Prisma's
+convention), not `DATABASE_URL_UNPOOLED_PROD`/`_STAGING` (this repo's local
+`.env.production.local` convention). This isn't a stylistic pick between two
+equally-valid options — `prisma.config.ts` in `app-generator` already reads
+`process.env.DIRECT_URL` specifically (subtask_657a, merged ahead of this
+change); naming the Vercel env var anything else would mean the value never
+reaches the code that consumes it. The two conventions are kept in their own
+layers rather than mixed: `.env.production.local` (local persistence, this
+repo) keeps its existing `DATABASE_URL_UNPOOLED_*` names; `DIRECT_URL` is
+only the name of the Vercel-injected variable, matching what the consuming
+`prisma.config.ts` reads.
+
+### 18.2 Corrected: `migrate:deploy` **is** part of `buildCommand`
+
+`scripts/vercel-setup.sh`'s Step 3/5 comments previously claimed `prisma
+migrate deploy` was "deliberately NOT part of vercel.json buildCommand,"
+citing §3. The Step 3 migration call itself (one-time, local, unpooled) was
+never wrong — only that claim was. Lineage, traced via `git log` across both
+repos rather than a point-in-time `grep` (a `grep` alone would only show
+today's mismatch, not whether the comment was ever accurate):
+
+- The comment was added in `de54bd0` (cmd_290, 2026-07-07). At that commit,
+  app-template's **root-level** `vercel.json` existed with a buildCommand
+  (`bash scripts/sync-prj.sh && npm --prefix app-generator run db:generate &&
+  ... build`) that genuinely did **not** include `migrate:deploy` — the claim
+  was correct for the config actually in effect at the time.
+- `app-generator/vercel.json`, whose buildCommand (`npm run vercel-build`)
+  *does* include `migrate:deploy`, had existed since `74383f86`
+  (2026-05-24) — predating the comment — but was not yet the operative
+  config: Root Directory pointed at the app-template repository root, so
+  Vercel read the root `vercel.json`, not the submodule's.
+- `9cfdd7c` (cmd_484, 2026-07-29) deleted the root-level `vercel.json` as
+  dead configuration (§17.3) once Root Directory was confirmed to already be
+  `app-generator` in practice. From that point on, `app-generator/vercel.json`
+  became the operative buildCommand — the one that includes `migrate:deploy`
+  — but the Step 3/5 comments in `vercel-setup.sh` were never updated to
+  match. §17.5 (this same cmd_484 correction) already established the
+  current reality; this task closes the remaining stale comment cmd_484
+  missed.
+
+**Verdict: the comment went stale, it was not wrong from the start.** It
+accurately described app-template's build config as it stood on
+2026-07-07 and stopped matching reality only after cmd_484's Root Directory
+correction on 2026-07-29. The Step 3/5 comments have been corrected in
+place; see the script for the current rationale (schema must exist before
+Step 4/5.5's `db:seed-tenant`, which is not part of `buildCommand`).
+
+One practical consequence, not itself investigated or changed by this task:
+the `migrate:deploy` embedded in `vercel-build` now also picks up `DIRECT_URL`
+(via `prisma.config.ts`'s `directMigrationUrl || DATABASE_URL` — see the
+app-generator doc above) once this Vercel-env change is applied via
+`vercel-setup.sh`, so the every-build `prisma migrate deploy` inside
+`vercel-build` moves off the pooled connection too, not just
+`vercel-setup.sh`'s own one-time calls (which already used the unpooled value
+directly and were never affected by this gap).
+
+### 18.3 Whether `migrate:deploy` should keep running on every build
+
+Out of scope for this task (cmd_657's addendum scoped it to the connection
+target, not the timing) — flagged upstream instead of changed. `vercel-build`
+running `prisma migrate deploy` on every ordinary Vercel build/deploy means a
+bad migration can block all Vercel deploys, as `vercel-setup.sh`'s original
+(now-corrected) Step 3 comment warned about in the first place, just
+attributed to the wrong file.

@@ -5,6 +5,48 @@ Detailed change history will begin from the first versioned release.
 
 ## [Unreleased]
 
+### Internal
+- Set `x-generate.test: false` on `approval_flow` (cmd_661) — its generated CRUD Cypress specs (desktop/mobile/API)
+  and support helper are being replaced by hand-written coverage placed in app-generator (submodule) so the coverage
+  reaches every consumer through the submodule, rather than living only in this repo's `prj/`. Verified via
+  `generate-code`: the three specs, `cypress/support/approval_flow/helper.ts`, and the task registry entry in
+  `cypress/support/generated-tasks.ts` are no longer written (confirmed against `.generated-manifest.json`, 
+  which no longer lists them). The hand-written replacement is tracked separately, pending an app-generator submodule
+- `scripts/vercel-env.sh`'s `vercel_env_inject()` now also injects `DIRECT_URL` (Production and Preview), sourced
+  from the unpooled Neon connection strings `vercel-setup.sh` already fetches and persists as
+  `DATABASE_URL_UNPOOLED_PROD`/`DATABASE_URL_UNPOOLED_STAGING` — nothing new is fetched from Neon, only forwarded
+  to Vercel (cmd_657 addendum). This is what `app-generator`'s `prisma.config.ts` (cmd_657) needs so that
+  `prisma migrate deploy` (the DB-schema-change command, not a Vercel app deploy) stops running through the pooled
+  connection during a Vercel deploy's build. Corrected a comment in `vercel-setup.sh` Step 3/5 that claimed
+  `prisma migrate deploy` was "deliberately not part of vercel.json buildCommand" — traced via `git log`
+  (not just today's `grep`): the comment was accurate when written (cmd_290, 2026-07-07, describing the then-operative
+  root-level `vercel.json`, which never included it) and went stale after cmd_484 (2026-07-29) made
+  `app-generator/vercel.json` — which had included it since 2026-05-24 — the operative buildCommand; 
+  the comment was never updated for that switch. See `docs/vercel-automation-design.md` §18.
+
+### Fixed
+- **`approval_flow` predecessor/successor list showed a different label on the View page than on
+  the Edit page for the same row**, and picking a predecessor/successor offered candidates from
+  every entity type instead of just the one the approval chain applies to. Both are fixed upstream
+  in app-generator; see its CHANGELOG for detail. Multiple `approval_flow` rows sharing the same
+  entity type is expected (multi-stage approval chains), not a data-quality issue.
+
+### Added
+- `parent1`'s `organization` relationship is now optional (was required) — `resource` stays
+  required, so the schema now covers both a required-org and an optional-org entity for exercising
+  CSV import organization isolation end to end. A migration
+  (`prj/prisma/migrations/20260808112800_parent1_organization_optional/migration.sql`) drops the
+  `NOT NULL` constraint; `onDelete` on the relation changed from `Cascade` to `SetNull` (deleting
+  an organization should orphan a now-optional `parent1` row, not destroy it).
+- `leave_request.user_id` now uses `x-server-value` delegation
+  (`{source: actor, override_permission: delete}`): the field defaults to the acting user, and an
+  actor holding delete permission on `leave_request` may explicitly file one on another user's
+  behalf. See `prj/cypress/e2e/api/leave_request_server_value_delegation.cy.ts` for both directions
+  proven end to end.
+- `resource` and `parent1` gained `x-import-key: [name]`, making both genuinely CSV-importable. New
+  spec `prj/cypress/e2e/api/org_isolation_csv_import.cy.ts` proves organization isolation on
+  import for both the required-org and optional-org path.
+
 ### Security
 - The `setting` entity (the acting user's own profile/settings view) was missing the `x-self-only: { admin_bypass: true }` schema declaration that app-generator's own default schema already carries — a non-owner authenticated user could read another user's settings (`GET /api/setting/{id}` returned 200 instead of 404). Added the declaration to `prj/code_generator/json_schema.yaml` so `setting` gets the same creator-id-scoped ownership filter as app-generator's default, with an audited Administrator bypass (`self_only:admin_bypass` rows written to `audit_log`, see `lib/self_only.ts`). App-layer only — no `schema.prisma`/migration changes (verified byte-identical with and without the declaration).
 

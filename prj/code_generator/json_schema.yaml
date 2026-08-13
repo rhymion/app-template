@@ -306,19 +306,17 @@ definitions:
       delete: true
       invalidate: false
       api: true
-      test: true
+      test: false
       import: true
     x-relationships:
       preceded_by:
         type: many-to-many
         target: approval_flow
-        labelField: entity_name
-        secondaryLabelField: approver_role.name
+        labelField: [entity_name, approver_role.name]
       followed_by:
         type: many-to-many
         target: approval_flow
-        labelField: entity_name
-        secondaryLabelField: approver_role.name
+        labelField: [entity_name, approver_role.name]
     x-import-key: [entity_name, approver_role.name]
     x-display:
       table:
@@ -692,6 +690,7 @@ definitions:
       delete: true
       invalidate: false
       api: true
+      test: true
     fields:
       name:
         minLength: 1
@@ -708,10 +707,10 @@ definitions:
         format: uri
         x-uri-kind: link
     required:
-      - organization
       - parent1_child1s
       - parent1_child2s
       - parent1_lists
+    x-import-key: [name]
     properties:
       organization:
         $ref: "#/definitions/organization"
@@ -985,6 +984,7 @@ definitions:
           labelField: id
     required:
       - organization
+    x-import-key: [name]
     properties:
       organization:
         $ref: "#/definitions/organization"
@@ -1508,6 +1508,9 @@ definitions:
       user_id:
         pattern: "^c[a-z0-9]{24,}$"
         x-relationship: {}
+        x-server-value:
+          source: actor
+          override_permission: delete
       start_date:
         format: date
       end_date:
