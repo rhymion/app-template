@@ -235,10 +235,15 @@ Files (all in `app-template/scripts/` unless noted):
 
 ## 5. Operation Sequence
 
+> **⚠ cmd_691 correction (2026-08-14): three-stage split.** `vercel-setup.sh`
+> used to also run `migrate:deploy`/`db:seed-tenant` (old Steps 3/4/5/5.5).
+> Those are now two separate scripts run *after* setup — see §19 for why and
+> what changed. `vercel-setup.sh` is control-plane only.
+
 The Neon/Upstash/Blob provisioning steps originally planned as manual (see §6, §14-§16)
 are now automated inside `vercel-setup.sh` — a single script run handles get-or-create
-provisioning for all three, migration, and seeding. `.env.production.local` only needs
-credentials, not resource URLs.
+provisioning for all three. `.env.production.local` only needs credentials, not resource
+URLs.
 
 ### Step 1: Prepare `.env.production.local`
 
@@ -255,7 +260,7 @@ cp .env.production.local.example .env.production.local
 # written back into this file automatically by vercel-setup.sh — leave them blank.
 ```
 
-### Step 2: Run setup
+### Step 2: Run control-plane setup (no DB writes)
 
 ```bash
 export VERCEL_TOKEN="<your-token>"    # env var only, never --token flag
@@ -266,24 +271,61 @@ bash scripts/vercel-setup.sh
 `vercel-setup.sh`, in order: verify the submodule is checked out (Step 0) → Neon
 get-or-create (Step A, §14) → Upstash get-or-create (Step B, §15) → link the Vercel
 project and ensure its Root Directory (Steps 1/1.5) → Vercel Blob get-or-create
-(Step C, §16) → inject all env vars for `production` and `preview` (Step 2) →
-`migrate:deploy` against production (Step 3) → `db:seed-tenant` against production
-(Step 4) → `migrate:deploy` against staging (Step 5). Every step is idempotent — re-running
-after a partial failure skips whatever already succeeded.
+(Step C, §16) → inject all env vars for `production` and `preview` (Step 2). Every
+step is idempotent — re-running after a partial failure skips whatever already
+succeeded. **No migration or seeding runs here** — see Steps 3/4 below.
 
-### Step 3: Verify Env and Trigger Deploy
+### Step 3: First deploy (creates the database schema)
 
 ```bash
-vercel env ls production     # confirm all vars are listed
-git push origin main         # Vercel auto-deploys on push (preferred path)
-# Or: bash scripts/vercel-deploy.sh [--prod]   # manual CLI deploy
+vercel env ls production     # optional: confirm all vars are listed
+
+# Staging (either works — both trigger the same vercel-build, which runs
+# migrate:deploy):
+git push origin develop      # Vercel preview auto-deploy (preferred path)
+# or: bash scripts/vercel-deploy.sh
+
+# Production:
+bash scripts/vercel-deploy.sh --prod
 ```
+
+Both environments must have at least one successful deploy before seeding —
+`vercel-build` (not `vercel-setup.sh`) is what creates the schema, via
+`migrate:deploy` (§18).
+
+### Step 4: Seed (bootstrap tenant and admin user)
+
+Run **after** Step 3 has completed for the target environment:
+
+```bash
+bash scripts/vercel-seed.sh          # seed staging
+bash scripts/vercel-seed.sh --prod   # seed production
+```
+
+`vercel-seed.sh` checks that the schema exists (`prisma migrate status`)
+before seeding; if Step 3 hasn't run yet for that environment, it stops with
+a human-readable message instead of failing on missing tables. See §19.
+
+### Diagnostic (any time, read-only)
+
+```bash
+bash scripts/vercel-setup.sh --status
+```
+
+Prints `prisma migrate status` for both production and staging without
+writing anything — useful for confirming Step 3/4 landed, or for checking
+whether an auto-deploy (git push) already migrated staging behind your back.
 
 ### On Teardown
 
 ```bash
 bash scripts/vercel-teardown.sh
 ```
+
+Removes injected env vars and unlinks the project only — it never depended
+on the removed migrate/seed steps in `vercel-setup.sh`, so this split
+required no teardown change (confirmed by reading the script: `_VARS` and
+the unlink call reference nothing from those steps).
 
 ---
 
@@ -887,3 +929,105 @@ running `prisma migrate deploy` on every ordinary Vercel build/deploy means a
 bad migration can block all Vercel deploys, as `vercel-setup.sh`'s original
 (now-corrected) Step 3 comment warned about in the first place, just
 attributed to the wrong file.
+
+---
+
+## 19. Three-stage split: setup / deploy / seed, and the SSL warning fix (cmd_691, 2026-08-14)
+
+### 19.1 Why `vercel-setup.sh` no longer runs migrate/seed
+
+`vercel-setup.sh`'s old Steps 3/4/5/5.5 ran `migrate:deploy`/`db:seed-tenant`
+against production, then staging, as the last part of setup. Two problems,
+both about *when* a step runs, not *who* owns it (§18.2 already established
+who owns `migrate:deploy`: `vercel-build`, not `vercel-setup.sh`):
+
+- **Redundant owner for migrate.** `vercel-build` already runs
+  `migrate:deploy` on every deploy. A second, earlier call inside
+  `vercel-setup.sh` added no coverage `vercel-deploy.sh`'s first run
+  wouldn't already provide, just an extra place migration failures could
+  surface.
+- **Wrong-order risk for seed.** `vercel-setup.sh` runs *before* the first
+  deploy. If migration ownership ever moved earlier (or a future change
+  reordered steps), seeding before any deploy has happened means seeding a
+  database with no schema yet — a silent, hard-to-diagnose failure mode:
+  relying on operators to run things in the right order, with no check,
+  eventually fails when someone doesn't.
+
+The fix: split into three scripts, each with one job, run in a fixed order —
+`vercel-setup.sh` (control plane: provisioning, project link, env vars — no
+DB writes) → `vercel-deploy.sh` (creates the schema, via `vercel-build`'s
+`migrate:deploy`) → `vercel-seed.sh` (new; bootstrap data). `vercel-seed.sh`
+does not just assume the order was followed — it checks `prisma migrate
+status` before seeding and stops with a plain-language message if the schema
+isn't there yet (§4's `gcp-seed.sh` uses the same pattern: check the
+prerequisite is real before touching data, don't just document it and hope).
+
+Verified live, without touching Vercel/Neon: a scratch local Postgres
+container with no migrations applied reproduces the "someone ran
+`vercel-seed.sh` before any deploy" scenario. `vercel-seed.sh` against it:
+
+```
+[Guard] Checking schema exists (migration state)...
+ERROR: schema is not ready for seeding on staging.
+
+  ...
+  No migration found in prisma/migrations
+  The current database is not managed by Prisma Migrate.
+  ...
+
+  If the message above says no migration is applied yet / database not
+  managed by Prisma Migrate:
+    Run scripts/vercel-deploy.sh (or git push to trigger Vercel auto-deploy)
+    first, then re-run this script.
+```
+
+exit 1, no seed attempted. Against the same container after a real
+`migrate deploy` (full schema applied, `_prisma_migrations` populated): the
+guard reports "Schema confirmed", `db:seed-tenant` runs, and prints "Tenant
+seeded successfully!" — re-running it a second time is a no-op success
+(idempotent), same as `db:seed-tenant`'s existing upsert-based writes always
+were.
+
+**A note on the guard's own implementation** (found only by running it, not
+by reading the design): an earlier version of this guard matched
+`migrate status`'s output against fixed message strings (`"No migration
+found in the migrations directory"`, `"P1001|P1017|..."`). Neither string
+occurs verbatim in this Prisma version's real output, and this repo (unlike
+a real consumer with committed migrations) has zero migration files of its
+own, so the same "No migration found in prisma/migrations" line appears on
+*both* a schema-less database (real problem) and an up-to-date one (fine) —
+text matching can't tell them apart, and the original pattern silently fell
+through to "confirmed" on every failure mode it didn't happen to match,
+including an unrelated `prisma.config.ts` load error. The guard now keys on
+`prisma migrate status`'s exit code instead (0 = proceed, nonzero = stop and
+show the real output) — the only signal confirmed reliable across all cases
+tested.
+
+### 19.2 SSL deprecation warning: root cause and fix
+
+Separately, a warning appeared during `db:seed-tenant`:
+
+```
+Warning: SECURITY WARNING: The SSL modes 'prefer', 'require', and
+'verify-ca' are treated as aliases for 'verify-full'. In the next major
+version (pg-connection-string v3.0.0 and pg v9.0.0), these modes will adopt
+standard libpq semantics, which have weaker security guarantees.
+```
+
+This is an `app-generator`-side fix (`lib/db-url.ts`, applied in
+`lib/prisma.ts` and `scripts/seed-tenant.ts`), reached by this repo's own
+submodule pointer bump rather than duplicated here — see
+`app-generator/docs/knowledge/pg-connection-string-sslmode-deprecation.md`
+for the full root-cause writeup (source of the warning, why it's harmless
+today, why it would become a real regression after the next major version,
+and the fix). Summary: Neon's connection strings embed
+`sslmode=require`, which `pg-connection-string` warns about but currently
+treats identically to `sslmode=verify-full` (byte-identical resulting `ssl`
+config, confirmed by direct inspection of the installed
+`pg-connection-string@2.11.0` source and by a live `pg.Pool` connection
+attempt with each). Pinning to `verify-full` explicitly silences the warning
+today and — per the deprecation message's own guidance — keeps that same
+verification strength after the next major version, instead of drifting to
+weaker libpq semantics along with everyone who left it unpinned.
+`prisma migrate deploy` (`vercel-build`) is unaffected — Prisma's migration
+engine doesn't use the `pg-connection-string` npm package at all.

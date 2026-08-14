@@ -6,6 +6,29 @@ Detailed change history will begin from the first versioned release.
 ## [Unreleased]
 
 ### Internal
+- **`vercel-setup.sh` no longer runs database migration or seeding** (cmd_691) — its old
+  Steps 3/4/5/5.5 (`migrate:deploy`/`db:seed-tenant` against production then staging) are removed.
+  `vercel-build` already runs `migrate:deploy` on every deploy (§18), so the earlier call was a
+  redundant second owner; and `vercel-setup.sh` runs before the first deploy, so seeding there
+  risked seeding a database with no schema yet. Split into a fixed three-stage sequence:
+  `vercel-setup.sh` (control plane only — provisioning, project link, env vars) → `vercel-deploy.sh`
+  (unchanged; creates the schema via `vercel-build`) → new `scripts/vercel-seed.sh` (bootstrap
+  tenant/admin data, modeled on `app-generator/scripts/gcp-seed.sh`'s idempotency/DRY_RUN/prerequisite
+  conventions). `vercel-seed.sh` checks `prisma migrate status`'s exit code before seeding and stops
+  with a plain-language message if the schema isn't there yet, rather than assuming the order was
+  followed — verified live against a scratch local Postgres container: halts cleanly when no
+  migrations are applied, proceeds and successfully seeds once a real migration has been deployed,
+  and is idempotent on a second run. Added `vercel-setup.sh --status`, a read-only diagnostic that
+  prints production/staging `prisma migrate status` without writing anything. `docs/vercel-automation-design.md`
+  §5 and new §19 updated; `vercel-teardown.sh` confirmed to need no change (it only removes env vars
+  and unlinks the project — never depended on the removed steps).
+- **SSL deprecation warning during `db:seed-tenant`, root-caused and fixed** (cmd_691) — traced to
+  `pg-connection-string`'s one-time warning for Neon's embedded `sslmode=require`, not to any
+  first-party SSL configuration (repo-wide grep for `sslmode|ssl:|rejectUnauthorized|NODE_TLS` in
+  first-party `.ts`/`.js` sources returns zero hits). The fix is in `app-generator` (`lib/db-url.ts`,
+  reaching this repo through the submodule pointer, not duplicated here) — see
+  `app-generator/docs/knowledge/pg-connection-string-sslmode-deprecation.md` for the full writeup and
+  §19.2 of this repo's `docs/vercel-automation-design.md` for a summary.
 - Set `x-generate.test: false` on `approval_flow` (cmd_661) — its generated CRUD Cypress specs (desktop/mobile/API)
   and support helper are being replaced by hand-written coverage placed in app-generator (submodule) so the coverage
   reaches every consumer through the submodule, rather than living only in this repo's `prj/`. Verified via
