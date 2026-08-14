@@ -81,9 +81,14 @@ at merge time via CI.
 
 Required, in this order:
 
-1. `npm run test:e2e:build` — prj:sync + docker:up:test + generate-code + db:push + db:generate + db:seed-tenant + build
-2. `npm --prefix app-generator run check:generated` — generated code matches templates/schema
-3. `npm run lint` — must run after step 1, not before (see below for why)
+1. `npm run lint` — runs `prj:sync` internally, then lints exactly the
+   `.ts`/`.tsx` files `prj:sync` just reported syncing (see below for
+   why this is not app-generator's own `lint` script and does not
+   measure the full generated codebase).
+2. `npm run test:e2e:build` — prj:sync (idempotent re-run; safe — step 1
+   already did the same copy) + docker:up:test + generate-code + db:push +
+   db:generate + db:seed-tenant + build
+3. `npm --prefix app-generator run check:generated` — generated code matches templates/schema
 4. `npm run test:e2e:cy:api` — API Cypress specs only (mandatory dev-time gate)
 5. `npm --prefix app-generator audit --omit=dev --audit-level=high` — production-dependency vulnerability scan
 
@@ -113,20 +118,86 @@ to execute against `prj/` regardless of gate ordering — it would only
 re-run app-generator's own existing suite, which is already covered by
 app-generator's own CI.
 
-### Why lint stays — and why step order matters
+### Why lint stays — and why it is not app-generator's own `lint`
 
-Unlike pytest/vitest, `npm run lint` **is** retained as a required step —
-run at step 3, **after** step 1 (`test:e2e:build`, which performs
-`prj:sync`), not before. ESLint has no path-based include/exclude rule
-that would skip prj/-synced files, so running lint after prj:sync means
-it genuinely lints all 32 of `prj/`'s TS/TSX files at their synced
-destination paths inside `app-generator/`, not just app-generator's own
-templates. This is real coverage app-generator's own CI cannot provide:
-app-generator's own `lint`/`unit-tests` CI jobs check out app-generator
-alone with no `prj/` sibling directory, so they structurally never see
-this content, no matter what changes in this repo. **Do not reorder step
-3 ahead of step 1** — doing so silently drops prj/ lint coverage back to
-zero.
+`npm run lint` here does **not** delegate to app-generator's own `lint`
+script (`eslint --max-warnings 20`, unscoped over that whole repo) —
+it delegates to `npm --prefix app-generator run lint:prj`
+(`app-generator/scripts/lint_prj_synced.py`). This is a decision (cmd_683,
+2026-08-13): a consumer's lint is not a copy of the generator's own lint.
+app-generator's own code is already covered by app-generator's own CI;
+what this repo needs to check is whether `prj/`'s own hand-written
+content — the only thing unique to this repo — passes ESLint once
+synced to its real destination paths.
+
+`lint:prj` runs `prj:sync` itself, takes prj_sync.py's own
+`copied`/`merged` stdout lines as the list of what to lint (never
+re-derives that list independently), filters to `.ts`/`.tsx`, and lints
+exactly those files. Because the population is explicitly the output of
+`prj:sync` and nothing else, running it before or after `generate-code`
+makes no difference to what gets measured — there is no larger,
+unscoped population for step ordering to accidentally expose (contrast
+with app-generator's own `lint`, which genuinely must run before
+`generate-code` to match its own CI precondition — see
+`app-generator/docs/knowledge/lint-gate-must-match-ci-precondition.md`
+and `app-generator/docs/knowledge/consumer-prj-scoped-lint.md` for the
+full contrast between the two). Step 1 here is placed first purely so a
+badly-formed `prj/` change is caught before spending time on the much
+slower `test:e2e:build` step, not because of a scope leak this ordering
+prevents.
+
+**Fail-closed, not "no target files = pass"**: `lint:prj` exits non-zero
+if `prj:sync` reports zero `.ts`/`.tsx` files, for any reason —
+including a genuinely fresh `prj/` with no hand-written TS content yet.
+A lint step that can go green by having nothing to check is the exact
+failure mode the earlier candidate (i) investigation hit (naive
+invocation linted 0 files due to an ESLint base-path restriction and
+exited 0) — `lint:prj` refuses to reproduce that shape.
+
+**No `--max-warnings` ceiling here**, unlike app-generator's own `lint`
+— only ESLint errors (or the fail-closed check above) fail this step.
+See `app-generator/docs/knowledge/consumer-prj-scoped-lint.md` for why a
+ceiling inherited from app-generator's own template-surface baseline
+would not be a meaningful signal for `prj/`'s own, structurally
+different and independently growing content.
+
+Verified end-to-end against this repo's actual `prj/` content (cmd_683,
+same unmodified schema as cmd_682's measurement): `npm run lint`
+reports 32 `.ts`/`.tsx` files synced from `prj/` and **exits 0**. This
+supersedes cmd_682's intermediate fix (which reordered app-generator's
+own `--max-warnings 20`-capped `lint` to run before `generate-code`,
+reducing the false population from 450 to 56 warnings but still failing
+against a ceiling that was never calibrated for `prj/`'s own content) —
+`lint:prj` has no such ceiling, so the residual failure cmd_682 flagged
+does not apply to this mechanism.
+
+#### History of this section
+
+An earlier revision of this doc (through cmd_682, 2026-08-13) delegated
+`npm run lint` to app-generator's own `lint` script and placed it after
+`test:e2e:build` — measuring the full generated codebase (hundreds of
+pre-existing, per-entity template warnings unrelated to `prj/`).
+cmd_682 fixed the *ordering* (moved it before `generate-code`) but kept
+delegating to app-generator's own capped `lint` script, leaving a
+smaller but still-present false-population problem plus a stale warning
+ceiling. cmd_683 replaces the delegate target entirely with the
+purpose-built, `prj/`-scoped `lint:prj` mechanism described above —
+ordering relative to `generate-code` is no longer a correctness
+requirement for this step at all, only a minor performance
+consideration (fail fast before the slow build step).
+
+### CI does not run this step — a green CI run does not mean lint passed
+
+This repo's own `.github/workflows/ci.yml` defines exactly one job
+(`E2E Tests`: `test:e2e:build` then `test:e2e:cy:start`). It has no lint
+job of any kind, and never has (confirmed by reading the workflow file
+directly, not inferred from a job name). A product gate is deliberately
+not made to depend on CI in this repo (a local-only check must still
+work for a developer who never touches CI), so this is not itself a
+defect — but it means a green CI run on a PR is **not** evidence that
+`npm run lint` was ever run or passed on that PR. Only this local
+Completion gate step, or an explicit local run, tells you that. Do not
+read "CI is green" as "lint passed" for this repo.
 
 ### npm audit — why it stays
 
