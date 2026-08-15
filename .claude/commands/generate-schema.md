@@ -146,13 +146,22 @@ badly-formed `prj/` change is caught before spending time on the much
 slower `test:e2e:build` step, not because of a scope leak this ordering
 prevents.
 
-**Fail-closed, not "no target files = pass"**: `lint:prj` exits non-zero
-if `prj:sync` reports zero `.ts`/`.tsx` files, for any reason —
-including a genuinely fresh `prj/` with no hand-written TS content yet.
-A lint step that can go green by having nothing to check is the exact
-failure mode the earlier candidate (i) investigation hit (naive
-invocation linted 0 files due to an ESLint base-path restriction and
-exited 0) — `lint:prj` refuses to reproduce that shape.
+**Fail-closed on measurement, not on empty result**: `lint:prj` exits
+non-zero if `prj:sync` could not be observed running against a real
+`../prj` — no `../prj` sibling directory at all, or a `../prj` that
+exists but from which `prj:sync` synced zero files of any kind. It does
+**not** fail merely because none of the files `prj:sync` did observe
+and sync happen to be `.ts`/`.tsx` — a `prj/` that holds only e.g.
+schema/SQL/migration files and no hand-written TypeScript is a
+legitimate state, not a temporary gap to be treated as red
+(2026-08-15 product decision). A lint step that can go green without
+`prj:sync` ever actually observing a real `../prj` is the exact failure
+mode the earlier candidate (i) investigation hit (naive invocation
+linted 0 files due to an ESLint base-path restriction and exited 0
+without `prj:sync` running against a real `../prj` at all) — `lint:prj`
+refuses to reproduce that shape; see
+`app-generator/docs/knowledge/consumer-prj-scoped-lint.md` for the full
+measured-vs-unmeasured distinction and its verification.
 
 **No `--max-warnings` ceiling here**, unlike app-generator's own `lint`
 — only ESLint errors (or the fail-closed check above) fail this step.
