@@ -13,6 +13,7 @@
     "test:e2e:cy:start": "npm --prefix app-generator run test:e2e:cy:start",
     "test:e2e:cy:api": "npm --prefix app-generator run test:e2e:cy:api",
     "lint": "npm --prefix app-generator run lint:prj",
+    "check:generated": "npm --prefix app-generator run check:generated",
     "generate-code": "npm --prefix app-generator run prj:sync && npm --prefix app-generator run generate-code",
     "cleanup": "npm --prefix app-generator run cleanup:all"
   },

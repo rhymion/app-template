@@ -77,6 +77,12 @@ jobs:
           fi
       - name: Generate code, start test database, push schema and build
         run: npm run test:e2e:build
+      - name: Check generated output for banned patterns (write:direct, raw SQL)
+        # cmd_705: was never wired into CI (only ran as a local
+        # generate-schema.md completion-gate step, so it only executed on
+        # schema-changing tasks). Runs after the build step above so the
+        # generated lib/app tree it scans actually exists on disk.
+        run: npm run check:generated
       - name: Run API E2E tests
         run: npm run test:e2e:cy:start
 
