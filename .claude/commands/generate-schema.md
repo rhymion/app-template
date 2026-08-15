@@ -51,6 +51,13 @@ If a built-in feature (comment, attachment, reaction, approval, etc.) can largel
 the requirement, recommend using it. Explain that labels and display names are easily
 changed without altering the model structure. Confirm before creating a custom model.
 
+**④a Built-in extension keys, proactively**
+Before writing a workaround for something the generator seems not to support, check
+`app-generator/docs/knowledge/schema-yaml-configuration.md` for an existing `x-*` key that
+already expresses it. Use it even if the task description doesn't name it — this is the
+default, not something that needs to be asked for, and applies with extra force in
+fast-track mode (⑥).
+
 **⑤ JSON schema array display**
 Confirm whether to show an independent entity's list on another entity's detail page.
 Default: do NOT add a user-created item list to the user detail page unless explicitly
@@ -61,6 +68,12 @@ always confirm.
 Offer the user the option to skip all confirmation prompts and let the AI choose the best
 approach autonomously. In fast-track mode the AI generates and presents the result;
 the user follows up with adjustments after reviewing the generated application.
+
+**⑦ Deviating from a source diagram**
+If the task description includes or references an ER diagram or another external design
+document, the generated schema does not need to match it exactly. Shaping the schema to
+what the generator actually supports is a legitimate choice — write down *what broke and
+why* as fact, kept separate from any "this is the better design anyway" justification.
 
 ---
 
