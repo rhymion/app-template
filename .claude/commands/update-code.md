@@ -25,16 +25,33 @@ at merge time via CI.
 Required, in this order:
 
 1. `npm run test:e2e:build` — prj:sync + docker:up:test + generate-code + db:push + db:generate + db:seed-tenant + build
-2. `npm run lint` — must run after step 1, not before (see below for why)
-3. `npm run test:e2e:cy:api` — API Cypress specs only (mandatory dev-time gate)
-4. `npm --prefix app-generator audit --omit=dev --audit-level=high` — production-dependency vulnerability scan
+2. `npm run check:generated` — must run after step 1 (needs the generated `lib/`/`app/` tree on disk); see below for why
+3. `npm run lint` — must run after step 1, not before (see below for why)
+4. `npm run test:e2e:cy:api` — API Cypress specs only (mandatory dev-time gate)
+5. `npm --prefix app-generator audit --omit=dev --audit-level=high` — production-dependency vulnerability scan
 
 Not a local step — enforced by CI instead:
 
-5. `npm run test:e2e:cy:start` — full Cypress suite including UI specs.
+6. `npm run test:e2e:cy:start` — full Cypress suite including UI specs.
    Runs automatically on push/PR to `develop`/`main` via this repo's own
    `.github/workflows/ci.yml` (`e2e-tests` job). Do not run this locally
    as a gate; it's covered before merge regardless.
+
+### check:generated — why it's a required step here, not just generate-schema's
+
+`check:generated` was already a `generate-schema.md` completion-gate step
+(schema-changing tasks only). That was the whole reason a real violation
+(the `commentable` bridge's comment/reaction writes going straight to
+`prisma.comment.*`/`prisma.reaction.*` from `lib/db_table/actions.ts`
+instead of through a service layer) went unnoticed from 2026-05-23 until
+cmd_705: `update-code` tasks — routine feature work, not schema changes —
+are both far more frequent and exactly the kind of task that can introduce
+a new write:direct violation (e.g. a hand-authored server action reaching
+for `prisma.<model>.*` directly) without ever touching a schema file, so a
+generate-schema-only gate structurally never saw it. Requiring the check
+here closes that gap at the source instead of relying solely on CI (added
+as a CI step, see `.github/workflows/ci.yml`'s `e2e-tests` job, in the same
+change) to catch it after the fact.
 
 ### Why pytest and vitest are not required steps here
 
