@@ -264,3 +264,5 @@ The test database uses `app-generator/.env.test`, which is checked in and requir
 ## License
 
 See [LICENSE](./LICENSE).
+
+<!-- cmd721 docs-only probe: this line should not trigger E2E Tests -->
