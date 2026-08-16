@@ -1,0 +1,4 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "ignoreCommand": "echo ROOT_VERCEL_JSON_PROBE_PWD=$(pwd) && exit 0"
+}
