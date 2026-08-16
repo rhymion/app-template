@@ -266,3 +266,4 @@ The test database uses `app-generator/.env.test`, which is checked in and requir
 See [LICENSE](./LICENSE).
 
 <!-- cmd721 docs-only probe: this line should not trigger E2E Tests -->
+<!-- trigger synchronize after base change -->
