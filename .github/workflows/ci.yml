@@ -15,8 +15,49 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  detect-changes:
+    name: Detect docs-only change
+    runs-on: ubuntu-latest
+    outputs:
+      docs_only: ${{ steps.check.outputs.docs_only }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Classify this diff as docs-only or not (machine-checked path judgment)
+        # Same design as app-generator's canonical copy: path-based,
+        # never a human "this is docs-only" claim in the commit message
+        # or PR text. Gated via needs:+if: (not a top-level
+        # paths-ignore: trigger filter) so a docs-only PR still shows
+        # E2E Tests as a visible "Skipped" check instead of no check
+        # appearing at all.
+        id: check
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE="${{ github.event.pull_request.base.sha }}"
+          else
+            BASE="${{ github.event.before }}"
+          fi
+          if [ -z "${BASE:-}" ] || [ "$BASE" = "0000000000000000000000000000000000000000" ] || ! git cat-file -e "$BASE" 2>/dev/null; then
+            echo "No usable base commit (new branch or shallow history) — running the full suite (fail-closed)."
+            echo "docs_only=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if git diff --quiet "$BASE" HEAD -- . \
+              ':(exclude)docs/**' \
+              ':(exclude)README.md' ':(exclude)README_ja.md' \
+              ':(exclude)CHANGELOG.md' ':(exclude)AGENTS.md' ':(exclude)CLAUDE.md' \
+              ':(exclude)LICENSE'; then
+            echo "docs_only=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "docs_only=false" >> "$GITHUB_OUTPUT"
+          fi
+
   e2e-tests:
     name: E2E Tests
+    needs: detect-changes
+    if: needs.detect-changes.outputs.docs_only != 'true'
     runs-on: ubuntu-latest
     env:
       NODE_ENV: test
