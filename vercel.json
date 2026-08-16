@@ -1,4 +1,0 @@
-{
-  "$schema": "https://openapi.vercel.sh/vercel.json",
-  "ignoreCommand": "echo BEFORE_CD=$(pwd) && (cd .. && echo AFTER_CD=$(pwd) && ls -la && git rev-parse --is-inside-work-tree && git log --oneline -3 || echo CD_OR_GIT_FAILED) ; exit 1"
-}
