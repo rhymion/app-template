@@ -15,6 +15,46 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  verify-canonical-ci:
+    name: Verify ci.yml matches canonical source
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - name: Diff this file's body against app-generator's canonical source
+        # Machine-checked, not a human "I copied it verbatim" claim — same
+        # reasoning as the detect-changes job below (cmd_498: "a condition
+        # the machine doesn't see is a hole, not an exemption"). Both sides
+        # are extracted from "name: CI" onward: this file's own body (per
+        # the canonical source's header, everything from that line IS what
+        # a consumer should have), and the canonical source's body with its
+        # own canonical-source-only annotation header stripped the same
+        # way. Compares against the submodule commit this repo currently
+        # pins, not app-generator's latest — a stale submodule pointer is a
+        # separate, already-covered concern (bumping it is a real code
+        # change, excluded from the docs-only skip below), not this job's
+        # job. See docs/knowledge/ci-workflow-canonical-source.md "Drift
+        # check" for what to do when this fails, and for the missing-file
+        # case just below (this job's own bootstrapping edge case, found
+        # verifying against app-template: a submodule pointer pinned to a
+        # commit older than the one that introduced this canonical file in
+        # the first place has nothing to compare against yet — that is not
+        # drift and must not fail the build).
+        run: |
+          set -euo pipefail
+          CANONICAL=app-generator/docs/consumer-commands/ci.yml
+          if [ ! -f "$CANONICAL" ]; then
+            echo "::notice::Canonical source $CANONICAL is not present at the commit this repo's app-generator submodule currently pins (older than the commit that introduced it) — nothing to compare against yet. Not a drift; the check activates automatically once the submodule pointer is next bumped past that commit."
+            exit 0
+          fi
+          sed -n '/^name: CI$/,$p' "$CANONICAL" > /tmp/canonical-body.yml
+          sed -n '/^name: CI$/,$p' .github/workflows/ci.yml > /tmp/this-body.yml
+          if ! diff -u /tmp/canonical-body.yml /tmp/this-body.yml; then
+            echo "::error::.github/workflows/ci.yml has drifted from the canonical source ($CANONICAL, at the commit this repo's app-generator submodule currently pins). Copy the canonical body (from 'name: CI' onward) verbatim into this file."
+            exit 1
+          fi
+
   detect-changes:
     name: Detect docs-only change
     runs-on: ubuntu-latest
@@ -25,12 +65,17 @@ jobs:
         with:
           fetch-depth: 0
       - name: Classify this diff as docs-only or not (machine-checked path judgment)
-        # Same design as app-generator's canonical copy: path-based,
-        # never a human "this is docs-only" claim in the commit message
-        # or PR text. Gated via needs:+if: (not a top-level
-        # paths-ignore: trigger filter) so a docs-only PR still shows
-        # E2E Tests as a visible "Skipped" check instead of no check
-        # appearing at all.
+        # Path-based, not a human "this is docs-only" claim in the commit
+        # message or PR text (cmd_498: "a condition the machine doesn't see
+        # is a hole, not an exemption"). e2e-tests below is gated on this
+        # job's output via needs:+if:, not a top-level `paths-ignore:`
+        # trigger filter — paths-ignore would make the workflow (and its
+        # check) not run at all for a docs-only push/PR, which is
+        # indistinguishable in the PR Checks list from the check simply
+        # never having existed. Gating the job instead makes it show up
+        # as "Skipped" — visible, not silently absent. See
+        # docs/knowledge/ci-workflow-canonical-source.md "Docs-only E2E
+        # skip" for the fail-closed list of excluded paths.
         id: check
         run: |
           set -euo pipefail
@@ -87,29 +132,29 @@ jobs:
         working-directory: app-generator
         run: pip install -r requirements.txt
       - name: Generate disposable test-only AUTH_SECRET (not a production secret)
-        # Same fix as app-generator's ci.yml: AUTH_SECRET is a throwaway
-        # value scoped to this CI run only, so it's generated in-workflow
-        # instead of read from repository secrets. GitHub does not pass
-        # repository secrets to Dependabot-authored `pull_request` runs or
-        # to fork PRs, so referencing secrets.AUTH_SECRET here made CI
-        # unusable for those PRs: the secret resolved empty, got written to
-        # .env.test.local anyway, and only surfaced much later as an Auth.js
-        # MissingSecret failure deep into the UI test suite.
+        # AUTH_SECRET is a throwaway value scoped to this CI run only, so
+        # it's generated in-workflow instead of read from repository
+        # secrets. GitHub does not pass repository secrets to
+        # Dependabot-authored `pull_request` runs or to fork PRs, so
+        # referencing secrets.AUTH_SECRET here made CI unusable for those
+        # PRs: the secret resolved empty, got written to .env.test.local
+        # anyway, and only surfaced much later as an Auth.js MissingSecret
+        # failure deep into the UI test suite.
         run: echo "AUTH_SECRET=$(openssl rand -base64 32)" >> app-generator/.env.test.local
-      - name: Enable the test-only mock Google OAuth provider (cmd_527)
-        # Same fix as app-generator's ci.yml (cmd_527/cmd_528): registers an
-        # extra CredentialsProvider under id:"google" in auth.ts, used only
-        # by cypress/e2e/auth/mfa.cy.ts to exercise the OAuth+MFA code path
-        # without any real Google credentials or outbound network call —
-        # see app-generator/docs/knowledge/authentication.md "MFA on the
+      - name: Enable the test-only mock Google OAuth provider
+        # Registers an extra CredentialsProvider under id:"google" in
+        # auth.ts, used only by cypress/e2e/auth/mfa.cy.ts to exercise the
+        # OAuth+MFA code path without any real Google credentials or
+        # outbound network call — see
+        # app-generator/docs/knowledge/authentication.md "MFA on the
         # OAuth path". Safe to always set in this workflow: this job only
         # ever runs against the ephemeral CI test database, never a real
         # deployment, and the flag adds a provider, it never removes or
         # weakens one.
         #
-        # This env var alone is NOT sufficient to register the provider
-        # (cmd_528): auth.ts also requires the filesystem sentinel written
-        # by scripts/write-mock-oauth-sentinel.js, which runs automatically
+        # This env var alone is NOT sufficient to register the provider:
+        # auth.ts also requires the filesystem sentinel written by
+        # scripts/write-mock-oauth-sentinel.js, which runs automatically
         # via the `pre*` hooks on the `test:e2e:build`/`test:e2e:cy:start`
         # npm scripts invoked below. Real deploy pipelines never run that
         # script, so this flag alone leaking into a real deployment's env
@@ -127,11 +172,10 @@ jobs:
       - name: Generate code, start test database, push schema and build
         run: npm run test:e2e:build
       - name: Check generated output for banned patterns (write:direct, raw SQL)
-        # cmd_705: was never wired into CI (only ran as a local
-        # generate-schema.md completion-gate step, so it only executed on
-        # schema-changing tasks). Runs after the build step above so the
-        # generated lib/app tree it scans actually exists on disk.
+        # Was never wired into CI (only ran as a local generate-schema.md
+        # completion-gate step, so it only executed on schema-changing
+        # tasks). Runs after the build step above so the generated
+        # lib/app tree it scans actually exists on disk.
         run: npm run check:generated
       - name: Run API E2E tests
         run: npm run test:e2e:cy:start
-

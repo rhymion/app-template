@@ -6,6 +6,13 @@ Detailed change history will begin from the first versioned release.
 ## [Unreleased]
 
 ### Internal
+- **`.github/workflows/ci.yml` re-synced to the app-generator canonical source, and gained a
+  machine-checked drift gate.** The previous copy had silently diverged from the canonical body
+  (`app-generator/docs/consumer-commands/ci.yml`) in one step's `name:` field and several step
+  comments — this restores an exact match and adds a `verify-canonical-ci` job (now part of the
+  canonical body itself) that diffs this file's body against the submodule-pinned canonical copy
+  on every push/PR, so future drift fails the build instead of going unnoticed. See
+  `app-generator/docs/knowledge/ci-workflow-canonical-source.md` "Drift check".
 - **`vercel-setup.sh` no longer runs database migration or seeding** (cmd_691) — its old
   Steps 3/4/5/5.5 (`migrate:deploy`/`db:seed-tenant` against production then staging) are removed.
   `vercel-build` already runs `migrate:deploy` on every deploy (§18), so the earlier call was a
