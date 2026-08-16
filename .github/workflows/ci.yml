@@ -1,3 +1,7 @@
+# Canonical source: app-generator/docs/consumer-commands/ci.yml
+# (see app-generator/docs/knowledge/ci-workflow-canonical-source.md).
+# Edit there first, then copy the change here — this is a plain
+# distributed copy, not a live reference.
 name: CI
 
 on:
@@ -5,6 +9,10 @@ on:
     branches: [master, main, develop]
   pull_request:
     branches: [master, main, develop]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   e2e-tests:
