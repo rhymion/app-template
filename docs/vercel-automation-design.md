@@ -294,7 +294,7 @@ bash scripts/vercel-teardown.sh
 > The original Prisma Postgres decision and rationale are preserved below for audit trail.
 > Active design: see §14 (Neon provisioning) and §8.1 (updated env var inventory).
 
-### Original decision (cmd_290 / subtask_290b) — superseded
+### Original decision (cmd_290) — superseded
 
 Prisma Postgres was selected under the assumption of a single app. Decision table as
 originally written:
@@ -513,7 +513,7 @@ the implementation described in §6, §14, and §16 above.
 
 ---
 
-## 13. Deliverables (this implementation — subtask_290c)
+## 13. Deliverables (this implementation)
 
 | File | Contents |
 |------|----------|
@@ -654,7 +654,7 @@ cmd_484 closes.
 §3 ("Why the existing scripts don't work on Vercel") asserted "no Python/uv
 available in the Vercel build environment" as the reason code generation
 could not run in `buildCommand`. This was never empirically verified when
-written (cmd_290/subtask_290c, 2026-07-07) and is **false**: production build
+written (cmd_290, 2026-07-07) and is **false**: production build
 logs for `app-generator-sample` (deployed 2026-07-24), `sample-app`
 (2026-06-26), and `real-estate` (2026-06-05) all show `uv venv --python 3.12
 .venv && ... && npm run generate-code` completing successfully as part of
@@ -779,7 +779,7 @@ matching `test:e2e:build` and `generate-code`, which already used `prj:sync`.
 wholesale — a strict improvement over the plain `cp -a` `sync-prj.sh` used.
 
 **Lineage of this decision, for anyone reading the git history:** an earlier
-branch (`doreen/subtask_480c_sync_prj_retirement`, commit `1ef16c4`)
+branch (an internal working branch, commit `1ef16c4`)
 concluded the opposite — *keep* `sync-prj.sh` and narrow its callers to
 `vercel.json` only, reasoning that the Vercel build container had no Python
 runtime to run `prj_sync.py`. That conclusion does not apply here, for two

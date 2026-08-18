@@ -1,6 +1,6 @@
 import { TEST_API_KEY, TEST_CREDENTIALS } from '../../support/test-credentials';
 
-// cmd_305 FIX-B follow-up (subtask_305i, test-coverage-gap review): permanent,
+// cmd_305 FIX-B follow-up (test-coverage-gap review): permanent,
 // entity-focused coverage for purchase_per_item's terminal-reject reservation
 // release (lib/purchase_per_item/service_after_reject.ts, invoked via
 // on_rejected dispatch — FIX-C). This path already correctly undoes the O-6
