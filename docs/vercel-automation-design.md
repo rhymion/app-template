@@ -13,7 +13,7 @@ in the app-generator repository's `scripts/`)
 `docs/knowledge/vercel-automation-design.md` in the app-generator repository
 (see redirect note left at that path).
 
-> **⚠ cmd_484 correction (2026-07-29): §1/§3/§3.1/§3.2/§4 build-strategy design
+> **⚠ PR #25 correction (2026-07-29): §1/§3/§3.1/§3.2/§4 build-strategy design
 > superseded in practice — root-level `vercel.json` removed.** This document's
 > originally adopted build strategy ("pre-generated commit + explicit root
 > `vercel.json` `buildCommand`", §3) was never actually deployed. Every live
@@ -28,7 +28,7 @@ in the app-generator repository's `scripts/`)
 > silently pivoted to the alternative design after this document was written,
 > and this document was never updated to match. The root-level `vercel.json`
 > this document specified (§3.2) was consequently **dead configuration**,
-> never read by any live deployment, and has been deleted (cmd_484). See §17
+> never read by any live deployment, and has been deleted (PR #25). See §17
 > for the corrected design. Additionally, §3's claim that Python/uv are
 > unavailable in the Vercel build environment was never actually tested and
 > is **false** — see §17 for the empirical correction.
@@ -197,7 +197,7 @@ file** (must be set per-project in the dashboard). `vercel.json` with explicit
 the primary approach. `vercel-setup.sh` may add `--rootDirectory app-generator` to
 `vercel link` if this alternative is later preferred.
 
-> **⚠ cmd_484 correction:** this "alternative" is what actually shipped —
+> **⚠ PR #25 correction:** this "alternative" is what actually shipped —
 > `scripts/vercel-setup.sh` Step 1.5 sets Root Directory to `app-generator`
 > via the Vercel Projects API, and every live project confirms it. The
 > "primary" design above (root `vercel.json`, adopted at the time this
@@ -235,7 +235,7 @@ Files (all in `app-template/scripts/` unless noted):
 
 ## 5. Operation Sequence
 
-> **⚠ cmd_691 correction (2026-08-14): three-stage split.** `vercel-setup.sh`
+> **⚠ PR #58 correction (2026-08-14): three-stage split.** `vercel-setup.sh`
 > used to also run `migrate:deploy`/`db:seed-tenant` (old Steps 3/4/5/5.5).
 > Those are now two separate scripts run *after* setup — see §19 for why and
 > what changed. `vercel-setup.sh` is control-plane only.
@@ -331,12 +331,12 @@ the unlink call reference nothing from those steps).
 
 ## 6. DB Provider Decision Gate (V-1)
 
-> **⚠ cmd_292 ruling (2026-07-07): V-1 superseded.**
+> **⚠ Neon-migration ruling (2026-07-07): V-1 superseded.**
 > Prisma Postgres is replaced by **Neon** as the Vercel DB provider.
 > The original Prisma Postgres decision and rationale are preserved below for audit trail.
 > Active design: see §14 (Neon provisioning) and §8.1 (updated env var inventory).
 
-### Original decision (cmd_290) — superseded
+### Original decision (PR #7) — superseded
 
 Prisma Postgres was selected under the assumption of a single app. Decision table as
 originally written:
@@ -348,7 +348,7 @@ originally written:
 
 Prisma Postgres Free tier: 5 databases max. Paid tiers: Starter $10/mo, Pro $49/mo.
 
-### cmd_292 ruling: Neon replaces Prisma Postgres
+### Neon-migration ruling: Neon replaces Prisma Postgres
 
 **Reason for reversal:** Prisma Postgres Free tier caps at 5 databases. At scale (multi-app
 deployments, per-preview independent DBs), this cap is a structural constraint. Neon Free
@@ -422,9 +422,9 @@ Step A for the actual current logic):**
 
 ---
 
-## 7. Two-DB Environment Variable Pattern (FS-6, updated for cmd_292)
+## 7. Two-DB Environment Variable Pattern (FS-6, updated for the Neon migration)
 
-> **cmd_292 update:** Variable names changed from `PRISMA_DATABASE_URL_*` to `DATABASE_URL_*`
+> **Neon-migration update:** Variable names changed from `PRISMA_DATABASE_URL_*` to `DATABASE_URL_*`
 > to reflect the switch from Prisma Accelerate URLs to standard Neon PostgreSQL URLs.
 > The two-DB injection pattern (prod/staging share one staging DB) is unchanged.
 
@@ -438,7 +438,7 @@ Step A for the actual current logic):**
 All preview (staging) deploys share the same `DATABASE_URL_STAGING` (Neon `staging`
 branch pooled endpoint) — deliberate, keeps total Neon branch usage at 2 per project.
 
-**Migrations use unpooled endpoints** (added in cmd_292):
+**Migrations use unpooled endpoints** (added in the Neon migration):
 `migrate:deploy` in `vercel-setup.sh` uses `DATABASE_URL_UNPOOLED_PROD` /
 `DATABASE_URL_UNPOOLED_STAGING` (direct Neon endpoints) instead of the pooled
 endpoints. PgBouncer transaction mode does not preserve DDL statement ordering across
@@ -448,11 +448,11 @@ connections, so migration must run on a direct connection.
 
 ## 8. Environment Variable Inventory
 
-> **cmd_292 update:** `PRISMA_DATABASE_URL_PROD/STAGING` renamed to `DATABASE_URL_PROD/STAGING`.
+> **Neon-migration update:** `PRISMA_DATABASE_URL_PROD/STAGING` renamed to `DATABASE_URL_PROD/STAGING`.
 > New vars added: `DATABASE_URL_UNPOOLED_PROD/STAGING`, `NEON_API_KEY`, `NEON_PROJECT_NAME`,
 > `NEON_PROJECT_ID`, `VERCEL_BLOB_STORE_ID`, `BLOB_READ_WRITE_TOKEN`.
 
-### 8.1 Variables Required on Vercel Production (cmd_292 updated)
+### 8.1 Variables Required on Vercel Production (updated for the Neon migration)
 
 | Variable | Required | Secret | Value Source | Notes |
 |----------|----------|--------|------|-------|
@@ -519,7 +519,7 @@ the implementation described in §6, §14, and §16 above.
   Not duplicated as literals here: if the target project/team changes, this
   section would otherwise go stale independently of the actual config file
   (confirmed 2026-07-28 to still match the live-linked project).
-- **V-5** Vercel Blob (`BLOB_READ_WRITE_TOKEN`) — **cmd_292 update:** `vercel blob create-store` CLI is available; provisioning now automatable in vercel-setup.sh (§16). Uploads API code migration (`app/api/uploads/`) still tracked as PD-3 (separate cmd).
+- **V-5** Vercel Blob (`BLOB_READ_WRITE_TOKEN`) — **Neon-migration update:** `vercel blob create-store` CLI is available; provisioning now automatable in vercel-setup.sh (§16). Uploads API code migration (`app/api/uploads/`) still tracked as PD-3 (separate task).
 - **V-6** Upstash Redis shared with GCP (`REDIS_URL`, Upstash global tier, HTTP-based) — get-or-create in vercel-setup.sh (§15)
 - **V-7** personal token (`VERCEL_TOKEN` env var only, never `--token` flag)
 
@@ -567,7 +567,7 @@ the implementation described in §6, §14, and §16 above.
 | `scripts/vercel-deploy.sh` | Submodule checkout guard + `vercel deploy [--prod]` |
 | `scripts/vercel-teardown.sh` | Remove all env vars + unlink |
 
-**Scope note (cmd_290):** no real Vercel operations are executed in this implementation
+**Scope note (PR #7):** no real Vercel operations are executed in this implementation
 (PD-1). Verification is limited to `bash -n` syntax checks, `DRY_RUN=true` execution
 paths, required-var guard behavior, and secret non-exposure checks.
 
@@ -575,7 +575,7 @@ All scripts are written in English (maintained deliverable).
 
 ---
 
-## 14. Neon Provisioning: get-or-create (cmd_292, implemented)
+## 14. Neon Provisioning: get-or-create (Neon migration, implemented)
 
 > **Source:** https://api-docs.neon.tech/reference/createproject
 
@@ -616,7 +616,7 @@ live findings that shaped it. Summary of what it does:
 
 ---
 
-## 16. Vercel Blob get-or-create (cmd_292, implemented — supersedes PD-4 "cannot automate")
+## 16. Vercel Blob get-or-create (Neon migration, implemented — supersedes PD-4 "cannot automate")
 
 > **Source:** https://vercel.com/docs/vercel-blob/manage-blob-storage
 
@@ -636,19 +636,19 @@ Storage → Connect to Project, then re-run).
 
 ---
 
-## 16. Script File Changes Summary (cmd_292 — for implementation)
+## 16. Script File Changes Summary (Neon migration — for implementation)
 
 ### vercel.json (app-template root)
 
-Historical note only — this file was removed in cmd_484 (see §17). It was
-dead configuration by the time of the cmd_292 addendum (no live project's
+Historical note only — this file was removed in PR #25 (see §17). It was
+dead configuration by the time of the Neon-migration addendum (no live project's
 Root Directory pointed at the app-template repo root), so this section's
 original "no changes required" verdict was moot in practice, not merely
-unaffected by the cmd_292 DB-provider change.
+unaffected by the Neon-migration DB-provider change.
 
 ---
 
-## 17. Build Strategy Correction (cmd_484): Root Directory = `app-generator`, not root `vercel.json`
+## 17. Build Strategy Correction (PR #25): Root Directory = `app-generator`, not root `vercel.json`
 
 > **Superseded:** §1 ("Deploy Target"), §3 ("Build Command"), §3.1, §3.2, and
 > the `vercel.json` deliverable in §13/§16 above. Kept for historical record;
@@ -689,14 +689,14 @@ reads and, if necessary, `PATCH`es a linked project's `rootDirectory` to
 `${VERCEL_ROOT_DIRECTORY:-app-generator}` via the Vercel Projects API. The
 automation was evidently updated to this design after this document (§3.2)
 was written, and this document was never updated to match — that gap is what
-cmd_484 closes.
+PR #25 closes.
 
 ### 17.2 Python/uv availability in the Vercel build container — §3's claim was never tested and is false
 
 §3 ("Why the existing scripts don't work on Vercel") asserted "no Python/uv
 available in the Vercel build environment" as the reason code generation
 could not run in `buildCommand`. This was never empirically verified when
-written (cmd_290, 2026-07-07) and is **false**: production build
+written (PR #7, 2026-07-07) and is **false**: production build
 logs for `app-generator-sample` (deployed 2026-07-24), `sample-app`
 (2026-06-26), and `real-estate` (2026-06-05) all show `uv venv --python 3.12
 .venv && ... && npm run generate-code` completing successfully as part of
@@ -704,7 +704,7 @@ logs for `app-generator-sample` (deployed 2026-07-24), `sample-app`
 own Python 3.12 interpreter at build time; no system Python needs to be
 preinstalled in the Vercel image. This same unverified assumption was
 independently repeated (not re-verified against the live build environment)
-in an earlier cmd_480 investigation report — both trace back to this
+in an earlier investigation report — both trace back to this
 document's original, untested §3 claim. Lesson: a claim about what a runtime
 environment can or cannot do must be checked against that runtime directly
 (actual build logs, or a real deploy) — restating an earlier design
@@ -713,7 +713,7 @@ verification.
 
 ### 17.3 Disposition of root-level `vercel.json`
 
-Deleted (cmd_484). It specified `buildCommand: bash scripts/sync-prj.sh &&
+Deleted (PR #25). It specified `buildCommand: bash scripts/sync-prj.sh &&
 npm --prefix app-generator run db:generate && npm --prefix app-generator run
 build` — a "pre-generated commit" strategy (§3) that both (a) was never
 actually deployed by any live project, per §17.1, and (b) would have relied
@@ -748,7 +748,7 @@ the project (Project Settings → Build & Development Settings — an "Override"
 toggle next to each of Build/Install/Output Command) and, if so, whether it
 still matches the new Root Directory.
 
-### 17.5 Confirmed rule (cmd_485): a root-level `vercel.json` must never exist in this repository
+### 17.5 Confirmed rule (PR #26): a root-level `vercel.json` must never exist in this repository
 
 **Rule:** `vercel.json` must not be recreated at the app-template repository
 root, for any reason, regardless of what Root Directory is set to in the
@@ -761,7 +761,7 @@ top of a build cwd Vercel had already moved to `app-generator/` via the
 Root Directory setting. The two `--prefix app-generator` segments stacked
 into a doubled path (`/vercel/path0/app-generator/app-generator/`) and the
 build failed with a missing-`package.json` error. Deleting the file
-(cmd_484) is what fixed this deploy: with no root `vercel.json` present,
+(PR #25) is what fixed this deploy: with no root `vercel.json` present,
 Vercel fell through to **`app-generator/vercel.json`** (`buildCommand: npm
 run vercel-build`), which succeeded.
 
@@ -811,7 +811,7 @@ performed):
   build/deploy — this is a config-reading observation only, not something
   this task investigates or fixes further.
 
-### 17.6 `scripts/sync-prj.sh` retired (cmd_485)
+### 17.6 `scripts/sync-prj.sh` retired (PR #26)
 
 `scripts/sync-prj.sh` has been deleted. Root `package.json`'s `dev` and
 `build` scripts now run `npm --prefix app-generator run prj:sync` (i.e.
@@ -846,7 +846,7 @@ the same change rather than kept "just in case."
 `test:e2e:build` and `generate-code` already required Python 3 before this
 change (see the Prerequisites table in `README.md`/`README_ja.md`).
 
-## 18. `DIRECT_URL` wired into Vercel (cmd_657 follow-up, 2026-08-12)
+## 18. `DIRECT_URL` wired into Vercel (PR #52 follow-up, 2026-08-12)
 
 ### 18.1 What changed
 
@@ -860,7 +860,7 @@ unpooled value to Vercel. Re-running `vercel-setup.sh` (idempotent, same as
 every other var it injects) is sufficient to apply this — no manual Vercel
 dashboard step.
 
-This closes the gap `app-generator`'s `prisma.config.ts` (cmd_657,
+This closes the gap `app-generator`'s `prisma.config.ts` (PR #52,
 `docs/knowledge/prisma-direct-vs-pooled-connection.md` in that repo) depends
 on: on Vercel, that file now requires `DIRECT_URL` to be set and throws at
 config-load time if it isn't. Before this change, nothing set it on Vercel.
@@ -886,7 +886,7 @@ never wrong — only that claim was. Lineage, traced via `git log` across both
 repos rather than a point-in-time `grep` (a `grep` alone would only show
 today's mismatch, not whether the comment was ever accurate):
 
-- The comment was added in `de54bd0` (cmd_290, 2026-07-07). At that commit,
+- The comment was added in `de54bd0` (PR #7, 2026-07-07). At that commit,
   app-template's **root-level** `vercel.json` existed with a buildCommand
   (`bash scripts/sync-prj.sh && npm --prefix app-generator run db:generate &&
   ... build`) that genuinely did **not** include `migrate:deploy` — the claim
@@ -896,18 +896,18 @@ today's mismatch, not whether the comment was ever accurate):
   (2026-05-24) — predating the comment — but was not yet the operative
   config: Root Directory pointed at the app-template repository root, so
   Vercel read the root `vercel.json`, not the submodule's.
-- `9cfdd7c` (cmd_484, 2026-07-29) deleted the root-level `vercel.json` as
+- `9cfdd7c` (PR #25, 2026-07-29) deleted the root-level `vercel.json` as
   dead configuration (§17.3) once Root Directory was confirmed to already be
   `app-generator` in practice. From that point on, `app-generator/vercel.json`
   became the operative buildCommand — the one that includes `migrate:deploy`
   — but the Step 3/5 comments in `vercel-setup.sh` were never updated to
-  match. §17.5 (this same cmd_484 correction) already established the
-  current reality; this task closes the remaining stale comment cmd_484
+  match. §17.5 (this same PR #25 correction) already established the
+  current reality; this task closes the remaining stale comment PR #25
   missed.
 
 **Verdict: the comment went stale, it was not wrong from the start.** It
 accurately described app-template's build config as it stood on
-2026-07-07 and stopped matching reality only after cmd_484's Root Directory
+2026-07-07 and stopped matching reality only after PR #25's Root Directory
 correction on 2026-07-29. The Step 3/5 comments have been corrected in
 place; see the script for the current rationale (schema must exist before
 Step 4/5.5's `db:seed-tenant`, which is not part of `buildCommand`).
@@ -923,7 +923,7 @@ directly and were never affected by this gap).
 
 ### 18.3 Whether `migrate:deploy` should keep running on every build
 
-Out of scope for this task (cmd_657's addendum scoped it to the connection
+Out of scope for this task (PR #52's addendum scoped it to the connection
 target, not the timing) — flagged upstream instead of changed. `vercel-build`
 running `prisma migrate deploy` on every ordinary Vercel build/deploy means a
 bad migration can block all Vercel deploys, as `vercel-setup.sh`'s original
@@ -932,7 +932,7 @@ attributed to the wrong file.
 
 ---
 
-## 19. Three-stage split: setup / deploy / seed, and the SSL warning fix (cmd_691, 2026-08-14)
+## 19. Three-stage split: setup / deploy / seed, and the SSL warning fix (PR #58, 2026-08-14)
 
 ### 19.1 Why `vercel-setup.sh` no longer runs migrate/seed
 

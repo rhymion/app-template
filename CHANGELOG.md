@@ -13,7 +13,7 @@ Detailed change history will begin from the first versioned release.
   canonical body itself) that diffs this file's body against the submodule-pinned canonical copy
   on every push/PR, so future drift fails the build instead of going unnoticed. See
   `app-generator/docs/knowledge/ci-workflow-canonical-source.md` "Drift check".
-- **`vercel-setup.sh` no longer runs database migration or seeding** (cmd_691) — its old
+- **`vercel-setup.sh` no longer runs database migration or seeding** (PR #58) — its old
   Steps 3/4/5/5.5 (`migrate:deploy`/`db:seed-tenant` against production then staging) are removed.
   `vercel-build` already runs `migrate:deploy` on every deploy (§18), so the earlier call was a
   redundant second owner; and `vercel-setup.sh` runs before the first deploy, so seeding there
@@ -29,14 +29,14 @@ Detailed change history will begin from the first versioned release.
   prints production/staging `prisma migrate status` without writing anything. `docs/vercel-automation-design.md`
   §5 and new §19 updated; `vercel-teardown.sh` confirmed to need no change (it only removes env vars
   and unlinks the project — never depended on the removed steps).
-- **SSL deprecation warning during `db:seed-tenant`, root-caused and fixed** (cmd_691) — traced to
+- **SSL deprecation warning during `db:seed-tenant`, root-caused and fixed** (PR #58) — traced to
   `pg-connection-string`'s one-time warning for Neon's embedded `sslmode=require`, not to any
   first-party SSL configuration (repo-wide grep for `sslmode|ssl:|rejectUnauthorized|NODE_TLS` in
   first-party `.ts`/`.js` sources returns zero hits). The fix is in `app-generator` (`lib/db-url.ts`,
   reaching this repo through the submodule pointer, not duplicated here) — see
   `app-generator/docs/knowledge/pg-connection-string-sslmode-deprecation.md` for the full writeup and
   §19.2 of this repo's `docs/vercel-automation-design.md` for a summary.
-- Set `x-generate.test: false` on `approval_flow` (cmd_661) — its generated CRUD Cypress specs (desktop/mobile/API)
+- Set `x-generate.test: false` on `approval_flow` (PR #53) — its generated CRUD Cypress specs (desktop/mobile/API)
   and support helper are being replaced by hand-written coverage placed in app-generator (submodule) so the coverage
   reaches every consumer through the submodule, rather than living only in this repo's `prj/`. Verified via
   `generate-code`: the three specs, `cypress/support/approval_flow/helper.ts`, and the task registry entry in
@@ -45,12 +45,12 @@ Detailed change history will begin from the first versioned release.
 - `scripts/vercel-env.sh`'s `vercel_env_inject()` now also injects `DIRECT_URL` (Production and Preview), sourced
   from the unpooled Neon connection strings `vercel-setup.sh` already fetches and persists as
   `DATABASE_URL_UNPOOLED_PROD`/`DATABASE_URL_UNPOOLED_STAGING` — nothing new is fetched from Neon, only forwarded
-  to Vercel (cmd_657 addendum). This is what `app-generator`'s `prisma.config.ts` (cmd_657) needs so that
+  to Vercel (PR #52 addendum). This is what `app-generator`'s `prisma.config.ts` (PR #52) needs so that
   `prisma migrate deploy` (the DB-schema-change command, not a Vercel app deploy) stops running through the pooled
   connection during a Vercel deploy's build. Corrected a comment in `vercel-setup.sh` Step 3/5 that claimed
   `prisma migrate deploy` was "deliberately not part of vercel.json buildCommand" — traced via `git log`
-  (not just today's `grep`): the comment was accurate when written (cmd_290, 2026-07-07, describing the then-operative
-  root-level `vercel.json`, which never included it) and went stale after cmd_484 (2026-07-29) made
+  (not just today's `grep`): the comment was accurate when written (PR #7, 2026-07-07, describing the then-operative
+  root-level `vercel.json`, which never included it) and went stale after PR #25 (2026-07-29) made
   `app-generator/vercel.json` — which had included it since 2026-05-24 — the operative buildCommand; 
   the comment was never updated for that switch. See `docs/vercel-automation-design.md` §18.
 
@@ -81,10 +81,10 @@ Detailed change history will begin from the first versioned release.
 - The `setting` entity (the acting user's own profile/settings view) was missing the `x-self-only: { admin_bypass: true }` schema declaration that app-generator's own default schema already carries — a non-owner authenticated user could read another user's settings (`GET /api/setting/{id}` returned 200 instead of 404). Added the declaration to `prj/code_generator/json_schema.yaml` so `setting` gets the same creator-id-scoped ownership filter as app-generator's default, with an audited Administrator bypass (`self_only:admin_bypass` rows written to `audit_log`, see `lib/self_only.ts`). App-layer only — no `schema.prisma`/migration changes (verified byte-identical with and without the declaration).
 
 ### BREAKING
-- **`ApprovalRequestStatus`, `ReactionType`, `ShiftStatus`, and `DayOfWeek` nativeEnum members are now lowercase snake_case** (e.g. `Pending` → `pending`, `Sunday` → `sunday`), matching app-generator's cmd_493 casing convention for the two inherited enums and extending it to app-template's own `ShiftStatus`/`DayOfWeek`. A migration (`prj/prisma/migrations/20260730221905_cmd499_enum_case_normalization/migration.sql`) rewrites existing rows losslessly; verified against a seeded isolated database (all pre-migration member values round-tripped with zero data loss, `prisma migrate diff` empty against the new schema). Any code or scripts outside this repo that compare against the old PascalCase literals (e.g. `'Scheduled'`, `'Sunday'`) must be updated to the lowercase form.
+- **`ApprovalRequestStatus`, `ReactionType`, `ShiftStatus`, and `DayOfWeek` nativeEnum members are now lowercase snake_case** (e.g. `Pending` → `pending`, `Sunday` → `sunday`), matching app-generator's established casing convention for the two inherited enums and extending it to app-template's own `ShiftStatus`/`DayOfWeek`. A migration (`prj/prisma/migrations/20260730221905_cmd499_enum_case_normalization/migration.sql`) rewrites existing rows losslessly; verified against a seeded isolated database (all pre-migration member values round-tripped with zero data loss, `prisma migrate diff` empty against the new schema). Any code or scripts outside this repo that compare against the old PascalCase literals (e.g. `'Scheduled'`, `'Sunday'`) must be updated to the lowercase form.
 
 ### Changed
-- Updated npm scripts to align with app-generator cmd_007-015 patterns
+- Updated npm scripts to align with app-generator's established script patterns
 - Fixed broken script references (dev, build, start, cleanup)
 - Aligned setup.sh bootstrap with env:use dual-link flow
 - Added thin wrapper scripts: env:use, env:current, ports:generate, ports:check
@@ -94,4 +94,4 @@ Detailed change history will begin from the first versioned release.
 - `scripts/sync-prj.sh` — retired now that all local commands and the Vercel deploy path use `prj:sync`, leaving it with zero callers.
 
 ### Internal
-- Fixed hand-written Cypress test helpers (`prj/cypress/support/purchase_order/reservation_helper.ts`) that predated the `inventory.location_id` required id-FK migration (cmd_562) and never supplied a `location_id` when seeding `inventory` rows, crashing `seedReservationInventory`/`seedSecondProduct` with a Prisma validation error before any assertions ran. Added a deterministic find-or-create default location (same idiom as `seedSecondInventoryLot` and the generated `populatePurchaseOrderDependencies` helper). This unblocked 37 previously-crashing tests across 8 hand-written API specs (`purchase_order_reservation`, `purchase_order_move_reservation`, `purchase_per_item_approval_approve`/`_dispatch`/`_split`, `receiving_receipt_line_approval_approve`/`_dispatch`/`_split`) — all now pass. Also updated two stale assertions in `purchase_order_move_reservation.cy.ts` that expected a `null` location on the default lot, which is no longer possible post-migration.
+- Fixed hand-written Cypress test helpers (`prj/cypress/support/purchase_order/reservation_helper.ts`) that predated the `inventory.location_id` required id-FK migration and never supplied a `location_id` when seeding `inventory` rows, crashing `seedReservationInventory`/`seedSecondProduct` with a Prisma validation error before any assertions ran. Added a deterministic find-or-create default location (same idiom as `seedSecondInventoryLot` and the generated `populatePurchaseOrderDependencies` helper). This unblocked 37 previously-crashing tests across 8 hand-written API specs (`purchase_order_reservation`, `purchase_order_move_reservation`, `purchase_per_item_approval_approve`/`_dispatch`/`_split`, `receiving_receipt_line_approval_approve`/`_dispatch`/`_split`) — all now pass. Also updated two stale assertions in `purchase_order_move_reservation.cy.ts` that expected a `null` location on the default lot, which is no longer possible post-migration.
