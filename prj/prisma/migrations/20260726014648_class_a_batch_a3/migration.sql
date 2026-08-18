@@ -1,7 +1,7 @@
 -- Class A Batch A3 (final): Int -> Prisma nativeEnum for 4 fields.
 -- Prisma's default USING cast cannot cast integer directly to an enum type,
 -- so each column is migrated via ADD new column -> CASE WHEN backfill ->
--- DROP old -> RENAME, per subtask_446i design (standard_pattern_non_nullable_*
+-- DROP old -> RENAME, per the design record (standard_pattern_non_nullable_*
 -- / standard_pattern_nullable / special_case_reaction_type).
 
 -- CreateEnum

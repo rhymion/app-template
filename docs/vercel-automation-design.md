@@ -336,7 +336,7 @@ the unlink call reference nothing from those steps).
 > The original Prisma Postgres decision and rationale are preserved below for audit trail.
 > Active design: see §14 (Neon provisioning) and §8.1 (updated env var inventory).
 
-### Original decision (cmd_290 / subtask_290b) — superseded
+### Original decision (cmd_290) — superseded
 
 Prisma Postgres was selected under the assumption of a single app. Decision table as
 originally written:
@@ -555,7 +555,7 @@ the implementation described in §6, §14, and §16 above.
 
 ---
 
-## 13. Deliverables (this implementation — subtask_290c)
+## 13. Deliverables
 
 | File | Contents |
 |------|----------|
@@ -696,7 +696,7 @@ cmd_484 closes.
 §3 ("Why the existing scripts don't work on Vercel") asserted "no Python/uv
 available in the Vercel build environment" as the reason code generation
 could not run in `buildCommand`. This was never empirically verified when
-written (cmd_290/subtask_290c, 2026-07-07) and is **false**: production build
+written (cmd_290, 2026-07-07) and is **false**: production build
 logs for `app-generator-sample` (deployed 2026-07-24), `sample-app`
 (2026-06-26), and `real-estate` (2026-06-05) all show `uv venv --python 3.12
 .venv && ... && npm run generate-code` completing successfully as part of
@@ -821,7 +821,7 @@ matching `test:e2e:build` and `generate-code`, which already used `prj:sync`.
 wholesale — a strict improvement over the plain `cp -a` `sync-prj.sh` used.
 
 **Lineage of this decision, for anyone reading the git history:** an earlier
-branch (`doreen/subtask_480c_sync_prj_retirement`, commit `1ef16c4`)
+branch (commit `1ef16c4`)
 concluded the opposite — *keep* `sync-prj.sh` and narrow its callers to
 `vercel.json` only, reasoning that the Vercel build container had no Python
 runtime to run `prj_sync.py`. That conclusion does not apply here, for two
@@ -869,8 +869,8 @@ config-load time if it isn't. Before this change, nothing set it on Vercel.
 convention), not `DATABASE_URL_UNPOOLED_PROD`/`_STAGING` (this repo's local
 `.env.production.local` convention). This isn't a stylistic pick between two
 equally-valid options — `prisma.config.ts` in `app-generator` already reads
-`process.env.DIRECT_URL` specifically (subtask_657a, merged ahead of this
-change); naming the Vercel env var anything else would mean the value never
+`process.env.DIRECT_URL` specifically (added in a prior change, merged
+ahead of this one); naming the Vercel env var anything else would mean the value never
 reaches the code that consumes it. The two conventions are kept in their own
 layers rather than mixed: `.env.production.local` (local persistence, this
 repo) keeps its existing `DATABASE_URL_UNPOOLED_*` names; `DIRECT_URL` is
