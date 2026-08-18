@@ -1,10 +1,10 @@
 import { TEST_API_KEY, TEST_CREDENTIALS } from '../../support/test-credentials';
 
-// cmd_305 FIX-B follow-up (subtask_305i): permanent regression coverage for
+// cmd_305 FIX-B follow-up: permanent regression coverage for
 // purchase_per_item's x-splittable action (quantityField=quantity,
 // perPartRequired=[inventory_id], parentField=parent_id) — child generation,
 // per-child inventory bridge, auto-allocate, DP-B1a hard error, and the
-// parent-reservation-release bug (subtask_305h QC): the split
+// parent-reservation-release bug (found during QC): the split
 // template's parent-release WHERE clause used `_row.location ?? ''`, which
 // never matches inventory.location=NULL rows (the default/most common case —
 // location is only written on inventory_transaction as '' via O-6
@@ -84,7 +84,7 @@ describe('API: Purchase Per Item — Split (cmd_305 FIX-B)', () => {
                 }
               });
 
-              // ---- THE REGRESSION CHECK (subtask_305h bug) ----
+              // ---- THE REGRESSION CHECK ----
               // Before fix: parent's 20 units were never released (silent no-op on
               // the location=null lot) → total reserved = 40 (20 stale + 6 + 14).
               // After fix: parent's reservation is released → total reserved = 20

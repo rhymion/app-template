@@ -1,7 +1,7 @@
 import { TEST_API_KEY } from '../../support/test-credentials';
 
-// D7 (B-5 Phase2c, subtask_281m revised_14_4_equiv_scenario_A + subtask_281d
-// generic 13.5/13.6 templates, applied to receiving_receipt_line):
+// D7 (B-5 Phase2c, revised_14_4_equiv_scenario_A + generic 13.5/13.6
+// templates, applied to receiving_receipt_line):
 // receiving_receipt_line's terminal reject is a no-op on inventory — its
 // x-ledger-source only fires on approve (afterApprove), which as of Phase2c
 // remains a TODO stub (Phase2c/G13/G14 planned but not yet implemented).
