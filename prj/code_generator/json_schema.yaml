@@ -76,6 +76,43 @@ x-ledger-entities:
     lotField: lot_number
     expirationField: expiration_date
 
+# Nested sidebar navigation groups (x-nav-groups, entity-level x-nav.parent).
+# Sample grouping for this consumer schema's 51 flat entities, chosen along
+# real business lines (entities that touch the same ledger or workflow),
+# not an arbitrary bundling — see the task report for the rationale per
+# group. `inventory_ops` demonstrates a genuine two-level hierarchy: it
+# splits into `stock_ledger` (physical stock tracking: inventory/location/
+# product plus the inventory_transaction/movement/adjustment ledger trio)
+# and `procurement` (the purchase_order -> receiving PO/ASN/receipt chain,
+# which itself drives the same inventory_domain ledger via
+# x-reservation.transaction.ledgerDomain above) — two distinct workflows
+# under one domain, not depth added for its own sake. Every other group
+# here is a single level. Entities not listed below (auth/admin/approval
+# scaffolding, generic bridge entities, and the demo-only
+# yyyyy_yyyyy/xxxxx_xxxxx/parent_only fixtures) intentionally stay
+# ungrouped and keep their existing flat nav entries.
+x-nav-groups:
+  inventory_ops:
+    order: 10
+    icon: Inventory2
+  stock_ledger:
+    parent: inventory_ops
+    order: 1
+    icon: Inventory
+  procurement:
+    parent: inventory_ops
+    order: 2
+    icon: LocalShipping
+  facilities:
+    order: 20
+    icon: Assignment
+  workforce:
+    order: 30
+    icon: People
+  supply_requests:
+    order: 40
+    icon: ShoppingCart
+
 definitions:
   user:
     x-generate:
@@ -937,6 +974,9 @@ definitions:
           $ref: "#/definitions/procedure"
 
   resource:
+    x-nav:
+      parent: facilities
+      order: 5
     x-generate:
       list: true
       view: true
@@ -992,6 +1032,9 @@ definitions:
         $ref: "#/definitions/attachable"
 
   booking:
+    x-nav:
+      parent: facilities
+      order: 4
     x-generate:
       list: true
       view: true
@@ -1031,6 +1074,9 @@ definitions:
         $ref: "#/definitions/resource"
 
   shift_template:
+    x-nav:
+      parent: workforce
+      order: 1
     x-generate:
       list: true
       view: true
@@ -1077,6 +1123,9 @@ definitions:
         $ref: "#/definitions/user"
 
   shift:
+    x-nav:
+      parent: workforce
+      order: 2
     x-generate:
       list: true
       view: true
@@ -1117,6 +1166,9 @@ definitions:
         $ref: "#/definitions/user"
 
   product:
+    x-nav:
+      parent: stock_ledger
+      order: 6
     x-generate:
       list: true
       view: true
@@ -1164,6 +1216,9 @@ definitions:
         $ref: "#/definitions/attachable"
 
   inventory:
+    x-nav:
+      parent: stock_ledger
+      order: 1
     x-generate:
       list: true
       view: true
@@ -1212,6 +1267,9 @@ definitions:
         $ref: "#/definitions/location"
 
   location:
+    x-nav:
+      parent: stock_ledger
+      order: 5
     x-generate:
       list: true
       view: true
@@ -1234,6 +1292,9 @@ definitions:
   inventory_transactionable: {}
 
   inventory_transaction:
+    x-nav:
+      parent: stock_ledger
+      order: 2
     x-generate:
       new: false
       edit: false
@@ -1263,6 +1324,9 @@ definitions:
         pattern: "^c[a-z0-9]{24,}$"
         x-relationship: {}
   inventory_movement:
+    x-nav:
+      parent: stock_ledger
+      order: 3
     x-generate:
       list: true
       view: true
@@ -1340,6 +1404,9 @@ definitions:
         $ref: "#/definitions/approvable"
 
   inventory_adjustment:
+    x-nav:
+      parent: stock_ledger
+      order: 4
     x-generate:
       list: true
       view: true
@@ -1404,6 +1471,9 @@ definitions:
         $ref: "#/definitions/approvable"
 
   purchase_order:
+    x-nav:
+      parent: procurement
+      order: 1
     x-generate:
       list: true
       view: true
@@ -1464,6 +1534,9 @@ definitions:
           $ref: "#/definitions/purchase_per_item"
 
   leave_request:
+    x-nav:
+      parent: workforce
+      order: 3
     x-generate:
       list: true
       view: true
@@ -1548,6 +1621,9 @@ definitions:
   # ============================================================
 
   supply_pool:
+    x-nav:
+      parent: supply_requests
+      order: 1
     x-generate:
       list: true
       view: true
@@ -1569,6 +1645,9 @@ definitions:
         minimum: 0
         default: 0
   supply_request:
+    x-nav:
+      parent: supply_requests
+      order: 2
     x-generate:
       list: true
       view: true
@@ -1599,6 +1678,9 @@ definitions:
       quantity:
         minimum: 1
   supply_allocation:
+    x-nav:
+      parent: supply_requests
+      order: 3
     fields:
       supply_request_id:
         pattern: "^c[a-z0-9]{24,}$"
@@ -1609,6 +1691,9 @@ definitions:
       quantity:
         minimum: 1
   room_type:
+    x-nav:
+      parent: facilities
+      order: 1
     x-generate:
       list: true
       view: true
@@ -1628,6 +1713,9 @@ definitions:
           rows: 4
 
   room:
+    x-nav:
+      parent: facilities
+      order: 2
     x-generate:
       list: true
       view: true
@@ -1665,6 +1753,9 @@ definitions:
         $ref: "#/definitions/room_type"
 
   room_reservation:
+    x-nav:
+      parent: facilities
+      order: 3
     x-generate:
       list: true
       view: true
@@ -1732,6 +1823,9 @@ definitions:
   # ============================================================
 
   receiving_purchase_order_line:
+    x-nav:
+      parent: procurement
+      order: 4
     fields:
       receiving_purchase_order_id:
         pattern: "^c[a-z0-9]{24,}$"
@@ -1759,6 +1853,9 @@ definitions:
           - cancelled
         default: outstanding
   receiving_purchase_order:
+    x-nav:
+      parent: procurement
+      order: 3
     x-generate:
       list: true
       view: true
@@ -1795,6 +1892,9 @@ definitions:
           $ref: "#/definitions/receiving_purchase_order_line"
 
   receiving_asn_line:
+    x-nav:
+      parent: procurement
+      order: 6
     fields:
       receiving_asn_id:
         pattern: "^c[a-z0-9]{24,}$"
@@ -1822,6 +1922,9 @@ definitions:
           - cancelled
         default: outstanding
   receiving_asn:
+    x-nav:
+      parent: procurement
+      order: 5
     x-generate:
       list: true
       view: true
@@ -1864,6 +1967,9 @@ definitions:
           $ref: "#/definitions/receiving_asn_line"
 
   receiving_receipt:
+    x-nav:
+      parent: procurement
+      order: 7
     x-generate:
       list: true
       view: true
@@ -1914,6 +2020,9 @@ definitions:
           $ref: "#/definitions/receiving_receipt_line"
 
   receiving_receipt_line:
+    x-nav:
+      parent: procurement
+      order: 8
     x-generate:
       list: true
       view: true
@@ -2029,6 +2138,9 @@ definitions:
         $ref: "#/definitions/user"
 
   purchase_per_item:
+    x-nav:
+      parent: procurement
+      order: 2
     x-generate:
       list: true
       view: true

@@ -165,7 +165,15 @@
     "shiftTemplate": "シフトテンプレート",
     "supplyPool": "支給品プール",
     "supplyRequest": "支給依頼",
-    "xxxxxXxxxx": "Xxxxx Xxxxx"
+    "xxxxxXxxxx": "Xxxxx Xxxxx",
+    "groups": {
+      "inventory_ops": "在庫・購買管理",
+      "stock_ledger": "在庫台帳",
+      "procurement": "購買・入荷",
+      "facilities": "施設予約",
+      "workforce": "勤怠管理",
+      "supply_requests": "支給品リクエスト"
+    }
   },
   "RoomStatus": {
     "available": "利用可能",
