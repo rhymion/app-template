@@ -1753,6 +1753,7 @@ definitions:
         $ref: "#/definitions/room_type"
 
   room_reservation:
+    x-payment: true
     x-nav:
       parent: facilities
       order: 3
