@@ -2227,3 +2227,185 @@ definitions:
         $ref: "#/definitions/product"
       approvable:
         $ref: "#/definitions/approvable"
+
+  # ============================================================
+  # Permanent regression fixtures. These three entities exist purely
+  # to keep known code-generator defect patterns (partial-match list
+  # clicks, enum primary display, FK labelField mismatches, skipped
+  # non-nullable URI fields, composite/dotted-path FK labels, Decimal
+  # and date fields that are optional in the UI but non-nullable in
+  # the database, list tables with no declared primary column, and
+  # role-gated approval flows) under standing end-to-end coverage in
+  # a schema that stays put, instead of relying on the business
+  # schema (which changes shape over time) to happen to exercise
+  # them. Do not remove an individual trap without first confirming
+  # the corresponding generator defect is now covered elsewhere.
+  # ============================================================
+
+  asset:
+    x-nav:
+      parent: stock_ledger
+      order: 20
+    x-generate:
+      list: true
+      view: true
+      new: true
+      edit: true
+      delete: true
+      invalidate: false
+      api: true
+      test: true
+    x-display:
+      table:
+        - asset_tag:
+            primary: true
+            width: 200
+    fields:
+      asset_tag:
+        minLength: 1
+      parent_asset_id:
+        pattern: "^c[a-z0-9]{24,}$"
+        x-relationship:
+          labelField: asset_tag
+      manual_url:
+        format: uri
+      unit_cost: {}
+      commissioned_at:
+        format: date
+    required:
+      - manual_url
+      - components
+    properties:
+      parent_asset:
+        $ref: "#/definitions/asset"
+      components:
+        type: array
+        items:
+          $ref: "#/definitions/asset_component"
+
+  # Inline DataGrid child of `asset` (no x-generate — never a standalone
+  # page). Carries the two FK-labelField patterns whose confirmed failures
+  # are specific to the child-DataGrid select, not the top-level parent-form
+  # autocomplete (which already resolves a non-`name` or composite labelField
+  # correctly via the dependency helper's `.name` alias — see the report for
+  # the asset entity's own `linked_product`/`assigned_room` fields, which do
+  # NOT reproduce the same defect at the top level).
+  asset_component:
+    fields:
+      asset_id:
+        x-relationship:
+          labelField: asset_tag
+      note:
+        minLength: 1
+      component_product_id:
+        pattern: "^c[a-z0-9]{24,}$"
+        x-relationship:
+          labelField: code
+      component_room_id:
+        pattern: "^c[a-z0-9]{24,}$"
+        x-relationship:
+          labelField:
+            - room_type.name
+            - room_no
+
+  spare_part:
+    x-nav:
+      parent: stock_ledger
+      order: 21
+    x-generate:
+      list: true
+      view: true
+      new: true
+      edit: true
+      delete: true
+      invalidate: false
+      api: true
+      test: true
+    x-display:
+      table:
+        - related_product:
+            width: 200
+        - name:
+            width: 200
+        - description:
+            width: 200
+    fields:
+      name:
+        minLength: 1
+      description: {}
+      related_product_id:
+        pattern: "^c[a-z0-9]{24,}$"
+        x-relationship: {}
+    required:
+      - related_product
+    properties:
+      related_product:
+        $ref: "#/definitions/product"
+
+  maintenance_ticket:
+    x-nav:
+      parent: stock_ledger
+      order: 22
+    x-generate:
+      list: true
+      view: true
+      new: true
+      edit: true
+      delete: true
+      invalidate: false
+      api: true
+      test: true
+    x-custom-components:
+      - name: ApprovalSection
+        path: "@/components/_standard/ApprovalSection"
+        target:
+          - view
+          - edit
+    x-display:
+      table:
+        - category:
+            primary: true
+            width: 150
+        - organization:
+            width: 200
+    x-approval:
+      on_approved:
+        set_fields:
+          status: "approved"
+        emit_hook: true
+      on_rejected:
+        terminal: false
+        set_fields:
+          status: "rejected"
+        emit_hook: false
+    fields:
+      category:
+        default: general
+        x-enum-namespace: MaintenanceTicketCategory
+        enum:
+          - general
+          - urgent
+      status:
+        default: open
+        x-enum-namespace: MaintenanceTicketStatus
+        enum:
+          - open
+          - approved
+          - rejected
+      organization_id:
+        pattern: "^c[a-z0-9]{24,}$"
+        x-relationship: {}
+      approvable_id:
+        pattern: "^c[a-z0-9]{24,}$"
+        x-relationship:
+          type: one-to-one_bridge
+          labelField: id
+    required:
+      - category
+      - status
+      - organization
+    properties:
+      organization:
+        $ref: "#/definitions/organization"
+      approvable:
+        $ref: "#/definitions/approvable"
