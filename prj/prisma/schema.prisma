@@ -151,6 +151,12 @@ model user {
   updated_rooms                 room[]              @relation("RoomUpdater")
   created_room_reservations             room_reservation[]         @relation("RoomReservationCreator")
   updated_room_reservations             room_reservation[]         @relation("RoomReservationUpdater")
+  created_assets                 asset[]              @relation("AssetCreator")
+  updated_assets                 asset[]              @relation("AssetUpdater")
+  created_spare_parts            spare_part[]         @relation("SparePartCreator")
+  updated_spare_parts            spare_part[]         @relation("SparePartUpdater")
+  created_maintenance_tickets    maintenance_ticket[]  @relation("MaintenanceTicketCreator")
+  updated_maintenance_tickets    maintenance_ticket[]  @relation("MaintenanceTicketUpdater")
   created_receiving_purchase_orders     receiving_purchase_order[] @relation("ReceivingPurchaseOrderCreator")
   updated_receiving_purchase_orders     receiving_purchase_order[] @relation("ReceivingPurchaseOrderUpdater")
   created_receiving_asns                receiving_asn[]            @relation("ReceivingAsnCreator")
@@ -208,6 +214,7 @@ model organization {
   parent1s    parent1[]
   resources   resource[]
   notes       note[]
+  maintenance_tickets maintenance_ticket[]
 
   @@index([creator_id])
   @@index([updater_id])
@@ -246,6 +253,7 @@ model approvable {
   receiving_receipt_line receiving_receipt_line?
   inventory_movement   inventory_movement?
   inventory_adjustment inventory_adjustment?
+  maintenance_ticket   maintenance_ticket?
   approved_at       DateTime?          @db.Timestamptz(0)
   rejection_reason  String?
 
@@ -946,6 +954,8 @@ model product {
   receiving_purchase_order_lines receiving_purchase_order_line[]
   receiving_asn_lines            receiving_asn_line[]
   receiving_receipt_lines        receiving_receipt_line[]
+  asset_components               asset_component[] @relation("AssetComponentProduct")
+  spare_parts                    spare_part[] @relation("SparePartRelatedProduct")
   created_at                     DateTime                        @default(now()) @db.Timestamptz(0)
   updated_at         DateTime            @updatedAt @db.Timestamptz(0)
   creator_id         String
@@ -1176,6 +1186,7 @@ model room {
   floor             Int?
   status            RoomStatus         @default(available)
   room_reservations room_reservation[]
+  asset_components  asset_component[] @relation("AssetComponentRoom")
   created_at        DateTime           @default(now()) @db.Timestamptz(0)
   updated_at        DateTime           @updatedAt @db.Timestamptz(0)
   creator_id        String
@@ -1400,4 +1411,97 @@ model notification {
 
   @@index([user_id, read])
   @@index([user_id, created_at(sort: Desc)])
+}
+
+// ============================================================
+// Permanent regression fixtures (see json_schema.yaml comment above
+// the `asset` / `spare_part` / `maintenance_ticket` definitions).
+// ============================================================
+
+model asset {
+  id              String    @id @default(cuid())
+  asset_tag       String
+  parent_asset_id String?
+  parent_asset    asset?    @relation("AssetParentChild", fields: [parent_asset_id], references: [id])
+  child_assets    asset[]   @relation("AssetParentChild")
+  manual_url      String
+  unit_cost       Decimal   @default(0) @db.Decimal(10, 2)
+  commissioned_at DateTime  @default(now()) @db.Timestamptz(0)
+  components      asset_component[]
+  created_at      DateTime  @default(now()) @db.Timestamptz(0)
+  updated_at      DateTime  @updatedAt @db.Timestamptz(0)
+  creator_id      String
+  creator         user      @relation("AssetCreator", fields: [creator_id], references: [id])
+  updater_id      String
+  updater         user      @relation("AssetUpdater", fields: [updater_id], references: [id])
+
+  @@index([creator_id])
+  @@index([updater_id])
+  @@index([parent_asset_id])
+}
+
+model asset_component {
+  id                     String   @id @default(cuid())
+  asset_id               String
+  asset                  asset    @relation(fields: [asset_id], references: [id], onDelete: Cascade)
+  note                   String
+  component_product_id   String
+  component_product      product  @relation("AssetComponentProduct", fields: [component_product_id], references: [id])
+  component_room_id      String?
+  component_room         room?    @relation("AssetComponentRoom", fields: [component_room_id], references: [id])
+  created_at             DateTime @default(now()) @db.Timestamptz(0)
+  updated_at             DateTime @updatedAt @db.Timestamptz(0)
+
+  @@index([asset_id])
+  @@index([component_product_id])
+  @@index([component_room_id])
+}
+
+model spare_part {
+  id                 String   @id @default(cuid())
+  name               String
+  description        String?
+  related_product_id String
+  related_product     product @relation("SparePartRelatedProduct", fields: [related_product_id], references: [id])
+  created_at  DateTime @default(now()) @db.Timestamptz(0)
+  updated_at  DateTime @updatedAt @db.Timestamptz(0)
+  creator_id  String
+  creator     user     @relation("SparePartCreator", fields: [creator_id], references: [id])
+  updater_id  String
+  updater     user     @relation("SparePartUpdater", fields: [updater_id], references: [id])
+
+  @@index([creator_id])
+  @@index([updater_id])
+  @@index([related_product_id])
+}
+
+enum MaintenanceTicketStatus {
+  open
+  approved
+  rejected
+}
+
+enum MaintenanceTicketCategory {
+  general
+  urgent
+}
+
+model maintenance_ticket {
+  id              String                    @id @default(cuid())
+  category        MaintenanceTicketCategory @default(general)
+  status          MaintenanceTicketStatus @default(open)
+  organization_id String
+  organization    organization            @relation(fields: [organization_id], references: [id])
+  approvable_id   String                  @unique
+  approvable      approvable              @relation(fields: [approvable_id], references: [id])
+  created_at      DateTime                @default(now()) @db.Timestamptz(0)
+  updated_at      DateTime                @updatedAt @db.Timestamptz(0)
+  creator_id      String
+  creator         user                    @relation("MaintenanceTicketCreator", fields: [creator_id], references: [id])
+  updater_id      String
+  updater         user                    @relation("MaintenanceTicketUpdater", fields: [updater_id], references: [id])
+
+  @@index([creator_id])
+  @@index([updater_id])
+  @@index([organization_id])
 }

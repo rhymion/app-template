@@ -6,6 +6,16 @@ Detailed change history will begin from the first versioned release.
 ## [Unreleased]
 
 ### Internal
+- **Added permanent regression fixtures for known code-generator defect patterns**
+  (`asset` / `asset_component` / `spare_part` / `maintenance_ticket`). These entities carry
+  no product meaning — they exist purely as standing end-to-end coverage for defect patterns
+  the code generator has shown before: a self-referential FK whose list-page click collides
+  with a same-named dependency row, a child DataGrid FK select using the wrong label field,
+  a non-nullable URI field silently skipped by populate/fill-command generation, a Decimal or
+  date field that is optional in the UI but non-nullable in the database, a list table with no
+  declared primary column, and a role-gated approval flow on an org-scoped entity. Kept to the
+  minimum entity count by concentrating multiple patterns per entity. See the entity block
+  comment in `prj/code_generator/json_schema.yaml` before removing or narrowing any of these.
 - **`.github/workflows/ci.yml` re-synced to the app-generator canonical source, and gained a
   machine-checked drift gate.** The previous copy had silently diverged from the canonical body
   (`app-generator/docs/consumer-commands/ci.yml`) in one step's `name:` field and several step
