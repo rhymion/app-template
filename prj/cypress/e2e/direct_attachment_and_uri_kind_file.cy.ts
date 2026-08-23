@@ -20,6 +20,15 @@
 // targets. And the uploaded file name is the TextField's `value`, which is
 // not part of the DOM's rendered text content, so cy.contains(filename)
 // never matches it -- `have.value` against the value input is required.
+//
+// Save is clicked via `button[aria-label="Save"]`, not
+// cy.contains('button', 'Save'): FormWithChildGrid's real submit button is
+// icon-only (SaveIcon inside a Tooltip, label only in aria-label/Tooltip
+// title, no visible text). On product -- which also carries a legacy
+// attachable_id bridge (AttachmentSection) -- cy.contains('button', 'Save')
+// silently matches that section's unrelated "Save attachments" button
+// instead, so the real form is never submitted and the page never leaves
+// /edit/.
 import { TEST_CREDENTIALS } from '../support/test-credentials';
 
 function pngFile(name: string) {
@@ -80,7 +89,7 @@ describe('UI: direct-attachment FK + x-uri-kind: file (SingleAttachmentUpload/Si
       cy.get('[data-testid="single-attachment-upload-specSheetUrl-file"]').selectFile(pdfFile('spec-sheet.pdf'), { force: true });
       cy.get('[data-testid="single-attachment-upload-specSheetUrl-value"]', { timeout: 10000 }).should('have.value', 'spec-sheet.pdf');
 
-      cy.contains('button', 'Save').click();
+      cy.get('button[aria-label="Save"]').click();
       cy.url().should('not.include', '/edit/');
 
       cy.visit(`/en/product/view/${product.id}`);
@@ -104,7 +113,7 @@ describe('UI: direct-attachment FK + x-uri-kind: file (SingleAttachmentUpload/Si
       cy.contains('button', 'Remove').first().click();
       cy.get('[data-testid="single-attachment-upload-warrantyCard-value"]').should('have.value', '');
 
-      cy.contains('button', 'Save').click();
+      cy.get('button[aria-label="Save"]').click();
       cy.url().should('not.include', '/edit/');
 
       cy.visit(`/en/product/edit/${product.id}`);
@@ -122,7 +131,7 @@ describe('UI: direct-attachment FK + x-uri-kind: file (SingleAttachmentUpload/Si
       cy.get('[data-testid="single-attachment-upload-medicalCertificate-file"]').selectFile(pdfFile('cert.pdf'), { force: true });
       cy.get('[data-testid="single-attachment-upload-medicalCertificate-value"]', { timeout: 10000 }).should('have.value', 'cert.pdf');
 
-      cy.contains('button', 'Save').click();
+      cy.get('button[aria-label="Save"]').click();
       cy.url().should('not.include', '/edit/');
 
       cy.visit(`/en/leave_request/view/${leaveRequest.id}`);
