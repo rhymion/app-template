@@ -1211,6 +1211,13 @@ definitions:
         x-relationship:
           type: one-to-one_bridge
           labelField: id
+      warranty_card_id:
+        x-relationship:
+          target: attachment
+          type: direct
+      spec_sheet_url:
+        format: uri
+        x-uri-kind: file
     properties:
       attachable:
         $ref: "#/definitions/attachable"
@@ -1595,6 +1602,10 @@ definitions:
         x-relationship:
           type: one-to-one_bridge
           labelField: id
+      medical_certificate_id:
+        x-relationship:
+          target: attachment
+          type: direct
       status:
         default: pending
         x-enum-namespace: LeaveRequestStatus
