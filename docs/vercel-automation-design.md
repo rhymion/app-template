@@ -115,11 +115,11 @@ in the uploaded snapshot.
 ### Why the existing scripts don't work on Vercel
 
 - Root `npm run build` = `bash scripts/sync-prj.sh && npm --prefix app-generator run build:full`
-- `build:full` = `docker:up:prod generate-code migrate:deploy db:generate db:seed-tenant build`
+- `build:full` = `docker:up:prod generate-code migrate:deploy db:generate db:seed-baseline build`
   - `docker:up:prod` → **fails**, no Docker available in the Vercel build environment
   - `generate-code` (= `python-generate`, invoking the Python code generator) → **fails**,
     no Python/uv available in the Vercel build environment
-  - `db:seed-tenant` → should not run on every production build
+  - `db:seed-baseline` → should not run on every production build
 - The submodule's own `"vercel-build"` npm script (auto-detected by Vercel by
   convention if no `vercel.json` `buildCommand` is set) is **also broken** for the
   same reasons — see §3.1 below.
@@ -147,12 +147,12 @@ changes are infrequent relative to code deploys.
 `app-generator/package.json` already defines:
 
 ```
-"vercel-build": "run-s prj:sync python-generate migrate:deploy db:generate db:seed-tenant build"
+"vercel-build": "run-s prj:sync python-generate migrate:deploy db:generate db:seed-baseline build"
 ```
 
 This script is **left unmodified and undeleted** — it is not Vercel-environment
 compatible (same failures as `build:full`: no Python/uv, `migrate:deploy` and
-`db:seed-tenant` should not run at build time). It is safe to leave in place because
+`db:seed-baseline` should not run at build time). It is safe to leave in place because
 **Vercel's explicit `vercel.json` `buildCommand` takes precedence over the
 package.json `vercel-build` / `build` script auto-detection convention** — when
 `buildCommand` is set in `vercel.json`, Vercel runs that command verbatim instead of
@@ -674,7 +674,7 @@ With Root Directory set this way, Vercel reads **`app-generator/vercel.json`**
 runs `app-generator/package.json`'s `vercel-build` script:
 
 ```
-run-s prj:sync python-generate migrate:deploy db:generate db:seed-tenant build
+run-s prj:sync python-generate migrate:deploy db:generate db:seed-baseline build
 ```
 
 This **does** run code generation at build time (`python-generate` = `uv venv
@@ -785,14 +785,14 @@ confirmed by reading `app-generator/package.json` (no live deploy needed —
 static config, §17.1):
 
 ```
-"vercel-build": "run-s prj:sync python-generate migrate:deploy db:generate db:seed-tenant build"
+"vercel-build": "run-s prj:sync python-generate migrate:deploy db:generate db:seed-baseline build"
 ```
 
-This **does** include `migrate:deploy` and `db:seed-tenant` on every single
+This **does** include `migrate:deploy` and `db:seed-baseline` on every single
 build/deploy (not just first-time setup) — confirmed by the script
 definition itself, not inferred.
 
-**Which DB a build's `migrate:deploy`/`db:seed-tenant` touch**, confirmed by
+**Which DB a build's `migrate:deploy`/`db:seed-baseline` touch**, confirmed by
 reading the environment-variable injection config (§7, §8 — no live check
 performed):
 - `vercel-env.sh inject preview` sets `DATABASE_URL` to `DATABASE_URL_STAGING`
@@ -983,9 +983,9 @@ ERROR: schema is not ready for seeding on staging.
 
 exit 1, no seed attempted. Against the same container after a real
 `migrate deploy` (full schema applied, `_prisma_migrations` populated): the
-guard reports "Schema confirmed", `db:seed-tenant` runs, and prints "Tenant
+guard reports "Schema confirmed", `db:seed-baseline` runs, and prints "Tenant
 seeded successfully!" — re-running it a second time is a no-op success
-(idempotent), same as `db:seed-tenant`'s existing upsert-based writes always
+(idempotent), same as `db:seed-baseline`'s existing upsert-based writes always
 were.
 
 **A note on the guard's own implementation** (found only by running it, not
@@ -1015,7 +1015,7 @@ standard libpq semantics, which have weaker security guarantees.
 ```
 
 This is an `app-generator`-side fix (`lib/db-url.ts`, applied in
-`lib/prisma.ts` and `scripts/seed-tenant.ts`), reached by this repo's own
+`lib/prisma.ts` and `scripts/seed-baseline.ts`), reached by this repo's own
 submodule pointer bump rather than duplicated here — see
 `app-generator/docs/knowledge/pg-connection-string-sslmode-deprecation.md`
 for the full root-cause writeup (source of the warning, why it's harmless

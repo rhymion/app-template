@@ -504,8 +504,15 @@ model attachment {
   path                    String
   encrypted_original_name String?
   name_iv                 String?
-  attachable_id           String
-  attachable              attachable @relation(fields: [attachable_id], references: [id], onDelete: Cascade)
+  // Nullable: a direct-attachment FK (x-relationship type:direct, e.g.
+  // product.warranty_card_id) creates an attachment row with no attachable
+  // bridge owner at all -- attachable_id stays null for that row's whole
+  // life. onDelete: SetNull (not Cascade) because a null attachable_id is a
+  // normal, permanent state here, not a transient one pending cleanup.
+  attachable_id           String?
+  attachable              attachable? @relation(fields: [attachable_id], references: [id], onDelete: SetNull)
+  product_warranty_card             product?       @relation("ProductWarrantyCard")
+  leave_request_medical_certificate leave_request? @relation("LeaveRequestMedicalCertificate")
   created_at              DateTime   @default(now()) @db.Timestamptz(0)
   updated_at              DateTime   @updatedAt @db.Timestamptz(0)
   @@index([attachable_id])
@@ -949,6 +956,15 @@ model product {
   barcode            String?
   attachable_id      String              @unique
   attachable         attachable          @relation(fields: [attachable_id], references: [id])
+  // Nullable, not required: an existing `product` table may already have
+  // rows, and an ADD COLUMN ... NOT NULL with no default fails a migration
+  // against non-empty data. The REQUIRED direct-attachment FK code path is
+  // covered instead by the generator's own direct_attachment_gate fixture
+  // (a from-scratch fixture DB has no such constraint), not by this
+  // consumer schema.
+  warranty_card_id   String?             @unique
+  warranty_card      attachment?         @relation("ProductWarrantyCard", fields: [warranty_card_id], references: [id], onDelete: SetNull)
+  spec_sheet_url     String?
   inventories                    inventory[]
   purchase_per_items             purchase_per_item[]
   receiving_purchase_order_lines receiving_purchase_order_line[]
@@ -1084,6 +1100,8 @@ model leave_request {
   status        LeaveRequestStatus @default(pending)
   approvable_id String     @unique
   approvable    approvable @relation(fields: [approvable_id], references: [id])
+  medical_certificate_id String?     @unique
+  medical_certificate    attachment? @relation("LeaveRequestMedicalCertificate", fields: [medical_certificate_id], references: [id], onDelete: SetNull)
   created_at    DateTime   @default(now()) @db.Timestamptz(0)
   updated_at    DateTime   @updatedAt @db.Timestamptz(0)
   creator_id    String

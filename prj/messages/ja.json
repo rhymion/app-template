@@ -81,6 +81,7 @@
     "lotNumber": "ロット番号",
     "max": "最大",
     "maxLength": "最大長",
+    "medicalCertificate": "診断書",
     "orderedQuantity": "発注数量",
     "orderNo": "受注番号",
     "organization": "組織",
@@ -114,6 +115,7 @@
     "roomNo": "客室番号",
     "roomType": "客室タイプ",
     "shippedQuantity": "出荷数量",
+    "specSheetUrl": "仕様書URL",
     "startDate": "開始日",
     "startTime": "開始時刻",
     "team": "チーム",
@@ -121,6 +123,7 @@
     "type": "タイプ",
     "url": "URL",
     "user": "ユーザ",
+    "warrantyCard": "保証書",
     "writtenBy": "作成者",
     "yyyyyYyyyys": "Yyyyy Yyyyy"
   },
