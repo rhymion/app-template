@@ -477,6 +477,7 @@ definitions:
       comment_id:
         x-relationship:
           labelField: id
+          constantParent: true
   attachable:
     x-generate:
       list: false
