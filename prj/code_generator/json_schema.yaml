@@ -130,7 +130,7 @@ definitions:
       search: false
       fields:
         - name
-        - image
+        - image_id
         - roles
     x-relationships:
       roles:
@@ -168,8 +168,10 @@ definitions:
         x-custom-component:
           target:
             - upsert
-      image:
-        format: uri
+      image_id:
+        x-relationship:
+          target: attachment
+          type: direct
         x-pii: indirect
       mfa_enabled:
         default: false
@@ -199,7 +201,7 @@ definitions:
       fields:
         - name
         - email
-        - image
+        - image_id
         - password
         - api_key
         - mfa_enabled

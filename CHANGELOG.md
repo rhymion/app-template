@@ -72,6 +72,15 @@ Detailed change history will begin from the first versioned release.
   entity type is expected (multi-stage approval chains), not a data-quality issue.
 
 ### Added
+- `user.image` (a plain string URL, no longer populated since OAuth avatar sync was retired
+  upstream) is now `user.image_id`, a direct-attachment FK to `attachment`, matching
+  app-generator's default schema. The Settings page's avatar field is now an upload widget
+  instead of a read-only URL string. A migration
+  (`prj/prisma/migrations/20260825110000_user_image_direct_fk/migration.sql`) drops the old
+  column — the stored values are external OAuth provider URLs, not locally uploaded files, so
+  there is nothing meaningful to carry forward into the new upload-backed model; see the
+  migration file's header comment for the full reasoning. No production data is affected
+  (pre-customer).
 - `parent1`'s `organization` relationship is now optional (was required) — `resource` stays
   required, so the schema now covers both a required-org and an optional-org entity for exercising
   CSV import organization isolation end to end. A migration
