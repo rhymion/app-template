@@ -6,6 +6,18 @@ Detailed change history will begin from the first versioned release.
 ## [Unreleased]
 
 ### Internal
+- **Added a real-DB regression fixture for the code generator's pre-edit-row
+  handoff to `validateCustomRules()`** (`prj/lib/organization/service_validation_custom.ts`
+  + `prj/test/flows/pre_edit_row_custom_validation.test.ts`). This was originally added
+  directly to app-generator's own self-generated app; it moved here because a test-only
+  fixture with no product meaning has no business living inside the generator's own
+  generated output, where it already collided twice with that entity's own generated
+  test suite. The rule locks an `organization.description` carrying a marker string no
+  real usage would ever produce, so it stays fully independent of `organization`'s own
+  generated CRUD coverage. See app-generator's
+  `docs/knowledge/pre-edit-row-handoff-to-custom-validation.md`, "Where the regression
+  fixture actually lives," for the full mechanism writeup and the two incidents that
+  motivated the move.
 - **Added permanent regression fixtures for known code-generator defect patterns**
   (`asset` / `asset_component` / `spare_part` / `maintenance_ticket`). These entities carry
   no product meaning — they exist purely as standing end-to-end coverage for defect patterns
