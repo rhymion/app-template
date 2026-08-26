@@ -62,7 +62,17 @@ export async function validateCustomRules(
   _tx: unknown,
   data: Record<string, unknown>,
   _currentId: string | null,
-  prevRow: Record<string, unknown> | null,
+  // Optional (defaulted, not required): this submodule's pointer is not
+  // yet bumped past app-generator's cmd_834 merge, so the currently
+  // generated service_validation.ts still calls validateCustomRules()
+  // with only 3 arguments (no widening cast yet -- that lives in the
+  // newer template). A required 4th parameter here would fail tsc
+  // ("Expected 4 arguments, but got 3"). The default keeps this file
+  // compiling -- and this rule correctly inert, since prevRow is never
+  // supplied pre-bump, so the lock can never fire -- against BOTH the
+  // current 3-argument call site and the future 4-argument one once this
+  // submodule's pointer is bumped past the merge.
+  prevRow: Record<string, unknown> | null = null,
 ): Promise<void> {
   const hadLockedDescription = typeof prevRow?.description === 'string' && prevRow.description.includes(LOCK_MARKER);
   if (!hadLockedDescription) return;
