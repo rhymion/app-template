@@ -414,6 +414,7 @@ definitions:
           - approved
           - rejected
           - terminal_rejected
+          - withdrawn
 
   approvable:
     x-generate:
@@ -2425,5 +2426,83 @@ definitions:
     properties:
       organization:
         $ref: "#/definitions/organization"
+      approvable:
+        $ref: "#/definitions/approvable"
+
+  # cmd_825/cmd_826: no entity in this schema combines edit:true with
+  # terminal:true + submit_on -- the four terminal x-approval entities
+  # above (inventory_movement/inventory_adjustment/purchase_per_item/
+  # receiving_receipt_line) are all edit:false, so testing "terminal
+  # rejection blocks resubmission" against them only proves the schema's
+  # own edit lockout, not the generator's own guard (cmd_826 甲/戊). This
+  # fixture is editable specifically so the generated resubmit tests
+  # exercise the edge-trigger's positive-predicate guard itself, the same
+  # role the other permanent regression fixtures above play for their own
+  # generator defect patterns. status's schema default stays 'pending'
+  # (matching submit_on, same as leave_request/maintenance_ticket above --
+  # deliberately NOT changed to a distinct default such as 'draft': the
+  # standard generated "creates approval requests" test (11.x) assumes
+  # create-time firing is unconditional and asserts a fixed
+  # approval_request count, which a mismatched default would silently
+  # break for every submit_on entity, this one included). The enum keeps
+  # a fourth 'draft' value purely so the generated "created but not yet
+  # submitted, then explicitly submitted" test (cmd_825, submit_on's whole
+  # reason for existing) can POST an explicit status: 'draft' override to
+  # reach that state without touching the schema-wide default.
+  approval_edit_terminal_test:
+    x-generate:
+      list: true
+      view: true
+      new: true
+      edit: true
+      delete: true
+      invalidate: false
+      api: true
+      test: true
+    x-custom-components:
+      - name: ApprovalSection
+        path: "@/components/_standard/ApprovalSection"
+        target:
+          - view
+          - edit
+    x-display:
+      table:
+        - title:
+            primary: true
+            width: 200
+        - status:
+            width: 150
+    x-approval:
+      submit_on:
+        status: pending
+      on_approved:
+        set_fields:
+          status: "approved"
+        emit_hook: false
+      on_rejected:
+        terminal: true
+        set_fields:
+          status: "rejected"
+        emit_hook: false
+    fields:
+      title:
+        minLength: 1
+      status:
+        default: pending
+        x-enum-namespace: ApprovalEditTerminalTestStatus
+        enum:
+          - pending
+          - approved
+          - rejected
+          - draft
+      approvable_id:
+        pattern: "^c[a-z0-9]{24,}$"
+        x-relationship:
+          type: one-to-one_bridge
+          labelField: id
+    required:
+      - title
+      - status
+    properties:
       approvable:
         $ref: "#/definitions/approvable"
