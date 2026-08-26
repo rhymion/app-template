@@ -1578,6 +1578,8 @@ definitions:
         end_field: end_date
       dashboard: true
     x-approval:
+      submit_on:
+        status: pending
       on_approved:
         set_fields:
           status: "approved"
@@ -2383,6 +2385,8 @@ definitions:
         - organization:
             width: 200
     x-approval:
+      submit_on:
+        status: open
       on_approved:
         set_fields:
           status: "approved"
