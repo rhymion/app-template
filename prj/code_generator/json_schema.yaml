@@ -415,6 +415,7 @@ definitions:
           - rejected
           - terminal_rejected
           - withdrawn
+      round_id: {}
 
   approvable:
     x-generate:
