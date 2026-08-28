@@ -2191,11 +2191,16 @@ definitions:
         - status:
             width: 120
     x-approval:
+      submit_on:
+        status: pending
       on_approved:
         emit_hook: true
       on_rejected:
         terminal: true
         emit_hook: true
+      on_withdrawn:
+        set_fields:
+          status: draft
     x-splittable:
       quantityField: quantity
       parentField: parent_id
@@ -2215,10 +2220,11 @@ definitions:
         minimum: 1
       status:
         enum:
+          - draft
           - pending
           - split
           - rejected
-        default: pending
+        default: draft
       price:
         minimum: 0
       parent_id:

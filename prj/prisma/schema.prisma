@@ -1061,6 +1061,7 @@ model purchase_order {
 }
 
 enum PurchasePerItemStatus {
+  draft
   pending
   split
   rejected
@@ -1073,7 +1074,7 @@ model purchase_per_item {
   product_id            String
   product               product                @relation(fields: [product_id], references: [id], onDelete: Cascade)
   quantity              Int
-  status                PurchasePerItemStatus  @default(pending)
+  status                PurchasePerItemStatus  @default(draft)
   price                 Int?
   approvable_id                 String                    @unique
   approvable                    approvable                @relation(fields: [approvable_id], references: [id])
