@@ -119,8 +119,11 @@ describe('API: Purchase Per Item — Split (cmd_305 FIX-B)', () => {
               });
 
               // Parent's own bridge must show a 'cancel' ledger row netting its reserve to zero.
+              // Re-fetch: submitPurchasePerItemForApproval sets
+              // inventory_transactionable_id server-side; `parent` above pre-dates that write.
+              cy.task<any>('db:getPurchasePerItemById', { id: parent.id }).then((parentAfter2: any) => {
               cy.task<any>('db:getInventoryTransactionsByBridge', {
-                inventory_transactionable_id: parent.inventory_transactionable_id,
+                inventory_transactionable_id: parentAfter2.inventory_transactionable_id,
               }).then((txs: any[]) => {
                 const sumReserved = txs.reduce((s, t) => s + t.reserved_delta, 0);
                 expect(sumReserved).to.eq(0); // reserve(+20) + cancel(-20) nets to zero
@@ -128,6 +131,7 @@ describe('API: Purchase Per Item — Split (cmd_305 FIX-B)', () => {
                 expect(cancelTx).to.exist;
                 expect(cancelTx.reserved_delta).to.eq(-20);
                 expect(cancelTx.quantity_delta).to.eq(0); // O-4: cancel never touches physical quantity
+              });
               });
             });
           });
@@ -169,16 +173,19 @@ describe('API: Purchase Per Item — Split (cmd_305 FIX-B)', () => {
             expect(poRes.status).to.eq(201);
             const orderId = poRes.body.id;
 
-            cy.request({
-              url: `${INV_API}/${invExplicit.id}`,
-              headers: { 'X-API-Key': TEST_API_KEY },
-            }).then((preRes) => {
-              expect(preRes.body.reserved_quantity).to.eq(20); // entire parent reservation on the explicit lot
+            cy.task<any>('db:getPurchasePerItemsForOrder', { purchase_order_id: orderId }).then((items) => {
+              const parent = items[0];
 
-              cy.task<any>('db:getPurchasePerItemsForOrder', { purchase_order_id: orderId }).then((items) => {
-                const parent = items[0];
+              // Reservation happens at explicit submit time (not at PO
+              // creation, since nested-create leaves the item in 'draft').
+              submitPurchasePerItemForApproval(parent.id);
 
-                submitPurchasePerItemForApproval(parent.id);
+              cy.request({
+                url: `${INV_API}/${invExplicit.id}`,
+                headers: { 'X-API-Key': TEST_API_KEY },
+              }).then((preRes) => {
+                expect(preRes.body.reserved_quantity).to.eq(20); // entire parent reservation on the explicit lot
+
                 cy.request({
                   method: 'POST',
                   url: `${SPLIT_API}/${parent.id}/actions/split`,
@@ -232,19 +239,22 @@ describe('API: Purchase Per Item — Split (cmd_305 FIX-B)', () => {
         expect(poRes.status).to.eq(201);
         const orderId = poRes.body.id;
 
-        cy.request({
-          url: `${INV_API}/${seed.inventory.id}`,
-          headers: { 'X-API-Key': TEST_API_KEY },
-        }).then((preRes) => {
-          expect(preRes.body.reserved_quantity).to.eq(10);
+        cy.task<any>('db:getPurchasePerItemsForOrder', { purchase_order_id: orderId }).then((items) => {
+          const parent = items[0];
 
-          // Physical shrinkage after the reservation: only 6 units of real
-          // stock remain, below the 10 the split's parts require in total.
-          cy.task('db:setInventoryQuantity', { inventory_id: seed.inventory.id, quantity: 6 }).then(() => {
-            cy.task<any>('db:getPurchasePerItemsForOrder', { purchase_order_id: orderId }).then((items) => {
-              const parent = items[0];
+          // Reservation happens at explicit submit time (not at PO
+          // creation, since nested-create leaves the item in 'draft').
+          submitPurchasePerItemForApproval(parent.id);
 
-              submitPurchasePerItemForApproval(parent.id);
+          cy.request({
+            url: `${INV_API}/${seed.inventory.id}`,
+            headers: { 'X-API-Key': TEST_API_KEY },
+          }).then((preRes) => {
+            expect(preRes.body.reserved_quantity).to.eq(10);
+
+            // Physical shrinkage after the reservation: only 6 units of real
+            // stock remain, below the 10 the split's parts require in total.
+            cy.task('db:setInventoryQuantity', { inventory_id: seed.inventory.id, quantity: 6 }).then(() => {
               cy.request({
                 method: 'POST',
                 url: `${SPLIT_API}/${parent.id}/actions/split`,
@@ -303,17 +313,20 @@ describe('API: Purchase Per Item — Split (cmd_305 FIX-B)', () => {
         expect(poRes.status).to.eq(201);
         const orderId = poRes.body.id;
 
-        cy.request({
-          url: `${INV_API}/${seed.inventory.id}`,
-          headers: { 'X-API-Key': TEST_API_KEY },
-        }).then((preRes) => {
-          expect(preRes.body.reserved_quantity).to.eq(100);
-          expect(preRes.body.quantity).to.eq(100);
+        cy.task<any>('db:getPurchasePerItemsForOrder', { purchase_order_id: orderId }).then((items) => {
+          const parent = items[0];
 
-          cy.task<any>('db:getPurchasePerItemsForOrder', { purchase_order_id: orderId }).then((items) => {
-            const parent = items[0];
+          // Reservation happens at explicit submit time (not at PO
+          // creation, since nested-create leaves the item in 'draft').
+          submitPurchasePerItemForApproval(parent.id);
 
-            submitPurchasePerItemForApproval(parent.id);
+          cy.request({
+            url: `${INV_API}/${seed.inventory.id}`,
+            headers: { 'X-API-Key': TEST_API_KEY },
+          }).then((preRes) => {
+            expect(preRes.body.reserved_quantity).to.eq(100);
+            expect(preRes.body.quantity).to.eq(100);
+
             cy.request({
               method: 'POST',
               url: `${SPLIT_API}/${parent.id}/actions/split`,

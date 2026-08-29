@@ -70,7 +70,12 @@ describe('API: Purchase Per Item — Terminal Reject Reservation Release (cmd_30
                 .then((rejectRes) => {
                   expect(rejectRes.status).to.eq(200);
                   expect(rejectRes.body.status).to.eq('terminal_rejected');
-                  return cy.wrap({ item, orderId });
+                  // Re-fetch: submitPurchasePerItemForApproval sets
+                  // inventory_transactionable_id server-side; the `item`
+                  // captured above pre-dates that write.
+                  return cy.task<any>('db:getPurchasePerItemById', { id: item.id }).then((freshItem) => {
+                    return cy.wrap({ item: freshItem, orderId });
+                  });
                 });
             });
           });

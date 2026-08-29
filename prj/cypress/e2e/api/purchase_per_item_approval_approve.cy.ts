@@ -72,7 +72,12 @@ describe('API: Purchase Per Item — Approve / Ship (cmd_309 item3)', () => {
               .then((approveRes) => {
                 expect(approveRes.status).to.eq(200);
                 expect(approveRes.body.status).to.eq('approved');
-                return cy.wrap({ item, orderId });
+                // Re-fetch: submitPurchasePerItemForApproval sets
+                // inventory_transactionable_id server-side; the `item`
+                // captured above pre-dates that write.
+                return cy.task<any>('db:getPurchasePerItemById', { id: item.id }).then((freshItem) => {
+                  return cy.wrap({ item: freshItem, orderId });
+                });
               });
           });
         });
