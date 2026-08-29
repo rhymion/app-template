@@ -2499,6 +2499,9 @@ definitions:
         set_fields:
           status: "rejected"
         emit_hook: false
+      on_withdrawn:
+        set_fields:
+          status: "draft"
     fields:
       title:
         minLength: 1
