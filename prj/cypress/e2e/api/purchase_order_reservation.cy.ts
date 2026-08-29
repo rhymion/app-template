@@ -126,22 +126,18 @@ describe('Reservation Allocation (B3/B4)', () => {
   //        one must succeed (201), one must fail (409), inventory stays >= 0
   // -------------------------------------------------------------------------
 
-  // cmd_869a UNRESOLVED (do not "fix" by adjusting expected values without
-  // re-litigating this note): PO creation no longer performs any capacity
-  // check (moved to submit-time, see R1/R2 above), so this test's premise
-  // -- firing two concurrent POSTs and expecting [201, 409] -- can no
-  // longer exercise the atomic-reservation race guarantee at all; both
-  // POSTs now trivially return 201 regardless of concurrency. The
-  // underlying guarantee itself (Serializable tx + a conditional
-  // `updateMany` guard in submit_actions.ts) still exists structurally at
-  // submit-time, but submission only exists as a UI-driven Server Action
-  // (ApprovalSection "Submit" button) -- Cypress cannot fire two truly
-  // concurrent authenticated submits against it the way the old
-  // fetch()-based Promise.all did against the REST endpoint, and this
-  // codebase's own precedent (purchase_per_item_approval_approve.cy.ts)
-  // explicitly rules out hand-encoding the Server Action's wire protocol
-  // to fake it. Left red and unmodified pending a decision on how (or
-  // whether) to re-establish this coverage.
+  // cmd_871/cmd_873 (was cmd_869a UNRESOLVED, superseded): app-generator
+  // PR#455 (subtask_871b) changed _build_approval_lines_post_create_code's
+  // submit_on skip from a compile-time declaration check to a runtime
+  // value check -- a purchase_per_item line created directly in its
+  // x-approval.submit_on state (status: 'pending') now fires the
+  // approval_request + reservation claim in the *same* create-edge
+  // transaction, instead of requiring a separate UI-driven "Submit"
+  // action afterward. Sending `status: 'pending'` on each line item here
+  // (rather than the default 'draft') re-establishes this test's original
+  // premise: firing two concurrent POSTs against the REST endpoint now
+  // exercises the atomic-reservation race guarantee again, without needing
+  // to hand-encode the Server Action's wire protocol.
   it('R3 (B6-concurrent): two simultaneous orders for last unit → exactly [201, 409]', () => {
     cy.task<any>('db:seedReservationInventory', { quantity: 1 }).then((seed) => {
       // Use cy.window() to get the fetch API, then fire both requests in parallel
@@ -157,7 +153,7 @@ describe('Reservation Allocation (B3/B4)', () => {
             body: JSON.stringify({
               order_no: 'RES-003A',
               customer_id: seed.customer.id,
-              items: [{ product_id: seed.product.id, quantity: 1, price: null }],
+              items: [{ product_id: seed.product.id, quantity: 1, price: null, status: 'pending' }],
             }),
           }),
           fetch(`${Cypress.config('baseUrl')}${API_BASE}`, {
@@ -169,7 +165,7 @@ describe('Reservation Allocation (B3/B4)', () => {
             body: JSON.stringify({
               order_no: 'RES-003B',
               customer_id: seed.customer.id,
-              items: [{ product_id: seed.product.id, quantity: 1, price: null }],
+              items: [{ product_id: seed.product.id, quantity: 1, price: null, status: 'pending' }],
             }),
           }),
         ])
