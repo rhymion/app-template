@@ -308,11 +308,19 @@ model approval_request {
   approval_flow_id   String
   approval_flow      approval_flow      @relation(fields: [approval_flow_id], references: [id])
   status             ApprovalRequestStatus @default(pending)
+  // cmd_874k: every row created in one submit transaction shares one
+  // round_id (cuid, generated once per submission by createId()) so
+  // canSubmitForApproval/canWithdrawApproval reason about all rows of the
+  // current round instead of a single non-deterministically-selected row.
+  // Design and backfill rule (round_id = id for pre-existing rows) match
+  // app-generator's own approval_request model (cmd_844, prisma/schema.prisma).
+  round_id           String
   approval_histories approval_history[]
   created_at         DateTime           @default(now()) @db.Timestamptz(0)
   updated_at         DateTime           @updatedAt @db.Timestamptz(0)
   @@index([approvable_id])
   @@index([approval_flow_id])
+  @@index([round_id])
 }
 
 model approval_history {
