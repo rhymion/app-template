@@ -680,6 +680,33 @@ definitions:
         items:
           $ref: "#/definitions/yyyyy_yyyyy"
 
+  # cmd_874/subtask_874f verification fixture: a restricted view of
+  # xxxxx_xxxxx showing/writable only for team=alpha rows. Proves
+  # x-filter-values end-to-end (list/detail/export/search hide non-alpha
+  # rows; PUT/DELETE on a non-alpha row 404; a legitimate PUT that moves a
+  # row's team out of alpha still succeeds, judged against the pre-image).
+  alpha_xxxxx_xxxxx:
+    x-generate:
+      list: true
+      view: true
+      new: false
+      edit: true
+      delete: true
+      invalidate: false
+      api: true
+      test: true
+    x-filter-values:
+      team: [alpha]
+    x-display:
+      table:
+        - name:
+            primary: true
+            width: 200
+        - team:
+            width: 150
+    allOf:
+      - $ref: "#/definitions/xxxxx_xxxxx"
+
   parent1_child1:
     fields:
       order: {}
