@@ -10,7 +10,23 @@ describe('moveReservation bespoke endpoint (B-5 Phase2d, G15)', () => {
     cy.task('db:grantAllPermissions');
   });
 
+  // cmd_869a: purchase_per_item now has its own x-approval.submit_on
+  // (cmd_856) -- moveReservation operates on an existing reservation
+  // (item.inventory_transactionable_id), which is only created once the
+  // line is submitted for approval (edit:false entity -> ApprovalSection
+  // "Submit" button's server action is the only way to reach it). Same
+  // pattern as purchase_per_item_split.cy.ts / purchase_order_reservation.cy.ts.
+  function submitPurchasePerItemForApproval(itemId: string) {
+    Cypress.session.clearAllSavedSessions();
+    cy.clearCookies();
+    cy.login(TEST_CREDENTIALS.email, TEST_CREDENTIALS.password);
+    cy.visit(`/en/purchase_per_item/view/${itemId}`);
+    cy.get('button[aria-label="Submit"]').click();
+    cy.get('button[aria-label="Submit"]').should('not.exist');
+  }
+
   it('O-8/O-4: moves a reservation off a depleted lot, spilling the re-reservation across two inventory lots', () => {
+    cy.task('db:setupPurchasePerItemSingleApprovalFlow');
     // Lot 1: default location (seedReservationInventory's shared "Reservation
     // Test Location" — location_id is a required FK, cmd_562) — quantity 5,
     // so the initial order reserves the full quantity from this single lot
@@ -28,6 +44,9 @@ describe('moveReservation bespoke endpoint (B-5 Phase2d, G15)', () => {
       }).then((res) => {
         expect(res.status).to.eq(201);
         const orderId = res.body.id;
+
+        cy.task<any>('db:getPurchasePerItemsForOrder', { purchase_order_id: orderId }).then((preSubmitItems) => {
+          submitPurchasePerItemForApproval(preSubmitItems[0].id);
 
         cy.request({
           url: `${INV_API}/${seed.inventory.id}`,
@@ -123,11 +142,13 @@ describe('moveReservation bespoke endpoint (B-5 Phase2d, G15)', () => {
             });
           });
         });
+        });
       });
     });
   });
 
   it('409 INSUFFICIENT_INVENTORY: rolls back atomically when no lot combination covers the reservation', () => {
+    cy.task('db:setupPurchasePerItemSingleApprovalFlow');
     cy.task<any>('db:seedReservationInventory', { quantity: 5 }).then((seed) => {
       cy.request({
         method: 'POST',
@@ -142,15 +163,19 @@ describe('moveReservation bespoke endpoint (B-5 Phase2d, G15)', () => {
         expect(res.status).to.eq(201);
         const orderId = res.body.id;
 
-        // Deplete lot 1 to 1 unit of available capacity with no other lot to spill onto.
-        cy.task('db:setInventoryQuantity', { inventory_id: seed.inventory.id, quantity: 1 });
+        cy.task<any>('db:getPurchasePerItemsForOrder', { purchase_order_id: orderId }).then((preSubmitItems) => {
+          const itemId = preSubmitItems[0].id;
+          // Submit first so the item actually holds a reservation (5 units,
+          // the lot's full quantity) for the move to act on.
+          submitPurchasePerItemForApproval(itemId);
 
         cy.task<any>('db:getPurchasePerItemsForOrder', { purchase_order_id: orderId }).then((items) => {
           const item = items[0];
+          expect(item.inventory_transactionable_id).to.not.be.null;
 
-          Cypress.session.clearAllSavedSessions();
-          cy.clearCookies();
-          cy.login(TEST_CREDENTIALS.email, TEST_CREDENTIALS.password);
+          // Deplete lot 1 to 1 unit of available capacity with no other lot to spill onto.
+          cy.task('db:setInventoryQuantity', { inventory_id: seed.inventory.id, quantity: 1 });
+
           cy.request({
             method: 'POST',
             url: `${API_BASE}/${orderId}/actions/moveReservation`,
@@ -172,6 +197,7 @@ describe('moveReservation bespoke endpoint (B-5 Phase2d, G15)', () => {
               expect(txs[0].event_type).to.eq('reserve');
             });
           });
+        });
         });
       });
     });

@@ -415,6 +415,7 @@ definitions:
           - rejected
           - terminal_rejected
           - withdrawn
+      round_id: {}
 
   approvable:
     x-generate:
@@ -679,6 +680,33 @@ definitions:
         type: array
         items:
           $ref: "#/definitions/yyyyy_yyyyy"
+
+  # cmd_874/subtask_874f verification fixture: a restricted view of
+  # xxxxx_xxxxx showing/writable only for team=alpha rows. Proves
+  # x-filter-values end-to-end (list/detail/export/search hide non-alpha
+  # rows; PUT/DELETE on a non-alpha row 404; a legitimate PUT that moves a
+  # row's team out of alpha still succeeds, judged against the pre-image).
+  alpha_xxxxx_xxxxx:
+    x-generate:
+      list: true
+      view: true
+      new: false
+      edit: true
+      delete: true
+      invalidate: false
+      api: true
+      test: true
+    x-filter-values:
+      team: [alpha]
+    x-display:
+      table:
+        - name:
+            primary: true
+            width: 200
+        - team:
+            width: 150
+    allOf:
+      - $ref: "#/definitions/xxxxx_xxxxx"
 
   parent1_child1:
     fields:
@@ -2191,11 +2219,16 @@ definitions:
         - status:
             width: 120
     x-approval:
+      submit_on:
+        status: pending
       on_approved:
         emit_hook: true
       on_rejected:
         terminal: true
         emit_hook: true
+      on_withdrawn:
+        set_fields:
+          status: draft
     x-splittable:
       quantityField: quantity
       parentField: parent_id
@@ -2215,10 +2248,11 @@ definitions:
         minimum: 1
       status:
         enum:
+          - draft
           - pending
           - split
           - rejected
-        default: pending
+        default: draft
       price:
         minimum: 0
       parent_id:
@@ -2492,6 +2526,9 @@ definitions:
         set_fields:
           status: "rejected"
         emit_hook: false
+      on_withdrawn:
+        set_fields:
+          status: "draft"
     fields:
       title:
         minLength: 1

@@ -22,6 +22,19 @@ describe('API: Purchase Per Item — Terminal Reject Reservation Release (cmd_30
     cy.task('db:grantAllPermissions');
   });
 
+  // cmd_856 [変更1]: see purchase_per_item_approval_approve.cy.ts for the
+  // full rationale — purchase_per_item now starts in 'draft' and needs an
+  // explicit submit (via the ApprovalSection "Submit" button's server
+  // action) before it has an approval_request at all.
+  function submitPurchasePerItemForApproval(itemId: string) {
+    Cypress.session.clearAllSavedSessions();
+    cy.clearCookies();
+    cy.login(TEST_CREDENTIALS.email, TEST_CREDENTIALS.password);
+    cy.visit(`/en/purchase_per_item/view/${itemId}`);
+    cy.get('button[aria-label="Submit"]').click();
+    cy.get('button[aria-label="Submit"]').should('not.exist');
+  }
+
   function reserveAndReject(quantity: number, invSeed: any, orderNo: string) {
     return cy.task<any>('db:setupPurchasePerItemSingleApprovalFlow').then((flowSetup) => {
       return cy
@@ -41,6 +54,7 @@ describe('API: Purchase Per Item — Terminal Reject Reservation Release (cmd_30
 
           return cy.task<any>('db:getPurchasePerItemsForOrder', { purchase_order_id: orderId }).then((items) => {
             const item = items[0];
+            submitPurchasePerItemForApproval(item.id);
             return cy.task<any>('db:getPendingApprovalRequest', { approvable_id: item.approvable_id }).then((ar) => {
               expect(ar).to.not.be.null;
 
@@ -56,7 +70,12 @@ describe('API: Purchase Per Item — Terminal Reject Reservation Release (cmd_30
                 .then((rejectRes) => {
                   expect(rejectRes.status).to.eq(200);
                   expect(rejectRes.body.status).to.eq('terminal_rejected');
-                  return cy.wrap({ item, orderId });
+                  // Re-fetch: submitPurchasePerItemForApproval sets
+                  // inventory_transactionable_id server-side; the `item`
+                  // captured above pre-dates that write.
+                  return cy.task<any>('db:getPurchasePerItemById', { id: item.id }).then((freshItem) => {
+                    return cy.wrap({ item: freshItem, orderId });
+                  });
                 });
             });
           });
@@ -152,9 +171,7 @@ describe('API: Purchase Per Item — Terminal Reject Reservation Release (cmd_30
           cy.task<any>('db:getPurchasePerItemsForOrder', { purchase_order_id: orderId }).then((items) => {
             const parent = items[0];
 
-            Cypress.session.clearAllSavedSessions();
-            cy.clearCookies();
-            cy.login(TEST_CREDENTIALS.email, TEST_CREDENTIALS.password);
+            submitPurchasePerItemForApproval(parent.id);
             cy.request({
               method: 'POST',
               url: `/api/purchase_per_item/${parent.id}/actions/split`,

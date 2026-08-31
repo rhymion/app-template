@@ -23,7 +23,22 @@ describe('API: Purchase Per Item — Split (cmd_305 FIX-B)', () => {
     cy.task('db:grantAllPermissions');
   });
 
+  // cmd_856 [変更1]: see purchase_per_item_approval_approve.cy.ts for the
+  // full rationale — purchase_per_item now starts in 'draft' and the split
+  // action's pre-submission guard (cmd_847 [③]) requires a real
+  // approval_request to exist, which only the ApprovalSection "Submit"
+  // button's server action creates for this edit:false entity.
+  function submitPurchasePerItemForApproval(itemId: string) {
+    Cypress.session.clearAllSavedSessions();
+    cy.clearCookies();
+    cy.login(TEST_CREDENTIALS.email, TEST_CREDENTIALS.password);
+    cy.visit(`/en/purchase_per_item/view/${itemId}`);
+    cy.get('button[aria-label="Submit"]').click();
+    cy.get('button[aria-label="Submit"]').should('not.exist');
+  }
+
   it('splits into children summing to the parent quantity: parent → split status, children get their own bridge (specified lot + auto-allocate)', () => {
+    cy.task('db:setupPurchasePerItemSingleApprovalFlow');
     cy.task<any>('db:seedReservationInventory', { quantity: 30 }).then((seed) => {
       // parent reserves 20 out of INV1 (location=null — the default lot).
       cy.request({
@@ -47,9 +62,7 @@ describe('API: Purchase Per Item — Split (cmd_305 FIX-B)', () => {
           cy.task<any>('db:getPurchasePerItemsForOrder', { purchase_order_id: orderId }).then((items) => {
             const parent = items[0];
 
-            Cypress.session.clearAllSavedSessions();
-            cy.clearCookies();
-            cy.login(TEST_CREDENTIALS.email, TEST_CREDENTIALS.password);
+            submitPurchasePerItemForApproval(parent.id);
             cy.request({
               method: 'POST',
               url: `${SPLIT_API}/${parent.id}/actions/split`,
@@ -106,8 +119,11 @@ describe('API: Purchase Per Item — Split (cmd_305 FIX-B)', () => {
               });
 
               // Parent's own bridge must show a 'cancel' ledger row netting its reserve to zero.
+              // Re-fetch: submitPurchasePerItemForApproval sets
+              // inventory_transactionable_id server-side; `parent` above pre-dates that write.
+              cy.task<any>('db:getPurchasePerItemById', { id: parent.id }).then((parentAfter2: any) => {
               cy.task<any>('db:getInventoryTransactionsByBridge', {
-                inventory_transactionable_id: parent.inventory_transactionable_id,
+                inventory_transactionable_id: parentAfter2.inventory_transactionable_id,
               }).then((txs: any[]) => {
                 const sumReserved = txs.reduce((s, t) => s + t.reserved_delta, 0);
                 expect(sumReserved).to.eq(0); // reserve(+20) + cancel(-20) nets to zero
@@ -115,6 +131,7 @@ describe('API: Purchase Per Item — Split (cmd_305 FIX-B)', () => {
                 expect(cancelTx).to.exist;
                 expect(cancelTx.reserved_delta).to.eq(-20);
                 expect(cancelTx.quantity_delta).to.eq(0); // O-4: cancel never touches physical quantity
+              });
               });
             });
           });
@@ -124,6 +141,7 @@ describe('API: Purchase Per Item — Split (cmd_305 FIX-B)', () => {
   });
 
   it('no regression: parent release still works for a lot with an explicit (non-null) location', () => {
+    cy.task('db:setupPurchasePerItemSingleApprovalFlow');
     // Same scenario as above, but the parent's ORIGINAL reservation is taken
     // entirely from a lot that already has a non-empty location string, which
     // was never affected by the bug (`_row.location ?? ''` and
@@ -155,18 +173,19 @@ describe('API: Purchase Per Item — Split (cmd_305 FIX-B)', () => {
             expect(poRes.status).to.eq(201);
             const orderId = poRes.body.id;
 
-            cy.request({
-              url: `${INV_API}/${invExplicit.id}`,
-              headers: { 'X-API-Key': TEST_API_KEY },
-            }).then((preRes) => {
-              expect(preRes.body.reserved_quantity).to.eq(20); // entire parent reservation on the explicit lot
+            cy.task<any>('db:getPurchasePerItemsForOrder', { purchase_order_id: orderId }).then((items) => {
+              const parent = items[0];
 
-              cy.task<any>('db:getPurchasePerItemsForOrder', { purchase_order_id: orderId }).then((items) => {
-                const parent = items[0];
+              // Reservation happens at explicit submit time (not at PO
+              // creation, since nested-create leaves the item in 'draft').
+              submitPurchasePerItemForApproval(parent.id);
 
-                Cypress.session.clearAllSavedSessions();
-                cy.clearCookies();
-                cy.login(TEST_CREDENTIALS.email, TEST_CREDENTIALS.password);
+              cy.request({
+                url: `${INV_API}/${invExplicit.id}`,
+                headers: { 'X-API-Key': TEST_API_KEY },
+              }).then((preRes) => {
+                expect(preRes.body.reserved_quantity).to.eq(20); // entire parent reservation on the explicit lot
+
                 cy.request({
                   method: 'POST',
                   url: `${SPLIT_API}/${parent.id}/actions/split`,
@@ -196,6 +215,7 @@ describe('API: Purchase Per Item — Split (cmd_305 FIX-B)', () => {
   });
 
   it('DP-B1a: insufficient inventory for a split part is a hard error — tx aborts, no children created, parent unaffected', () => {
+    cy.task('db:setupPurchasePerItemSingleApprovalFlow');
     // cmd_307 FIX-α: parent's own reservation is now released BEFORE the
     // children auto-allocate (same $transaction), so re-splitting entirely
     // within the parent's own already-reserved lot legitimately succeeds —
@@ -219,21 +239,22 @@ describe('API: Purchase Per Item — Split (cmd_305 FIX-B)', () => {
         expect(poRes.status).to.eq(201);
         const orderId = poRes.body.id;
 
-        cy.request({
-          url: `${INV_API}/${seed.inventory.id}`,
-          headers: { 'X-API-Key': TEST_API_KEY },
-        }).then((preRes) => {
-          expect(preRes.body.reserved_quantity).to.eq(10);
+        cy.task<any>('db:getPurchasePerItemsForOrder', { purchase_order_id: orderId }).then((items) => {
+          const parent = items[0];
 
-          // Physical shrinkage after the reservation: only 6 units of real
-          // stock remain, below the 10 the split's parts require in total.
-          cy.task('db:setInventoryQuantity', { inventory_id: seed.inventory.id, quantity: 6 }).then(() => {
-            cy.task<any>('db:getPurchasePerItemsForOrder', { purchase_order_id: orderId }).then((items) => {
-              const parent = items[0];
+          // Reservation happens at explicit submit time (not at PO
+          // creation, since nested-create leaves the item in 'draft').
+          submitPurchasePerItemForApproval(parent.id);
 
-              Cypress.session.clearAllSavedSessions();
-              cy.clearCookies();
-              cy.login(TEST_CREDENTIALS.email, TEST_CREDENTIALS.password);
+          cy.request({
+            url: `${INV_API}/${seed.inventory.id}`,
+            headers: { 'X-API-Key': TEST_API_KEY },
+          }).then((preRes) => {
+            expect(preRes.body.reserved_quantity).to.eq(10);
+
+            // Physical shrinkage after the reservation: only 6 units of real
+            // stock remain, below the 10 the split's parts require in total.
+            cy.task('db:setInventoryQuantity', { inventory_id: seed.inventory.id, quantity: 6 }).then(() => {
               cy.request({
                 method: 'POST',
                 url: `${SPLIT_API}/${parent.id}/actions/split`,
@@ -271,6 +292,7 @@ describe('API: Purchase Per Item — Split (cmd_305 FIX-B)', () => {
   });
 
   it('cmd_307 FIX-α: re-splitting entirely within the parent\'s own already-reserved lot succeeds (parent release happens before child re-reservation)', () => {
+    cy.task('db:setupPurchasePerItemSingleApprovalFlow');
     // Before FIX-α: the parent's reserve rows were released AFTER the
     // children auto-allocated/claimed, so a re-split into the very same lot
     // the parent already reserved double-counted reserved_quantity and
@@ -291,19 +313,20 @@ describe('API: Purchase Per Item — Split (cmd_305 FIX-B)', () => {
         expect(poRes.status).to.eq(201);
         const orderId = poRes.body.id;
 
-        cy.request({
-          url: `${INV_API}/${seed.inventory.id}`,
-          headers: { 'X-API-Key': TEST_API_KEY },
-        }).then((preRes) => {
-          expect(preRes.body.reserved_quantity).to.eq(100);
-          expect(preRes.body.quantity).to.eq(100);
+        cy.task<any>('db:getPurchasePerItemsForOrder', { purchase_order_id: orderId }).then((items) => {
+          const parent = items[0];
 
-          cy.task<any>('db:getPurchasePerItemsForOrder', { purchase_order_id: orderId }).then((items) => {
-            const parent = items[0];
+          // Reservation happens at explicit submit time (not at PO
+          // creation, since nested-create leaves the item in 'draft').
+          submitPurchasePerItemForApproval(parent.id);
 
-            Cypress.session.clearAllSavedSessions();
-            cy.clearCookies();
-            cy.login(TEST_CREDENTIALS.email, TEST_CREDENTIALS.password);
+          cy.request({
+            url: `${INV_API}/${seed.inventory.id}`,
+            headers: { 'X-API-Key': TEST_API_KEY },
+          }).then((preRes) => {
+            expect(preRes.body.reserved_quantity).to.eq(100);
+            expect(preRes.body.quantity).to.eq(100);
+
             cy.request({
               method: 'POST',
               url: `${SPLIT_API}/${parent.id}/actions/split`,
@@ -342,6 +365,7 @@ describe('API: Purchase Per Item — Split (cmd_305 FIX-B)', () => {
   });
 
   it("cmd_307 FIX-γ: an unspecified part's inventory_id sent as '' (UI sentinel) auto-allocates instead of causing a purchase_per_item_inventory_id_fkey violation", () => {
+    cy.task('db:setupPurchasePerItemSingleApprovalFlow');
     // Before FIX-γ: '' is falsy so the reserve-vs-auto-allocate branch took
     // the auto-allocate path correctly, but the child record's own
     // `inventory_id: part.inventory_id ?? parent.inventory_id` used `??`,
@@ -368,9 +392,7 @@ describe('API: Purchase Per Item — Split (cmd_305 FIX-B)', () => {
         cy.task<any>('db:getPurchasePerItemsForOrder', { purchase_order_id: orderId }).then((items) => {
           const parent = items[0];
 
-          Cypress.session.clearAllSavedSessions();
-          cy.clearCookies();
-          cy.login(TEST_CREDENTIALS.email, TEST_CREDENTIALS.password);
+          submitPurchasePerItemForApproval(parent.id);
           cy.request({
             method: 'POST',
             url: `${SPLIT_API}/${parent.id}/actions/split`,
@@ -398,6 +420,7 @@ describe('API: Purchase Per Item — Split (cmd_305 FIX-B)', () => {
   });
 
   it('item3: rejects fewer than 2 parts (400) — quantity invariant validation, generic across x-splittable entities', () => {
+    cy.task('db:setupPurchasePerItemSingleApprovalFlow');
     cy.task<any>('db:seedReservationInventory', { quantity: 10 }).then((seed) => {
       cy.request({
         method: 'POST',
@@ -411,9 +434,7 @@ describe('API: Purchase Per Item — Split (cmd_305 FIX-B)', () => {
       }).then((poRes) => {
         cy.task<any>('db:getPurchasePerItemsForOrder', { purchase_order_id: poRes.body.id }).then((items) => {
           const parent = items[0];
-          Cypress.session.clearAllSavedSessions();
-          cy.clearCookies();
-          cy.login(TEST_CREDENTIALS.email, TEST_CREDENTIALS.password);
+          submitPurchasePerItemForApproval(parent.id);
           cy.request({
             method: 'POST',
             url: `${SPLIT_API}/${parent.id}/actions/split`,
@@ -428,6 +449,7 @@ describe('API: Purchase Per Item — Split (cmd_305 FIX-B)', () => {
   });
 
   it('item3: rejects a non-positive part quantity (400)', () => {
+    cy.task('db:setupPurchasePerItemSingleApprovalFlow');
     cy.task<any>('db:seedReservationInventory', { quantity: 10 }).then((seed) => {
       cy.request({
         method: 'POST',
@@ -441,9 +463,7 @@ describe('API: Purchase Per Item — Split (cmd_305 FIX-B)', () => {
       }).then((poRes) => {
         cy.task<any>('db:getPurchasePerItemsForOrder', { purchase_order_id: poRes.body.id }).then((items) => {
           const parent = items[0];
-          Cypress.session.clearAllSavedSessions();
-          cy.clearCookies();
-          cy.login(TEST_CREDENTIALS.email, TEST_CREDENTIALS.password);
+          submitPurchasePerItemForApproval(parent.id);
           cy.request({
             method: 'POST',
             url: `${SPLIT_API}/${parent.id}/actions/split`,
@@ -458,6 +478,7 @@ describe('API: Purchase Per Item — Split (cmd_305 FIX-B)', () => {
   });
 
   it('item3: rejects parts that do not sum to the parent quantity (400)', () => {
+    cy.task('db:setupPurchasePerItemSingleApprovalFlow');
     cy.task<any>('db:seedReservationInventory', { quantity: 10 }).then((seed) => {
       cy.request({
         method: 'POST',
@@ -471,9 +492,7 @@ describe('API: Purchase Per Item — Split (cmd_305 FIX-B)', () => {
       }).then((poRes) => {
         cy.task<any>('db:getPurchasePerItemsForOrder', { purchase_order_id: poRes.body.id }).then((items) => {
           const parent = items[0];
-          Cypress.session.clearAllSavedSessions();
-          cy.clearCookies();
-          cy.login(TEST_CREDENTIALS.email, TEST_CREDENTIALS.password);
+          submitPurchasePerItemForApproval(parent.id);
           cy.request({
             method: 'POST',
             url: `${SPLIT_API}/${parent.id}/actions/split`,
@@ -491,6 +510,7 @@ describe('API: Purchase Per Item — Split (cmd_305 FIX-B)', () => {
   });
 
   it('item3: hard-fails a split part whose specified inventory_id belongs to a different product than the line (real bug fix — pre-fix this silently reserved cross-product)', () => {
+    cy.task('db:setupPurchasePerItemSingleApprovalFlow');
     // Pre-fix, app/api/purchase_per_item/[id]/actions/split/route.ts's
     // specified-lot branch only checked inventory existence
     // (`tx.inventory.findUnique`), never `_childInv.product_id ===
@@ -517,9 +537,7 @@ describe('API: Purchase Per Item — Split (cmd_305 FIX-B)', () => {
             const parent = items[0];
             expect(parent.product_id).to.eq(seed.product.id);
 
-            Cypress.session.clearAllSavedSessions();
-            cy.clearCookies();
-            cy.login(TEST_CREDENTIALS.email, TEST_CREDENTIALS.password);
+            submitPurchasePerItemForApproval(parent.id);
             cy.request({
               method: 'POST',
               url: `${SPLIT_API}/${parent.id}/actions/split`,
