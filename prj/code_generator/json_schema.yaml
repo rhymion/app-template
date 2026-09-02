@@ -1300,7 +1300,16 @@ definitions:
     fields:
       name: {}
 
-  inventory_transactionable: {}
+  inventory_transactionable:
+    x-generate:
+      list: false
+      view: false
+      new: false
+      edit: false
+      delete: false
+      invalidate: false
+      api: false
+      test: false
 
   inventory_transaction:
     x-nav:
@@ -1311,6 +1320,8 @@ definitions:
       edit: false
       delete: false
       invalidate: false     # O-1: entity level read-only (list/view only, no UI mutation)
+      api: true              # align with proj_g inventory_transaction x-generate
+      test: true             # align with proj_g inventory_transaction x-generate
     fields:
       inventory_transactionable_id:
         pattern: "^c[a-z0-9]{24,}$"
