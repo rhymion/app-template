@@ -29,3 +29,4 @@ app-generator/.venv/bin/pip install -r app-generator/requirements.txt
 echo
 echo "Setup complete."
 echo "Next: start your local database, then run 'npm run dev' from the repository root."
+# subtask_931a probe: disposable comment to trigger a non-docs diff (removed after measurement)
