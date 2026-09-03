@@ -1350,6 +1350,27 @@ definitions:
       invalidate: false     # O-1: entity level read-only (list/view only, no UI mutation)
       api: true              # align with proj_g inventory_transaction x-generate
       test: true             # align with proj_g inventory_transaction x-generate
+    # subtask_925d (2026-09-03): without x-display.table, page_list_context()
+    # (app-generator code_generator/generators.py) emits no displayFields/
+    # primaryField, so the generated list page falls back to
+    # DataGridClient's hardcoded name/description columns — fields this
+    # entity doesn't have — and the grid cell renders the raw row id
+    # instead of any readable label. That silently broke the
+    # generated UI e2e assertions (`Inventory Transaction 1`) the moment
+    # test:true (above) started generating/running them.
+    # product_id is a plain required string (not a real relation despite
+    # the _id suffix — see prisma/schema.prisma), unique per seeded row,
+    # so it's a safe non-FK primary (cf. proj_g's inventory_transaction
+    # comment on why an aliased FK primary breaks the generated spec).
+    x-display:
+      table:
+        - product_id:
+            primary: true
+            width: 200
+        - event_type:
+            width: 140
+        - quantity_delta:
+            width: 140
     fields:
       inventory_transactionable_id:
         pattern: "^c[a-z0-9]{24,}$"
