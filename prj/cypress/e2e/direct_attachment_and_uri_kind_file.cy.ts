@@ -29,7 +29,30 @@
 // silently matches that section's unrelated "Save attachments" button
 // instead, so the real form is never submitted and the page never leaves
 // /edit/.
+//
+// attachmentTestid() below (rather than a bare cy.get('[data-testid=...]'))
+// is required because this data-testid is not always unique in the raw DOM:
+// every one of these edit pages wraps its async Server Component in
+// `<Suspense fallback={<FormSkeleton />}>` (the generator's standard
+// page.tsx.jinja2 pattern, used project-wide -- not specific to this
+// feature). React's streaming SSR occasionally leaves the resolved
+// boundary's HTML sitting in BOTH its final position AND a leftover
+// `<div hidden id="S:n">` streaming-template container that never gets
+// cleared client-side -- a framework-level timing artifact, not a real
+// second field: the `#S:n` copy is `hidden`/`display:none` and inert
+// (matches nothing a user can see or interact with). Reproduced locally
+// ~75% of runs (cmd_951 investigation) via cy.get(...).selectFile()
+// throwing "Your subject contained 2 elements" on whichever field's DOM
+// query happened to land while the leftover copy was still present.
+// The `:not([hidden] *)` suffix excludes anything nested under a `[hidden]`
+// ancestor, selecting the one live element deterministically -- via a plain
+// CSS selector so cy.get()'s own retry/timeout polling still applies,
+// without loosening what the test actually asserts.
 import { TEST_CREDENTIALS } from '../support/test-credentials';
+
+function attachmentTestid(testid: string, options?: Partial<Cypress.Timeoutable>) {
+  return cy.get(`[data-testid="${testid}"]:not([hidden] *)`, options);
+}
 
 function pngFile(name: string) {
   return {
@@ -82,12 +105,12 @@ describe('UI: direct-attachment FK + x-uri-kind: file (SingleAttachmentUpload/Si
       cy.contains('Warranty Card').should('be.visible');
 
       // Direct-attachment FK (mode='fk'): upload an image -- displays as an <img>.
-      cy.get('[data-testid="single-attachment-upload-warrantyCard-file"]').selectFile(pngFile('warranty.png'), { force: true });
-      cy.get('[data-testid="single-attachment-upload-warrantyCard-value"]', { timeout: 10000 }).should('have.value', 'warranty.png');
+      attachmentTestid('single-attachment-upload-warrantyCard-file').selectFile(pngFile('warranty.png'), { force: true });
+      attachmentTestid('single-attachment-upload-warrantyCard-value', { timeout: 10000 }).should('have.value', 'warranty.png');
 
       // x-uri-kind: file (mode='url'): upload a PDF -- displays as a download link, not an <img>.
-      cy.get('[data-testid="single-attachment-upload-specSheetUrl-file"]').selectFile(pdfFile('spec-sheet.pdf'), { force: true });
-      cy.get('[data-testid="single-attachment-upload-specSheetUrl-value"]', { timeout: 10000 }).should('have.value', 'spec-sheet.pdf');
+      attachmentTestid('single-attachment-upload-specSheetUrl-file').selectFile(pdfFile('spec-sheet.pdf'), { force: true });
+      attachmentTestid('single-attachment-upload-specSheetUrl-value', { timeout: 10000 }).should('have.value', 'spec-sheet.pdf');
 
       cy.get('button[aria-label="Save"]').click();
       cy.url().should('not.include', '/edit/');
@@ -107,11 +130,11 @@ describe('UI: direct-attachment FK + x-uri-kind: file (SingleAttachmentUpload/Si
       loginAs(TEST_CREDENTIALS.email);
       cy.visit(`/en/product/edit/${product.id}`);
 
-      cy.get('[data-testid="single-attachment-upload-warrantyCard-file"]').selectFile(pngFile('to-remove.png'), { force: true });
-      cy.get('[data-testid="single-attachment-upload-warrantyCard-value"]', { timeout: 10000 }).should('have.value', 'to-remove.png');
+      attachmentTestid('single-attachment-upload-warrantyCard-file').selectFile(pngFile('to-remove.png'), { force: true });
+      attachmentTestid('single-attachment-upload-warrantyCard-value', { timeout: 10000 }).should('have.value', 'to-remove.png');
 
       cy.contains('button', 'Remove').first().click();
-      cy.get('[data-testid="single-attachment-upload-warrantyCard-value"]').should('have.value', '');
+      attachmentTestid('single-attachment-upload-warrantyCard-value').should('have.value', '');
 
       cy.get('button[aria-label="Save"]').click();
       cy.url().should('not.include', '/edit/');
@@ -128,8 +151,8 @@ describe('UI: direct-attachment FK + x-uri-kind: file (SingleAttachmentUpload/Si
       cy.visit(`/en/leave_request/edit/${leaveRequest.id}`);
       cy.contains('Medical Certificate').should('be.visible');
 
-      cy.get('[data-testid="single-attachment-upload-medicalCertificate-file"]').selectFile(pdfFile('cert.pdf'), { force: true });
-      cy.get('[data-testid="single-attachment-upload-medicalCertificate-value"]', { timeout: 10000 }).should('have.value', 'cert.pdf');
+      attachmentTestid('single-attachment-upload-medicalCertificate-file').selectFile(pdfFile('cert.pdf'), { force: true });
+      attachmentTestid('single-attachment-upload-medicalCertificate-value', { timeout: 10000 }).should('have.value', 'cert.pdf');
 
       cy.get('button[aria-label="Save"]').click();
       cy.url().should('not.include', '/edit/');
