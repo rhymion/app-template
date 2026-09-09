@@ -6,7 +6,6 @@
 // either trigger has no spec that would catch it. This spec exercises both
 // triggers through the real POST /api/receiving_receipt path (not direct
 // Prisma seeding), so it goes through the exact code path a real user hits.
-import { TEST_API_KEY } from '../../support/test-credentials';
 
 const API_BASE = '/api/receiving_receipt';
 
