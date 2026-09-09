@@ -80,6 +80,14 @@ describe('UI: Receiving Receipt Line — Split (cmd_296)', () => {
           });
           cy.task<any>('db:getReceivingReceiptLineChildren', { parentId: line.id }).then((children) => {
             expect(children).to.have.length(2);
+            // Confirms the Autocomplete+lookup selection (D2 ruling — not free
+            // text) actually persisted inventory_id, and that each row's typed
+            // quantity landed on the matching child (Row 0=2, Row 1=3, ordered
+            // by created_at asc per getReceivingReceiptLineChildren).
+            expect(children[0].receipt_quantity).to.eq(2);
+            expect(children[0].inventory_id).to.eq(inventory.id);
+            expect(children[1].receipt_quantity).to.eq(3);
+            expect(children[1].inventory_id).to.eq(inventory.id);
           });
         });
       });
