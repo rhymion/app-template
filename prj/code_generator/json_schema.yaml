@@ -2561,6 +2561,9 @@ definitions:
       on_withdrawn:
         set_fields:
           status: "draft"
+    x-write-locked-values:
+      status:
+        - archived
     fields:
       title:
         minLength: 1
@@ -2572,6 +2575,7 @@ definitions:
           - approved
           - rejected
           - draft
+          - archived
       approvable_id:
         pattern: "^c[a-z0-9]{24,}$"
         x-relationship:
