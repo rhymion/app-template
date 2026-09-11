@@ -1452,6 +1452,15 @@ definitions:
       event_type: adjust
       poolIdField: inventory_id           # 対象 inventory FK フィールド名
       quantity_delta_field: quantity_delta
+    # cmd_1029: quantity_delta must allow both directions -- a positive
+    # value adds stock (a count came out higher than the system's
+    # record), a negative value removes it (a write-off, damage, etc.).
+    # The generator's default minimum of 0 (generators.py `mn =
+    # prop.get('minimum', 0)`) silently blocked negative input from the
+    # New form -- declare an explicit minimum here so negative
+    # corrections can be entered. No business-level lower bound is
+    # documented, so the type's own lower bound (Int/int32) is used
+    # rather than an arbitrary business threshold.
     fields:
       inventory_id:
         pattern: "^c[a-z0-9]{24,}$"
@@ -1461,7 +1470,8 @@ definitions:
             - location.name
             - lot_number
             - expiration_date
-      quantity_delta: {}
+      quantity_delta:
+        minimum: -2147483648
       reason: {}
       status:
         enum:
