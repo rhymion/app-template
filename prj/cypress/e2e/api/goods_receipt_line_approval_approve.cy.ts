@@ -1,8 +1,8 @@
 import { TEST_API_KEY } from '../../support/test-credentials';
 
-// item3 (cmd_309): receiving_receipt_line's approve path (afterApprove —
+// item3 (cmd_309): goods_receipt_line's approve path (afterApprove —
 // writes the 'receive' ledger row + increments inventory.quantity) had NO
-// coverage anywhere in the suite (receiving_receipt_line_approval_dispatch.cy.ts
+// coverage anywhere in the suite (goods_receipt_line_approval_dispatch.cy.ts
 // only exercises terminal reject, a documented no-op). This fills that gap
 // with the successful path, a split child's independent approve, and the
 // item3 cross-product hard-error (which also serves as the '承認中失敗
@@ -11,7 +11,7 @@ import { TEST_API_KEY } from '../../support/test-credentials';
 
 const INV_API = '/api/inventory';
 
-describe('API: Receiving Receipt Line — Approve / Receive Ledger (cmd_309 item3)', () => {
+describe('API: Goods Receipt Line — Approve / Receive Ledger (cmd_309 item3)', () => {
   beforeEach(() => {
     cy.task('db:reset');
     cy.task('db:seed');
@@ -19,10 +19,10 @@ describe('API: Receiving Receipt Line — Approve / Receive Ledger (cmd_309 item
   });
 
   function seedLineWithApprovalAndInventory(receiptQuantity = 5) {
-    return cy.task<any>('db:setupReceivingReceiptLineApprovalFlow').then((flowSetup) => {
+    return cy.task<any>('db:setupGoodsReceiptLineApprovalFlow').then((flowSetup) => {
       return cy.task<any>('db:seedReservationInventory', { quantity: 100 }).then((invSeed) => {
         return cy
-          .task<any>('db:populateReceivingReceiptLineWithApproval', {
+          .task<any>('db:populateGoodsReceiptLineWithApproval', {
             creatorId: flowSetup.approverUser.id,
             approvalFlowIds: [flowSetup.flowWithRole.id],
             // Align the line's own product/inventory with invSeed's lot so the
@@ -66,7 +66,7 @@ describe('API: Receiving Receipt Line — Approve / Receive Ledger (cmd_309 item
             expect(postRes.body.reserved_quantity).to.eq(0); // O-4: receive never touches reserved
           });
 
-          cy.task<any>('db:getReceivingReceiptLineById', { id: line.id }).then((lineAfter: any) => {
+          cy.task<any>('db:getGoodsReceiptLineById', { id: line.id }).then((lineAfter: any) => {
             cy.task<any>('db:getInventoryTransactionsByBridge', {
               inventory_transactionable_id: lineAfter.inventory_transactionable_id,
             }).then((txs: any[]) => {
@@ -95,7 +95,7 @@ describe('API: Receiving Receipt Line — Approve / Receive Ledger (cmd_309 item
       cy.login(flowSetup.approverUser.email, 'test-password');
       cy.request({
         method: 'POST',
-        url: `/api/receiving_receipt_line/${line.id}/actions/split`,
+        url: `/api/goods_receipt_line/${line.id}/actions/split`,
         body: {
           parts: [
             { receipt_quantity: 2, inventory_id: inventory.id },
@@ -105,7 +105,7 @@ describe('API: Receiving Receipt Line — Approve / Receive Ledger (cmd_309 item
       }).then((splitRes) => {
         expect(splitRes.status).to.eq(200);
 
-        cy.task<any>('db:getReceivingReceiptLineChildren', { parentId: line.id }).then((children) => {
+        cy.task<any>('db:getGoodsReceiptLineChildren', { parentId: line.id }).then((children) => {
           const [childA, childB] = children;
 
           cy.task<any>('db:getPendingApprovalRequest', { approvable_id: childA.approvable_id }).then((ar: any) => {
@@ -124,7 +124,7 @@ describe('API: Receiving Receipt Line — Approve / Receive Ledger (cmd_309 item
               });
 
               // Sibling untouched — no ledger row, still pending.
-              cy.task<any>('db:getReceivingReceiptLineById', { id: childB.id }).then((siblingAfter: any) => {
+              cy.task<any>('db:getGoodsReceiptLineById', { id: childB.id }).then((siblingAfter: any) => {
                 expect(siblingAfter.status).to.eq('pending');
               });
               cy.task<any>('db:getInventoryTransactionsByBridge', {
@@ -149,9 +149,9 @@ describe('API: Receiving Receipt Line — Approve / Receive Ledger (cmd_309 item
     // $transaction as the approval_request status flip, so everything rolls
     // back: status stays pending, approved_at stays null, no ledger row, no
     // inventory change.
-    cy.task<any>('db:setupReceivingReceiptLineApprovalFlow').then((flowSetup) => {
+    cy.task<any>('db:setupGoodsReceiptLineApprovalFlow').then((flowSetup) => {
       cy.task<any>('db:seedSecondProduct', { quantity: 50 }).then((otherProduct) => {
-        cy.task<any>('db:populateReceivingReceiptLineWithApproval', {
+        cy.task<any>('db:populateGoodsReceiptLineWithApproval', {
           creatorId: flowSetup.approverUser.id,
           approvalFlowIds: [flowSetup.flowWithRole.id],
           overrides: { inventory_id: otherProduct.inventory.id },

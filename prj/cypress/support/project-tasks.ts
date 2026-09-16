@@ -17,31 +17,31 @@ export function getProjectTasks(): Record<string, (...args: any[]) => any> {
       const { countAllInventoryTransactions } = require('./inventory_test_helpers');
       return await countAllInventoryTransactions();
     },
-    async 'db:setupReceivingReceiptNotificationFixture'() {
-      const { setupReceivingReceiptNotificationFixture } = require('./receiving_receipt/notification_helper');
-      return await setupReceivingReceiptNotificationFixture();
+    async 'db:setupGoodsReceiptNotificationFixture'() {
+      const { setupGoodsReceiptNotificationFixture } = require('./goods_receipt/notification_helper');
+      return await setupGoodsReceiptNotificationFixture();
     },
-    async 'db:getReceivingReceiptLineById'(params: { id: string }) {
-      const { getReceivingReceiptLineById } = require('./receiving_receipt/receiving_receipt_line_helper');
-      return await getReceivingReceiptLineById(params.id);
+    async 'db:getGoodsReceiptLineById'(params: { id: string }) {
+      const { getGoodsReceiptLineById } = require('./goods_receipt/goods_receipt_line_helper');
+      return await getGoodsReceiptLineById(params.id);
     },
-    async 'db:getReceivingReceiptLineChildren'(params: { parentId: string }) {
-      const { getReceivingReceiptLineChildren } = require('./receiving_receipt/receiving_receipt_line_helper');
-      return await getReceivingReceiptLineChildren(params.parentId);
+    async 'db:getGoodsReceiptLineChildren'(params: { parentId: string }) {
+      const { getGoodsReceiptLineChildren } = require('./goods_receipt/goods_receipt_line_helper');
+      return await getGoodsReceiptLineChildren(params.parentId);
     },
-    async 'db:setupReceivingReceiptLineSingleApprovalFlow'() {
-      const { setupReceivingReceiptLineSingleApprovalFlow } = require('./receiving_receipt/receiving_receipt_line_helper');
-      return await setupReceivingReceiptLineSingleApprovalFlow();
+    async 'db:setupGoodsReceiptLineSingleApprovalFlow'() {
+      const { setupGoodsReceiptLineSingleApprovalFlow } = require('./goods_receipt/goods_receipt_line_helper');
+      return await setupGoodsReceiptLineSingleApprovalFlow();
     },
-    async 'db:populateReceivingReceiptLineSingleApproval'(params: {
+    async 'db:populateGoodsReceiptLineSingleApproval'(params: {
       creatorId: string;
       approvalFlowIds: string[];
       inventoryId?: string | null;
       productId?: string;
       receiptQuantity?: number;
     }) {
-      const { populateReceivingReceiptLineSingleApproval } = require('./receiving_receipt/receiving_receipt_line_helper');
-      return await populateReceivingReceiptLineSingleApproval(
+      const { populateGoodsReceiptLineSingleApproval } = require('./goods_receipt/goods_receipt_line_helper');
+      return await populateGoodsReceiptLineSingleApproval(
         params.creatorId,
         params.approvalFlowIds,
         { inventoryId: params.inventoryId, productId: params.productId, receiptQuantity: params.receiptQuantity }

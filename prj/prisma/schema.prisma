@@ -165,15 +165,15 @@ model user {
   updated_maintenance_tickets    maintenance_ticket[]  @relation("MaintenanceTicketUpdater")
   created_approval_edit_terminal_tests  approval_edit_terminal_test[] @relation("ApprovalEditTerminalTestCreator")
   updated_approval_edit_terminal_tests  approval_edit_terminal_test[] @relation("ApprovalEditTerminalTestUpdater")
-  created_receiving_purchase_orders     receiving_purchase_order[] @relation("ReceivingPurchaseOrderCreator")
-  updated_receiving_purchase_orders     receiving_purchase_order[] @relation("ReceivingPurchaseOrderUpdater")
-  created_receiving_asns                receiving_asn[]            @relation("ReceivingAsnCreator")
-  updated_receiving_asns                receiving_asn[]            @relation("ReceivingAsnUpdater")
-  created_receiving_receipts            receiving_receipt[]        @relation("ReceivingReceiptCreator")
-  updated_receiving_receipts            receiving_receipt[]        @relation("ReceivingReceiptUpdater")
-  created_receiving_receipt_lines       receiving_receipt_line[]   @relation("ReceivingReceiptLineCreator")
-  updated_receiving_receipt_lines       receiving_receipt_line[]   @relation("ReceivingReceiptLineUpdater")
-  assigned_receiving_receipt_lines      receiving_receipt_line[]   @relation("ReceivingReceiptLineAssignee")
+  created_purchase_orders                purchase_order[]      @relation("PurchaseOrderCreator")
+  updated_purchase_orders                purchase_order[]      @relation("PurchaseOrderUpdater")
+  created_asns                           asn[]                 @relation("AsnCreator")
+  updated_asns                           asn[]                 @relation("AsnUpdater")
+  created_goods_receipts                 goods_receipt[]       @relation("GoodsReceiptCreator")
+  updated_goods_receipts                 goods_receipt[]       @relation("GoodsReceiptUpdater")
+  created_goods_receipt_lines            goods_receipt_line[]  @relation("GoodsReceiptLineCreator")
+  updated_goods_receipt_lines            goods_receipt_line[]  @relation("GoodsReceiptLineUpdater")
+  assigned_goods_receipt_lines           goods_receipt_line[]  @relation("GoodsReceiptLineAssignee")
   created_inventory_movements           inventory_movement[]       @relation("InventoryMovementCreator")
   updated_inventory_movements           inventory_movement[]       @relation("InventoryMovementUpdater")
   created_inventory_adjustments         inventory_adjustment[]     @relation("InventoryAdjustmentCreator")
@@ -258,7 +258,7 @@ model approvable {
   approval_requests approval_request[]
   leave_request     leave_request?
   purchase_per_item purchase_per_item?
-  receiving_receipt_line receiving_receipt_line?
+  goods_receipt_line     goods_receipt_line?
   inventory_movement   inventory_movement?
   inventory_adjustment inventory_adjustment?
   maintenance_ticket   maintenance_ticket?
@@ -349,7 +349,7 @@ model commentable {
 model inventory_transactionable {
   id                     String                  @id @default(cuid())
   purchase_per_item      purchase_per_item?
-  receiving_receipt_line receiving_receipt_line?
+  goods_receipt_line     goods_receipt_line?
   inventory_movement     inventory_movement?
   inventory_adjustment   inventory_adjustment?
   inventory_transactions inventory_transaction[]
@@ -990,9 +990,9 @@ model product {
   spec_sheet_url     String?
   inventories                    inventory[]
   purchase_per_items             purchase_per_item[]
-  receiving_purchase_order_lines receiving_purchase_order_line[]
-  receiving_asn_lines            receiving_asn_line[]
-  receiving_receipt_lines        receiving_receipt_line[]
+  purchase_order_lines            purchase_order_line[]
+  asn_lines                       asn_line[]
+  goods_receipt_lines             goods_receipt_line[]
   asset_components               asset_component[] @relation("AssetComponentProduct")
   spare_parts                    spare_part[] @relation("SparePartRelatedProduct")
   created_at                     DateTime                        @default(now()) @db.Timestamptz(0)
@@ -1022,7 +1022,7 @@ model inventory {
   creator           user      @relation("InventoryCreator", fields: [creator_id], references: [id])
   updater_id        String
   updater           user      @relation("InventoryUpdater", fields: [updater_id], references: [id])
-  receiving_receipt_lines receiving_receipt_line[] @relation("ReceiptLineInventory")
+  goods_receipt_lines goods_receipt_line[] @relation("ReceiptLineInventory")
   purchase_per_items purchase_per_item[]
   movements_from    inventory_movement[]   @relation("InventoryMovementFrom")
   movements_to      inventory_movement[]   @relation("InventoryMovementTo")
@@ -1265,10 +1265,10 @@ model room_reservation {
 }
 
 // ============================================================
-// x-receiving: Receiving lifecycle (PO / ASN / Receipt)
+// Procurement lifecycle (PO / ASN / Goods Receipt)
 // ============================================================
 
-enum ReceivingPurchaseOrderStatus {
+enum PurchaseOrderStatus {
   draft
   issued
   partially_received
@@ -1276,50 +1276,50 @@ enum ReceivingPurchaseOrderStatus {
   cancelled
 }
 
-model receiving_purchase_order {
+model purchase_order {
   id                             String                           @id @default(cuid())
   order_no                       String
-  status                         ReceivingPurchaseOrderStatus     @default(draft)
-  lines                          receiving_purchase_order_line[]
-  receiving_asns                 receiving_asn[]
-  receiving_receipts             receiving_receipt[]
+  status                         PurchaseOrderStatus              @default(draft)
+  lines                          purchase_order_line[]
+  asns                           asn[]
+  goods_receipts                 goods_receipt[]
   created_at                     DateTime                         @default(now()) @db.Timestamptz(0)
   updated_at                     DateTime                         @updatedAt @db.Timestamptz(0)
   creator_id                     String
-  creator                        user                             @relation("ReceivingPurchaseOrderCreator", fields: [creator_id], references: [id])
+  creator                        user                             @relation("PurchaseOrderCreator", fields: [creator_id], references: [id])
   updater_id                     String
-  updater                        user                             @relation("ReceivingPurchaseOrderUpdater", fields: [updater_id], references: [id])
+  updater                        user                             @relation("PurchaseOrderUpdater", fields: [updater_id], references: [id])
 
   @@index([creator_id])
   @@index([updater_id])
 }
 
-enum ReceivingPurchaseOrderLineStatus {
+enum PurchaseOrderLineStatus {
   outstanding
   partially_received
   fully_received
   cancelled
 }
 
-model receiving_purchase_order_line {
-  id                          String                   @id @default(cuid())
-  receiving_purchase_order_id String
-  receiving_purchase_order    receiving_purchase_order @relation(fields: [receiving_purchase_order_id], references: [id], onDelete: Cascade)
-  product_id                  String
-  product                     product                  @relation(fields: [product_id], references: [id], onDelete: Cascade)
-  ordered_quantity            Int
-  done_quantity               Int                      @default(0)
-  cancelled_quantity          Int                      @default(0)
-  outstanding_quantity        Int                      @default(0)
-  status                      ReceivingPurchaseOrderLineStatus @default(outstanding)
-  created_at                  DateTime                 @default(now()) @db.Timestamptz(0)
-  updated_at                  DateTime                 @updatedAt @db.Timestamptz(0)
+model purchase_order_line {
+  id                 String                   @id @default(cuid())
+  purchase_order_id  String
+  purchase_order     purchase_order           @relation(fields: [purchase_order_id], references: [id], onDelete: Cascade)
+  product_id         String
+  product            product                  @relation(fields: [product_id], references: [id], onDelete: Cascade)
+  ordered_quantity   Int
+  done_quantity      Int                      @default(0)
+  cancelled_quantity Int                      @default(0)
+  outstanding_quantity Int                    @default(0)
+  status             PurchaseOrderLineStatus @default(outstanding)
+  created_at         DateTime                 @default(now()) @db.Timestamptz(0)
+  updated_at         DateTime                 @updatedAt @db.Timestamptz(0)
 
-  @@index([receiving_purchase_order_id])
+  @@index([purchase_order_id])
   @@index([product_id])
 }
 
-enum ReceivingAsnStatus {
+enum AsnStatus {
   draft
   sent
   partially_matched
@@ -1327,73 +1327,73 @@ enum ReceivingAsnStatus {
   cancelled
 }
 
-model receiving_asn {
-  id                 String                    @id @default(cuid())
-  asn_no             String
-  purchase_order_id  String?
-  purchase_order     receiving_purchase_order? @relation(fields: [purchase_order_id], references: [id])
-  status             ReceivingAsnStatus        @default(draft)
-  lines              receiving_asn_line[]
-  receiving_receipts receiving_receipt[]
-  created_at         DateTime                  @default(now()) @db.Timestamptz(0)
-  updated_at         DateTime                  @updatedAt @db.Timestamptz(0)
-  creator_id         String
-  creator            user                      @relation("ReceivingAsnCreator", fields: [creator_id], references: [id])
-  updater_id         String
-  updater            user                      @relation("ReceivingAsnUpdater", fields: [updater_id], references: [id])
+model asn {
+  id                String                    @id @default(cuid())
+  asn_no            String
+  purchase_order_id String?
+  purchase_order    purchase_order?           @relation(fields: [purchase_order_id], references: [id])
+  status            AsnStatus                 @default(draft)
+  lines             asn_line[]
+  goods_receipts    goods_receipt[]
+  created_at        DateTime                  @default(now()) @db.Timestamptz(0)
+  updated_at        DateTime                  @updatedAt @db.Timestamptz(0)
+  creator_id        String
+  creator           user                      @relation("AsnCreator", fields: [creator_id], references: [id])
+  updater_id        String
+  updater           user                      @relation("AsnUpdater", fields: [updater_id], references: [id])
 
   @@index([creator_id])
   @@index([purchase_order_id])
   @@index([updater_id])
 }
 
-enum ReceivingAsnLineStatus {
+enum AsnLineStatus {
   outstanding
   partially_matched
   fully_matched
   cancelled
 }
 
-model receiving_asn_line {
-  id                   String        @id @default(cuid())
-  receiving_asn_id     String
-  receiving_asn        receiving_asn @relation(fields: [receiving_asn_id], references: [id], onDelete: Cascade)
+model asn_line {
+  id                   String    @id @default(cuid())
+  asn_id               String
+  asn                  asn       @relation(fields: [asn_id], references: [id], onDelete: Cascade)
   product_id           String
-  product              product       @relation(fields: [product_id], references: [id], onDelete: Cascade)
+  product              product   @relation(fields: [product_id], references: [id], onDelete: Cascade)
   shipped_quantity     Int
-  done_quantity        Int           @default(0)
-  cancelled_quantity   Int           @default(0)
-  outstanding_quantity Int           @default(0)
-  status               ReceivingAsnLineStatus @default(outstanding)
-  created_at           DateTime      @default(now()) @db.Timestamptz(0)
-  updated_at           DateTime      @updatedAt @db.Timestamptz(0)
+  done_quantity        Int       @default(0)
+  cancelled_quantity   Int       @default(0)
+  outstanding_quantity Int       @default(0)
+  status               AsnLineStatus @default(outstanding)
+  created_at           DateTime  @default(now()) @db.Timestamptz(0)
+  updated_at           DateTime  @updatedAt @db.Timestamptz(0)
 
-  @@index([receiving_asn_id])
+  @@index([asn_id])
   @@index([product_id])
 }
 
-enum ReceivingReceiptStatus {
+enum GoodsReceiptStatus {
   draft
   confirmed
   cancelled
 }
 
-model receiving_receipt {
+model goods_receipt {
   id                String                    @id @default(cuid())
   receipt_no        String
   purchase_order_id String?
-  purchase_order    receiving_purchase_order? @relation(fields: [purchase_order_id], references: [id])
+  purchase_order    purchase_order?           @relation(fields: [purchase_order_id], references: [id])
   asn_id            String?
-  asn               receiving_asn?            @relation(fields: [asn_id], references: [id])
-  status            ReceivingReceiptStatus    @default(draft)
+  asn               asn?                      @relation(fields: [asn_id], references: [id])
+  status            GoodsReceiptStatus        @default(draft)
   confirmed_at      DateTime?                 @db.Timestamptz(0)
-  lines             receiving_receipt_line[]
+  lines             goods_receipt_line[]
   created_at        DateTime                  @default(now()) @db.Timestamptz(0)
   updated_at        DateTime                  @updatedAt @db.Timestamptz(0)
   creator_id        String
-  creator           user                      @relation("ReceivingReceiptCreator", fields: [creator_id], references: [id])
+  creator           user                      @relation("GoodsReceiptCreator", fields: [creator_id], references: [id])
   updater_id        String
-  updater           user                      @relation("ReceivingReceiptUpdater", fields: [updater_id], references: [id])
+  updater           user                      @relation("GoodsReceiptUpdater", fields: [updater_id], references: [id])
 
   @@index([creator_id])
   @@index([purchase_order_id])
@@ -1401,40 +1401,40 @@ model receiving_receipt {
   @@index([updater_id])
 }
 
-enum ReceivingReceiptLineStatus {
+enum GoodsReceiptLineStatus {
   pending
   split
   rejected
 }
 
-model receiving_receipt_line {
+model goods_receipt_line {
   id                   String            @id @default(cuid())
-  receiving_receipt_id String
-  receiving_receipt    receiving_receipt @relation(fields: [receiving_receipt_id], references: [id], onDelete: Cascade)
+  goods_receipt_id     String
+  goods_receipt        goods_receipt     @relation(fields: [goods_receipt_id], references: [id], onDelete: Cascade)
   product_id           String
   product              product           @relation(fields: [product_id], references: [id], onDelete: Cascade)
   receipt_quantity     Int
-  status               ReceivingReceiptLineStatus @default(pending)
+  status               GoodsReceiptLineStatus @default(pending)
   inventory_id         String?
   inventory            inventory?        @relation("ReceiptLineInventory", fields: [inventory_id], references: [id])
   approvable_id        String           @unique
   approvable           approvable       @relation(fields: [approvable_id], references: [id])
   parent_id            String?
-  parent               receiving_receipt_line?   @relation("ReceiptLineSplit", fields: [parent_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  children             receiving_receipt_line[]  @relation("ReceiptLineSplit")
+  parent               goods_receipt_line?   @relation("ReceiptLineSplit", fields: [parent_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  children             goods_receipt_line[]  @relation("ReceiptLineSplit")
   is_split_result      Boolean           @default(false)
   inventory_transactionable_id String?                     @unique
   inventory_transactionable    inventory_transactionable? @relation(fields: [inventory_transactionable_id], references: [id])
   created_at           DateTime          @default(now()) @db.Timestamptz(0)
   updated_at           DateTime          @updatedAt @db.Timestamptz(0)
   creator_id           String?
-  creator              user?             @relation("ReceivingReceiptLineCreator", fields: [creator_id], references: [id])
+  creator              user?             @relation("GoodsReceiptLineCreator", fields: [creator_id], references: [id])
   updater_id           String?
-  updater              user?             @relation("ReceivingReceiptLineUpdater", fields: [updater_id], references: [id])
+  updater              user?             @relation("GoodsReceiptLineUpdater", fields: [updater_id], references: [id])
   assignee_id          String?
-  assignee             user?             @relation("ReceivingReceiptLineAssignee", fields: [assignee_id], references: [id])
+  assignee             user?             @relation("GoodsReceiptLineAssignee", fields: [assignee_id], references: [id])
 
-  @@index([receiving_receipt_id])
+  @@index([goods_receipt_id])
   @@index([inventory_id])
   @@index([parent_id])
   @@index([creator_id])

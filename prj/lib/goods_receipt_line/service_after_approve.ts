@@ -1,5 +1,5 @@
 // GENERATED ONCE — safe to edit (will not be overwritten on regeneration)
-// B-5: inventory ledger write stub for receiving_receipt_line
+// B-5: inventory ledger write stub for goods_receipt_line
 // x-ledger-source event_type: receive
 // Pattern: bridge create → business entity update → inventory_transaction INSERT → inventory cache update
 
@@ -8,7 +8,7 @@ import type { PrismaClient } from '@/app/generated/prisma/client';
 type Tx = Omit<PrismaClient, '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'>;
 
 /**
- * Called after receiving_receipt_line approval is confirmed.
+ * Called after goods_receipt_line approval is confirmed.
  * Implements ledger write: INSERT into inventory_transaction + update inventory cache.
  *
  * Idempotency: check for existing inventory_transaction before writing.
@@ -20,7 +20,7 @@ export async function afterApprove(
   approvableId: string,
   approvedByUserId: string,
 ): Promise<void> {
-  const entity = await tx.receiving_receipt_line.findFirst({
+  const entity = await tx.goods_receipt_line.findFirst({
     where: { approvable_id: approvableId },
   });
   if (!entity) return;
@@ -31,7 +31,7 @@ export async function afterApprove(
   if (!entity.approvable_id) return;
 
   // FS-3 defensive guard: ledger writes require a resolved inventory target.
-  if (!entity.inventory_id) throw new Error('inventory_id required for ledger write (receiving_receipt_line)');
+  if (!entity.inventory_id) throw new Error('inventory_id required for ledger write (goods_receipt_line)');
 
   // Idempotency guard: entity-level (preferred over approvable.approved_at check)
   // NOTE: approved_at is set by approve route BEFORE this function runs in the
@@ -51,7 +51,7 @@ export async function afterApprove(
 
   // Step 2: Link bridge to entity (if newly created)
   if (!entity.inventory_transactionable_id) {
-    await tx.receiving_receipt_line.update({
+    await tx.goods_receipt_line.update({
       where: { id: entityId },
       data: { inventory_transactionable_id: bridge.id },
     });
