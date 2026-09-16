@@ -2,7 +2,7 @@ import { prisma } from './db-helpers';
 
 /**
  * Inventory ledger read helpers shared by B-5 Phase2c D7 tests
- * (purchase_per_item reservation cancel + receiving_receipt_line terminal
+ * (sales_order_line reservation cancel + goods_receipt_line terminal
  * reject no-op). Split out from approval_test_helpers.ts (cmd_433) since
  * these are inventory_transaction-specific, not approval/ledger-generic.
  */

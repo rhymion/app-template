@@ -90,7 +90,7 @@ model user {
   shift_templates           shift_template[]    @relation("ShiftTemplateUser")
   shifts                    shift[]             @relation("ShiftUser")
   organizations             organization[]      @relation("UserOrganizations")
-  purchase_order_tmps       purchase_order_tmp[]    @relation("Buyer")
+  sales_orders              sales_order[]           @relation("Buyer")
   created_db_tables         db_table[]          @relation("DbTableCreator")
   updated_db_tables         db_table[]          @relation("DbTableUpdater")
   created_xxxxx_xxxxxs      xxxxx_xxxxx[]       @relation("XxxxxXxxxxCreator")
@@ -125,10 +125,10 @@ model user {
   created_by_inventory_transactions inventory_transaction[] @relation("InventoryTransactionCreatedBy")
   created_inventory_transactions inventory_transaction[] @relation("InventoryTransactionCreator")
   updated_inventory_transactions inventory_transaction[] @relation("InventoryTransactionUpdater")
-  created_purchase_order_tmps   purchase_order_tmp[]    @relation("PurchaseOrderTmpCreator")
-  updated_purchase_order_tmps   purchase_order_tmp[]    @relation("PurchaseOrderTmpUpdater")
-  created_purchase_per_items   purchase_per_item[]    @relation("PurchasePerItemCreator")
-  updated_purchase_per_items   purchase_per_item[]    @relation("PurchasePerItemUpdater")
+  created_sales_orders          sales_order[]           @relation("SalesOrderCreator")
+  updated_sales_orders          sales_order[]           @relation("SalesOrderUpdater")
+  created_sales_order_lines     sales_order_line[]      @relation("SalesOrderLineCreator")
+  updated_sales_order_lines     sales_order_line[]      @relation("SalesOrderLineUpdater")
   created_comments          comment[]           @relation("CommentCreator")
   reactions                 reaction[]          @relation("ReactionUser")
   created_notes             note[]              @relation("NoteCreator")
@@ -257,7 +257,7 @@ model approvable {
   creator           user?              @relation("ApprovableCreator", fields: [creator_id], references: [id])
   approval_requests approval_request[]
   leave_request     leave_request?
-  purchase_per_item purchase_per_item?
+  sales_order_line   sales_order_line?
   goods_receipt_line     goods_receipt_line?
   inventory_movement   inventory_movement?
   inventory_adjustment inventory_adjustment?
@@ -348,7 +348,7 @@ model commentable {
 
 model inventory_transactionable {
   id                     String                  @id @default(cuid())
-  purchase_per_item      purchase_per_item?
+  sales_order_line       sales_order_line?
   goods_receipt_line     goods_receipt_line?
   inventory_movement     inventory_movement?
   inventory_adjustment   inventory_adjustment?
@@ -989,7 +989,7 @@ model product {
   warranty_card      attachment?         @relation("ProductWarrantyCard", fields: [warranty_card_id], references: [id], onDelete: SetNull)
   spec_sheet_url     String?
   inventories                    inventory[]
-  purchase_per_items             purchase_per_item[]
+  sales_order_lines              sales_order_line[]
   purchase_order_lines            purchase_order_line[]
   asn_lines                       asn_line[]
   goods_receipt_lines             goods_receipt_line[]
@@ -1023,7 +1023,7 @@ model inventory {
   updater_id        String
   updater           user      @relation("InventoryUpdater", fields: [updater_id], references: [id])
   goods_receipt_lines goods_receipt_line[] @relation("ReceiptLineInventory")
-  purchase_per_items purchase_per_item[]
+  sales_order_lines sales_order_line[]
   movements_from    inventory_movement[]   @relation("InventoryMovementFrom")
   movements_to      inventory_movement[]   @relation("InventoryMovementTo")
   adjustments       inventory_adjustment[]
@@ -1050,61 +1050,61 @@ model location {
   @@index([updater_id])
 }
 
-model purchase_order_tmp {
+model sales_order {
   id          String              @id @default(cuid())
   order_no    String
   customer_id String
   customer    user                @relation("Buyer", fields: [customer_id], references: [id])
-  items       purchase_per_item[]
+  items       sales_order_line[]
   created_at  DateTime            @default(now()) @db.Timestamptz(0)
   updated_at  DateTime            @updatedAt @db.Timestamptz(0)
   creator_id  String
-  creator     user                @relation("PurchaseOrderTmpCreator", fields: [creator_id], references: [id])
+  creator     user                @relation("SalesOrderCreator", fields: [creator_id], references: [id])
   updater_id  String
-  updater     user                @relation("PurchaseOrderTmpUpdater", fields: [updater_id], references: [id])
+  updater     user                @relation("SalesOrderUpdater", fields: [updater_id], references: [id])
 
   @@index([creator_id])
   @@index([customer_id])
   @@index([updater_id])
 }
 
-enum PurchasePerItemStatus {
+enum SalesOrderLineStatus {
   draft
   pending
   split
   rejected
 }
 
-model purchase_per_item {
+model sales_order_line {
   id                    String                 @id @default(cuid())
-  purchase_order_id     String
-  purchase_order        purchase_order_tmp     @relation(fields: [purchase_order_id], references: [id], onDelete: Cascade)
+  sales_order_id        String
+  sales_order           sales_order            @relation(fields: [sales_order_id], references: [id], onDelete: Cascade)
   product_id            String
   product               product                @relation(fields: [product_id], references: [id], onDelete: Cascade)
   quantity              Int
-  status                PurchasePerItemStatus  @default(draft)
+  status                SalesOrderLineStatus   @default(draft)
   price                 Int?
   approvable_id                 String                    @unique
   approvable                    approvable                @relation(fields: [approvable_id], references: [id])
   inventory_transactionable_id  String?                    @unique
   inventory_transactionable     inventory_transactionable? @relation(fields: [inventory_transactionable_id], references: [id])
   parent_id            String?
-  parent               purchase_per_item?   @relation("PurchasePerItemSplit", fields: [parent_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  children             purchase_per_item[]  @relation("PurchasePerItemSplit")
+  parent               sales_order_line?   @relation("SalesOrderLineSplit", fields: [parent_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  children             sales_order_line[]  @relation("SalesOrderLineSplit")
   inventory_id         String?
   inventory            inventory?        @relation(fields: [inventory_id], references: [id])
   created_at           DateTime          @default(now()) @db.Timestamptz(0)
   updated_at           DateTime          @updatedAt @db.Timestamptz(0)
   creator_id           String?
-  creator              user?             @relation("PurchasePerItemCreator", fields: [creator_id], references: [id])
+  creator              user?             @relation("SalesOrderLineCreator", fields: [creator_id], references: [id])
   updater_id           String?
-  updater              user?             @relation("PurchasePerItemUpdater", fields: [updater_id], references: [id])
+  updater              user?             @relation("SalesOrderLineUpdater", fields: [updater_id], references: [id])
 
   @@index([creator_id])
   @@index([inventory_id])
   @@index([parent_id])
   @@index([product_id])
-  @@index([purchase_order_id])
+  @@index([sales_order_id])
   @@index([updater_id])
 }
 

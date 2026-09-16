@@ -83,7 +83,7 @@ x-ledger-entities:
 # group. `inventory_ops` demonstrates a genuine two-level hierarchy: it
 # splits into `stock_ledger` (physical stock tracking: inventory/location/
 # product plus the inventory_transaction/movement/adjustment ledger trio)
-# and `procurement` (the purchase_order -> receiving PO/ASN/receipt chain,
+# and `procurement` (the sales_order -> purchase_order/ASN/goods_receipt chain,
 # which itself drives the same inventory_domain ledger via
 # x-reservation.transaction.ledgerDomain above) — two distinct workflows
 # under one domain, not depth added for its own sake. Every other group
@@ -1551,7 +1551,7 @@ definitions:
       approvable:
         $ref: "#/definitions/approvable"
 
-  purchase_order_tmp:
+  sales_order:
     x-nav:
       parent: procurement
       order: 1
@@ -1592,11 +1592,11 @@ definitions:
           - lot_number: asc
           - id: asc
       result:
-        parentField: purchase_order_id
+        parentField: sales_order_id
         lineTransactionableField: inventory_transactionable_id
       # No "actions" block: under strategy: ledger_transaction, ship/cancel are
-      # driven by the standard approve/reject flow on purchase_per_item.approvable_id
-      # (see purchase_per_item's x-approval below), not by bespoke action routes.
+      # driven by the standard approve/reject flow on sales_order_line.approvable_id
+      # (see sales_order_line's x-approval below), not by bespoke action routes.
     fields:
       order_no:
         minLength: 1
@@ -1612,7 +1612,7 @@ definitions:
       items:
         type: array
         items:
-          $ref: "#/definitions/purchase_per_item"
+          $ref: "#/definitions/sales_order_line"
 
   leave_request:
     x-nav:
@@ -2229,7 +2229,7 @@ definitions:
       assignee:
         $ref: "#/definitions/user"
 
-  purchase_per_item:
+  sales_order_line:
     x-nav:
       parent: procurement
       order: 2
@@ -2252,7 +2252,7 @@ definitions:
         - product:
             primary: true
             width: 200
-        - purchase_order:
+        - sales_order:
             width: 150
         - inventory:
             width: 250
@@ -2279,7 +2279,7 @@ definitions:
       perPartRequired:
         - inventory_id
     fields:
-      purchase_order_id:
+      sales_order_id:
         pattern: "^c[a-z0-9]{24,}$"
         x-relationship:
           labelField: order_no
@@ -2318,8 +2318,8 @@ definitions:
     required:
       - product
     properties:
-      purchase_order:
-        $ref: "#/definitions/purchase_order_tmp"
+      sales_order:
+        $ref: "#/definitions/sales_order"
       product:
         $ref: "#/definitions/product"
       approvable:
@@ -2515,7 +2515,7 @@ definitions:
 
   # cmd_825/cmd_826: no entity in this schema combines edit:true with
   # terminal:true + submit_on -- the four terminal x-approval entities
-  # above (inventory_movement/inventory_adjustment/purchase_per_item/
+  # above (inventory_movement/inventory_adjustment/sales_order_line/
   # goods_receipt_line) are all edit:false, so testing "terminal
   # rejection blocks resubmission" against them only proves the schema's
   # own edit lockout, not the generator's own guard (cmd_826 甲/戊). This

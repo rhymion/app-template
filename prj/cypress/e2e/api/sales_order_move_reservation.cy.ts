@@ -1,6 +1,6 @@
 import { TEST_API_KEY, TEST_CREDENTIALS } from '../../support/test-credentials';
 
-const API_BASE = '/api/purchase_order';
+const API_BASE = '/api/sales_order';
 const INV_API = '/api/inventory';
 
 describe('moveReservation bespoke endpoint (B-5 Phase2d, G15)', () => {
@@ -10,23 +10,23 @@ describe('moveReservation bespoke endpoint (B-5 Phase2d, G15)', () => {
     cy.task('db:grantAllPermissions');
   });
 
-  // cmd_869a: purchase_per_item now has its own x-approval.submit_on
+  // cmd_869a: sales_order_line now has its own x-approval.submit_on
   // (cmd_856) -- moveReservation operates on an existing reservation
   // (item.inventory_transactionable_id), which is only created once the
   // line is submitted for approval (edit:false entity -> ApprovalSection
   // "Submit" button's server action is the only way to reach it). Same
-  // pattern as purchase_per_item_split.cy.ts / purchase_order_reservation.cy.ts.
-  function submitPurchasePerItemForApproval(itemId: string) {
+  // pattern as sales_order_line_split.cy.ts / sales_order_reservation.cy.ts.
+  function submitSalesOrderLineForApproval(itemId: string) {
     Cypress.session.clearAllSavedSessions();
     cy.clearCookies();
     cy.login(TEST_CREDENTIALS.email, TEST_CREDENTIALS.password);
-    cy.visit(`/en/purchase_per_item/view/${itemId}`);
+    cy.visit(`/en/sales_order_line/view/${itemId}`);
     cy.get('button[aria-label="Submit"]').click();
     cy.get('button[aria-label="Submit"]').should('not.exist');
   }
 
   it('O-8/O-4: moves a reservation off a depleted lot, spilling the re-reservation across two inventory lots', () => {
-    cy.task('db:setupPurchasePerItemSingleApprovalFlow');
+    cy.task('db:setupSalesOrderLineSingleApprovalFlow');
     // Lot 1: default location (seedReservationInventory's shared "Reservation
     // Test Location" — location_id is a required FK, cmd_562) — quantity 5,
     // so the initial order reserves the full quantity from this single lot
@@ -45,8 +45,8 @@ describe('moveReservation bespoke endpoint (B-5 Phase2d, G15)', () => {
         expect(res.status).to.eq(201);
         const orderId = res.body.id;
 
-        cy.task<any>('db:getPurchasePerItemsForOrder', { purchase_order_id: orderId }).then((preSubmitItems) => {
-          submitPurchasePerItemForApproval(preSubmitItems[0].id);
+        cy.task<any>('db:getSalesOrderLinesForOrder', { sales_order_id: orderId }).then((preSubmitItems) => {
+          submitSalesOrderLineForApproval(preSubmitItems[0].id);
 
         cy.request({
           url: `${INV_API}/${seed.inventory.id}`,
@@ -65,7 +65,7 @@ describe('moveReservation bespoke endpoint (B-5 Phase2d, G15)', () => {
           quantity: 6,
           location: 'LOT-B',
         }).then((lot2) => {
-          cy.task<any>('db:getPurchasePerItemsForOrder', { purchase_order_id: orderId }).then((items) => {
+          cy.task<any>('db:getSalesOrderLinesForOrder', { sales_order_id: orderId }).then((items) => {
             const item = items[0];
             expect(item.inventory_transactionable_id).to.not.be.null;
 
@@ -80,7 +80,7 @@ describe('moveReservation bespoke endpoint (B-5 Phase2d, G15)', () => {
             cy.request({
               method: 'POST',
               url: `${API_BASE}/${orderId}/actions/moveReservation`,
-              body: { purchase_per_item_id: item.id },
+              body: { sales_order_line_id: item.id },
             }).then((moveRes) => {
               expect(moveRes.status).to.eq(200);
               expect(moveRes.body.message).to.eq('Reservation moved successfully');
@@ -148,7 +148,7 @@ describe('moveReservation bespoke endpoint (B-5 Phase2d, G15)', () => {
   });
 
   it('409 INSUFFICIENT_INVENTORY: rolls back atomically when no lot combination covers the reservation', () => {
-    cy.task('db:setupPurchasePerItemSingleApprovalFlow');
+    cy.task('db:setupSalesOrderLineSingleApprovalFlow');
     cy.task<any>('db:seedReservationInventory', { quantity: 5 }).then((seed) => {
       cy.request({
         method: 'POST',
@@ -163,13 +163,13 @@ describe('moveReservation bespoke endpoint (B-5 Phase2d, G15)', () => {
         expect(res.status).to.eq(201);
         const orderId = res.body.id;
 
-        cy.task<any>('db:getPurchasePerItemsForOrder', { purchase_order_id: orderId }).then((preSubmitItems) => {
+        cy.task<any>('db:getSalesOrderLinesForOrder', { sales_order_id: orderId }).then((preSubmitItems) => {
           const itemId = preSubmitItems[0].id;
           // Submit first so the item actually holds a reservation (5 units,
           // the lot's full quantity) for the move to act on.
-          submitPurchasePerItemForApproval(itemId);
+          submitSalesOrderLineForApproval(itemId);
 
-        cy.task<any>('db:getPurchasePerItemsForOrder', { purchase_order_id: orderId }).then((items) => {
+        cy.task<any>('db:getSalesOrderLinesForOrder', { sales_order_id: orderId }).then((items) => {
           const item = items[0];
           expect(item.inventory_transactionable_id).to.not.be.null;
 
@@ -179,7 +179,7 @@ describe('moveReservation bespoke endpoint (B-5 Phase2d, G15)', () => {
           cy.request({
             method: 'POST',
             url: `${API_BASE}/${orderId}/actions/moveReservation`,
-            body: { purchase_per_item_id: item.id },
+            body: { sales_order_line_id: item.id },
             failOnStatusCode: false,
           }).then((moveRes) => {
             expect(moveRes.status).to.eq(409);
@@ -203,7 +203,7 @@ describe('moveReservation bespoke endpoint (B-5 Phase2d, G15)', () => {
     });
   });
 
-  it('404: rejects a purchase_per_item_id that does not belong to the given purchase_order', () => {
+  it('404: rejects a sales_order_line_id that does not belong to the given sales_order', () => {
     cy.task<any>('db:seedReservationInventory', { quantity: 5 }).then((seed) => {
       cy.request({
         method: 'POST',
@@ -223,7 +223,7 @@ describe('moveReservation bespoke endpoint (B-5 Phase2d, G15)', () => {
         cy.request({
           method: 'POST',
           url: `${API_BASE}/${orderId}/actions/moveReservation`,
-          body: { purchase_per_item_id: 'nonexistent-id' },
+          body: { sales_order_line_id: 'nonexistent-id' },
           failOnStatusCode: false,
         }).then((moveRes) => {
           expect(moveRes.status).to.eq(404);

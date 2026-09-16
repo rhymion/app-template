@@ -1,6 +1,6 @@
 import { TEST_API_KEY, TEST_CREDENTIALS } from '../../support/test-credentials';
 
-const API_BASE = '/api/purchase_order';
+const API_BASE = '/api/sales_order';
 const INV_API = '/api/inventory';
 
 describe('Reservation Allocation (B3/B4)', () => {
@@ -10,17 +10,17 @@ describe('Reservation Allocation (B3/B4)', () => {
     cy.task('db:grantAllPermissions');
   });
 
-  // cmd_869a: purchase_per_item (the order's `items` line entity) now has
-  // its own x-approval.submit_on (cmd_856) -- creating a purchase_order no
+  // cmd_869a: sales_order_line (the order's `items` line entity) now has
+  // its own x-approval.submit_on (cmd_856) -- creating a sales_order no
   // longer reserves inventory immediately; reservation only happens once
   // each line is submitted for approval, which for this edit:false entity
   // only exists as the ApprovalSection "Submit" button's server action.
-  // Same pattern as purchase_per_item_split.cy.ts / purchase_per_item_approval_approve.cy.ts.
-  function submitPurchasePerItemForApproval(itemId: string) {
+  // Same pattern as sales_order_line_split.cy.ts / sales_order_line_approval_approve.cy.ts.
+  function submitSalesOrderLineForApproval(itemId: string) {
     Cypress.session.clearAllSavedSessions();
     cy.clearCookies();
     cy.login(TEST_CREDENTIALS.email, TEST_CREDENTIALS.password);
-    cy.visit(`/en/purchase_per_item/view/${itemId}`);
+    cy.visit(`/en/sales_order_line/view/${itemId}`);
     cy.get('button[aria-label="Submit"]').click();
     cy.get('button[aria-label="Submit"]').should('not.exist');
   }
@@ -30,7 +30,7 @@ describe('Reservation Allocation (B3/B4)', () => {
   // -------------------------------------------------------------------------
 
   it('R1: successful order decrements inventory and creates allocation row', () => {
-    cy.task('db:setupPurchasePerItemSingleApprovalFlow');
+    cy.task('db:setupSalesOrderLineSingleApprovalFlow');
     cy.task<any>('db:seedReservationInventory', { quantity: 10 }).then((seed) => {
       cy.request({
         method: 'POST',
@@ -45,8 +45,8 @@ describe('Reservation Allocation (B3/B4)', () => {
         expect(res.status).to.eq(201);
         const orderId = res.body.id;
 
-        cy.task<any>('db:getPurchasePerItemsForOrder', { purchase_order_id: orderId }).then((items) => {
-          submitPurchasePerItemForApproval(items[0].id);
+        cy.task<any>('db:getSalesOrderLinesForOrder', { sales_order_id: orderId }).then((items) => {
+          submitSalesOrderLineForApproval(items[0].id);
 
           cy.request({
             url: `${INV_API}/${seed.inventory.id}`,
@@ -59,7 +59,7 @@ describe('Reservation Allocation (B3/B4)', () => {
             expect(invRes.body.reserved_quantity).to.eq(3);
           });
 
-          cy.task<any>('db:getInventoryAllocation', { purchase_order_id: orderId }).then((alloc) => {
+          cy.task<any>('db:getInventoryAllocation', { sales_order_id: orderId }).then((alloc) => {
             expect(alloc).to.not.be.null;
             expect(alloc.quantity).to.eq(3);
             expect(alloc.inventory_id).to.eq(seed.inventory.id);
@@ -73,7 +73,7 @@ describe('Reservation Allocation (B3/B4)', () => {
     // cmd_869a: creation no longer checks capacity at all (that moved to
     // submit-time, see R1's comment above) -- POST always succeeds (201)
     // here. The InsufficientPoolCapacityError thrown inside
-    // submitForApprovalPurchasePerItem's transaction (submit_actions.ts)
+    // submitForApprovalSalesOrderLine's transaction (submit_actions.ts)
     // rolls the whole transaction back; the client-side call site
     // (ApprovalSection.tsx's onClick -> startTransition(() =>
     // onSubmitForApproval())) has no .catch, so this surfaces only as an
@@ -81,7 +81,7 @@ describe('Reservation Allocation (B3/B4)', () => {
     // to assert on for a UI-driven server action. Verified instead via DB
     // state: the transaction rollback leaves quantity/reserved_quantity
     // untouched and the item stuck in 'draft' (never reaches 'pending').
-    cy.task('db:setupPurchasePerItemSingleApprovalFlow');
+    cy.task('db:setupSalesOrderLineSingleApprovalFlow');
     cy.task<any>('db:seedReservationInventory', { quantity: 2 }).then((seed) => {
       cy.request({
         method: 'POST',
@@ -95,17 +95,17 @@ describe('Reservation Allocation (B3/B4)', () => {
       }).then((res) => {
         expect(res.status).to.eq(201);
         const orderId = res.body.id;
-        cy.task<any>('db:getPurchasePerItemsForOrder', { purchase_order_id: orderId }).then((items) => {
+        cy.task<any>('db:getSalesOrderLinesForOrder', { sales_order_id: orderId }).then((items) => {
           const itemId = items[0].id;
           Cypress.session.clearAllSavedSessions();
           cy.clearCookies();
           cy.login(TEST_CREDENTIALS.email, TEST_CREDENTIALS.password);
           cy.on('uncaught:exception', () => false);
-          cy.visit(`/en/purchase_per_item/view/${itemId}`);
+          cy.visit(`/en/sales_order_line/view/${itemId}`);
           cy.get('button[aria-label="Submit"]').click();
           cy.wait(2000);
 
-          cy.task<any>('db:getPurchasePerItemsForOrder', { purchase_order_id: orderId }).then((postItems) => {
+          cy.task<any>('db:getSalesOrderLinesForOrder', { sales_order_id: orderId }).then((postItems) => {
             expect(postItems[0].status).to.eq('draft'); // never reached 'pending' -- rolled back
           });
         });
@@ -129,7 +129,7 @@ describe('Reservation Allocation (B3/B4)', () => {
   // cmd_871/cmd_873 (was cmd_869a UNRESOLVED, superseded): app-generator
   // PR#455 (subtask_871b) changed _build_approval_lines_post_create_code's
   // submit_on skip from a compile-time declaration check to a runtime
-  // value check -- a purchase_per_item line created directly in its
+  // value check -- a sales_order_line line created directly in its
   // x-approval.submit_on state (status: 'pending') now fires the
   // approval_request + reservation claim in the *same* create-edge
   // transaction, instead of requiring a separate UI-driven "Submit"
@@ -193,7 +193,7 @@ describe('Reservation Allocation (B3/B4)', () => {
   // -------------------------------------------------------------------------
 
   it('R4 (B1 update guard): PUT with changed item quantity after allocation → 409', () => {
-    cy.task('db:setupPurchasePerItemSingleApprovalFlow');
+    cy.task('db:setupSalesOrderLineSingleApprovalFlow');
     cy.task<any>('db:seedReservationInventory', { quantity: 10 }).then((seed) => {
       cy.request({
         method: 'POST',
@@ -208,8 +208,8 @@ describe('Reservation Allocation (B3/B4)', () => {
         expect(res.status).to.eq(201);
         const orderId = res.body.id;
 
-        cy.task<any>('db:getPurchasePerItemsForOrder', { purchase_order_id: orderId }).then((items) => {
-          submitPurchasePerItemForApproval(items[0].id);
+        cy.task<any>('db:getSalesOrderLinesForOrder', { sales_order_id: orderId }).then((items) => {
+          submitSalesOrderLineForApproval(items[0].id);
 
           cy.request({
             url: `${API_BASE}/${orderId}`,
@@ -236,7 +236,7 @@ describe('Reservation Allocation (B3/B4)', () => {
   });
 
   it('R5 (B1 delete guard): DELETE with existing allocation → 409', () => {
-    cy.task('db:setupPurchasePerItemSingleApprovalFlow');
+    cy.task('db:setupSalesOrderLineSingleApprovalFlow');
     cy.task<any>('db:seedReservationInventory', { quantity: 10 }).then((seed) => {
       cy.request({
         method: 'POST',
@@ -251,8 +251,8 @@ describe('Reservation Allocation (B3/B4)', () => {
         expect(res.status).to.eq(201);
         const orderId = res.body.id;
 
-        cy.task<any>('db:getPurchasePerItemsForOrder', { purchase_order_id: orderId }).then((items) => {
-          submitPurchasePerItemForApproval(items[0].id);
+        cy.task<any>('db:getSalesOrderLinesForOrder', { sales_order_id: orderId }).then((items) => {
+          submitSalesOrderLineForApproval(items[0].id);
 
           cy.request({
             method: 'DELETE',
@@ -306,12 +306,12 @@ describe('Reservation Allocation (B3/B4)', () => {
 
   // -------------------------------------------------------------------------
   // D7 (B-5 Phase2c, 14.4b_equiv): terminal reject of a reserved
-  // purchase_per_item must revert reserved_quantity via a cancel ledger tx,
+  // sales_order_line must revert reserved_quantity via a cancel ledger tx,
   // leaving physical quantity untouched (O-4).
   // -------------------------------------------------------------------------
 
-  it('14.4b_equiv: purchase_per_item terminal reject creates a reverting cancel tx (reserved_quantity restored, quantity unchanged)', () => {
-    cy.task<any>('db:setupPurchasePerItemSingleApprovalFlow').then((flowSetup) => {
+  it('14.4b_equiv: sales_order_line terminal reject creates a reverting cancel tx (reserved_quantity restored, quantity unchanged)', () => {
+    cy.task<any>('db:setupSalesOrderLineSingleApprovalFlow').then((flowSetup) => {
       cy.task<any>('db:seedReservationInventory', { quantity: 10 }).then((seed) => {
         cy.request({
           method: 'POST',
@@ -326,8 +326,8 @@ describe('Reservation Allocation (B3/B4)', () => {
           expect(res.status).to.eq(201);
           const orderId = res.body.id;
 
-          cy.task<any>('db:getPurchasePerItemsForOrder', { purchase_order_id: orderId }).then((preSubmitItems) => {
-            submitPurchasePerItemForApproval(preSubmitItems[0].id);
+          cy.task<any>('db:getSalesOrderLinesForOrder', { sales_order_id: orderId }).then((preSubmitItems) => {
+            submitSalesOrderLineForApproval(preSubmitItems[0].id);
 
           cy.request({
             url: `${INV_API}/${seed.inventory.id}`,
@@ -339,7 +339,7 @@ describe('Reservation Allocation (B3/B4)', () => {
             expect(preQuantity).to.eq(10);
             expect(preReserved).to.eq(4);
 
-            cy.task<any>('db:getPurchasePerItemsForOrder', { purchase_order_id: orderId }).then((items) => {
+            cy.task<any>('db:getSalesOrderLinesForOrder', { sales_order_id: orderId }).then((items) => {
               const item = items[0];
               expect(item.approvable_id).to.not.be.null;
               expect(item.inventory_transactionable_id).to.not.be.null;
