@@ -94,9 +94,15 @@ async function main() {
   let migratedRows = 0;
   let skippedItems = 0;
 
+  // cmd_1072: purchase_per_item was renamed to sales_order_line -- only the
+  // two prisma.<model> accessors below are updated to keep this script
+  // compiling. The OldAllocationRow shape / raw SQL column names above
+  // describe the long-dropped `inventory_allocation` table as it existed
+  // when this one-time backfill actually ran; they're a historical record,
+  // not live schema, so they're deliberately left as-is.
   for (const [purchasePerItemId, allocations] of byItem) {
     const totalRemaining = allocations.reduce((sum, a) => sum + a.remaining_quantity, 0);
-    const item = await prisma.purchase_per_item.findUnique({
+    const item = await prisma.sales_order_line.findUnique({
       where: { id: purchasePerItemId },
       select: { id: true, inventory_transactionable_id: true },
     });
@@ -147,7 +153,7 @@ async function main() {
       }
 
       if (!item.inventory_transactionable_id) {
-        await tx.purchase_per_item.update({
+        await tx.sales_order_line.update({
           where: { id: purchasePerItemId },
           data: { inventory_transactionable_id: bridgeId },
         });

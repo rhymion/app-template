@@ -13,7 +13,7 @@ async function getTestUser() {
  * inventory.location_id is a required FK (cmd_562 id-FK migration) with no
  * default — every inventory.create() call needs one. Find-or-create by name
  * (same pattern as seedSecondInventoryLot below and the generated
- * populatePurchaseOrderDependencies helper) so repeated calls within a test
+ * populateSalesOrderDependencies helper) so repeated calls within a test
  * run reuse one row instead of piling up duplicates.
  */
 async function getOrCreateDefaultLocation(testUser: { id: string }) {
@@ -184,7 +184,7 @@ export async function seedSecondInventoryLot(product_id: string, quantity: numbe
 }
 
 /**
- * Reconstruct the reservation for a given purchase_order_id from the
+ * Reconstruct the reservation for a given sales_order_id from the
  * inventory_transaction ledger (B-5 Phase2: inventory_allocation was removed —
  * O-2/O-6/O-8. See afterReject/afterApprove for the same netting pattern).
  *
@@ -193,9 +193,9 @@ export async function seedSecondInventoryLot(product_id: string, quantity: numbe
  * these tests; `quantity` is the net outstanding reserved amount summed
  * across all lots (O-8), and `inventory_id` identifies the first active lot.
  */
-export async function getInventoryAllocation(purchase_order_id: string) {
-  const item = await prisma.purchase_per_item.findFirst({
-    where: { purchase_order_id, inventory_transactionable_id: { not: null } },
+export async function getInventoryAllocation(sales_order_id: string) {
+  const item = await prisma.sales_order_line.findFirst({
+    where: { sales_order_id, inventory_transactionable_id: { not: null } },
   });
   if (!item?.inventory_transactionable_id) return null;
 
@@ -252,23 +252,23 @@ export async function getInventoryAllocation(purchase_order_id: string) {
 /**
  * Single-role approval_flow + approver user, for the hand-written API-level
  * approval specs (approve/reject/dispatch/reservation). Renamed from
- * setupPurchasePerItemApprovalFlow to avoid colliding with the generated
+ * setupSalesOrderLineApprovalFlow to avoid colliding with the generated
  * (multi-flow) helper of that name under the same cy.task key — the
  * collision made this narrow one shadow the generated one everywhere,
  * including the generated UI spec (cmd_322 RC5).
  */
-export async function setupPurchasePerItemSingleApprovalFlow() {
+export async function setupSalesOrderLineSingleApprovalFlow() {
   const { hashPassword } = require('../test-credentials');
   const testUser = await getTestUser();
   const hashedPw = await hashPassword('test-password');
 
   const approverRole = await prisma.role.create({
-    data: { name: `Test Purchase Per Item Approver Role ${Date.now()}`, creator_id: testUser.id, updater_id: testUser.id },
+    data: { name: `Test Sales Order Line Approver Role ${Date.now()}`, creator_id: testUser.id, updater_id: testUser.id },
   });
   const approverUser = await prisma.user.create({
     data: {
-      name: 'Test Purchase Per Item Approver User',
-      email: `test-purchase_per_item-approver-${Date.now()}@example.com`,
+      name: 'Test Sales Order Line Approver User',
+      email: `test-sales_order_line-approver-${Date.now()}@example.com`,
       password: hashedPw,
       creator_id: testUser.id,
       updater_id: testUser.id,
@@ -276,10 +276,10 @@ export async function setupPurchasePerItemSingleApprovalFlow() {
     },
   });
   // requestor_role_id: null so any creator (e.g. the default TEST_API_KEY user)
-  // satisfies the flow's requestor gate in purchase_order/service.ts.
+  // satisfies the flow's requestor gate in sales_order/service.ts.
   const flow = await prisma.approval_flow.create({
     data: {
-      entity_name: 'purchase_per_item',
+      entity_name: 'sales_order_line',
       requestor_role_id: null,
       approver_role_id: approverRole.id,
       creator_id: testUser.id,
@@ -291,32 +291,32 @@ export async function setupPurchasePerItemSingleApprovalFlow() {
 }
 
 /**
- * Retrieve the purchase_per_item row(s) for a given purchase_order_id,
+ * Retrieve the sales_order_line row(s) for a given sales_order_id,
  * including the fields needed to locate its approvable/approval_request and
  * inventory_transaction ledger (approvable_id, inventory_transactionable_id).
  */
-export async function getPurchasePerItemsForOrder(purchase_order_id: string) {
-  const items = await prisma.purchase_per_item.findMany({
-    where: { purchase_order_id },
+export async function getSalesOrderLinesForOrder(sales_order_id: string) {
+  const items = await prisma.sales_order_line.findMany({
+    where: { sales_order_id },
   });
   return JSON.parse(JSON.stringify(items));
 }
 
 /**
- * Fetch a single purchase_per_item row by id (cmd_305 FIX-B follow-up,
+ * Fetch a single sales_order_line row by id (cmd_305 FIX-B follow-up,
  * split/reject-reservation permanent spec coverage).
  */
-export async function getPurchasePerItemById(id: string) {
-  const item = await prisma.purchase_per_item.findUnique({ where: { id } });
+export async function getSalesOrderLineById(id: string) {
+  const item = await prisma.sales_order_line.findUnique({ where: { id } });
   return JSON.parse(JSON.stringify(item));
 }
 
 /**
- * List purchase_per_item rows whose parent_id points at `parentId`
+ * List sales_order_line rows whose parent_id points at `parentId`
  * (split children), ordered by creation time.
  */
-export async function getPurchasePerItemChildren(parentId: string) {
-  const children = await prisma.purchase_per_item.findMany({
+export async function getSalesOrderLineChildren(parentId: string) {
+  const children = await prisma.sales_order_line.findMany({
     where: { parent_id: parentId },
     orderBy: { created_at: 'asc' },
   });

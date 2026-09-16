@@ -3,7 +3,7 @@ import { requireSession, handleApiError, ApiError } from '@/lib/api-auth';
 import prisma from '@/lib/prisma';
 
 /**
- * Moves a purchase_per_item line's reservation off its current inventory
+ * Moves a sales_order_line line's reservation off its current inventory
  * lot(s) and re-reserves via the same allocation policy used for new orders
  * (x-reservation.policy.orderBy: expiration_date asc, lot_number asc, id asc).
  *
@@ -37,28 +37,28 @@ type Params = { params: Promise<{ id: string }> };
 export async function POST(req: NextRequest, { params }: Params) {
   try {
     const { userId: actorId } = await requireSession();
-    const { id: purchaseOrderId } = await params;
+    const { id: salesOrderId } = await params;
 
-    let body: { purchase_per_item_id?: unknown };
+    let body: { sales_order_line_id?: unknown };
     try {
       body = await req.json();
     } catch {
       throw new ApiError(400, 'Invalid JSON body');
     }
-    const purchasePerItemId = body.purchase_per_item_id;
-    if (typeof purchasePerItemId !== 'string' || !purchasePerItemId) {
-      throw new ApiError(400, 'purchase_per_item_id is required');
+    const salesOrderLineId = body.sales_order_line_id;
+    if (typeof salesOrderLineId !== 'string' || !salesOrderLineId) {
+      throw new ApiError(400, 'sales_order_line_id is required');
     }
 
-    const item = await prisma.purchase_per_item.findFirst({
-      where: { id: purchasePerItemId, purchase_order_id: purchaseOrderId },
+    const item = await prisma.sales_order_line.findFirst({
+      where: { id: salesOrderLineId, sales_order_id: salesOrderId },
       select: { id: true, inventory_transactionable_id: true },
     });
     if (!item) {
-      throw new ApiError(404, 'purchase_per_item not found or does not belong to this purchase_order');
+      throw new ApiError(404, 'sales_order_line not found or does not belong to this sales_order');
     }
     if (!item.inventory_transactionable_id) {
-      throw new ApiError(400, 'purchase_per_item has no reservation to move');
+      throw new ApiError(400, 'sales_order_line has no reservation to move');
     }
     const inventoryTransactionableId = item.inventory_transactionable_id;
 

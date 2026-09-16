@@ -5,35 +5,37 @@ import type { PrismaClient } from '@/app/generated/prisma/client';
 type Tx = Omit<PrismaClient, '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'>;
 
 /**
- * Called after purchase_per_item's reservation is approved (ship — B-5 Phase2b
- * in-house ledger design).
+ * Called after sales_order_line's reservation is terminally rejected
+ * (Type1 cancel — B-5 Phase2a in-house ledger design).
  *
- * O-4: ship is the only path that touches physical `quantity` — it decrements
- * both `quantity` and `reserved_quantity` together (unlike reserve/cancel, which
- * only move `reserved_quantity`).
+ * O-4: cancel never touches physical `quantity`, only `reserved_quantity`.
  * O-6: inventory has no direct FK from inventory_transaction; the cache row is
  * re-identified via denormalized fields (product_id/location_id/lot_number/expiration_date).
  * cmd_562: location is an id-FK (location_id) on both pool and ledger — no more
  * name string / reverse-lookup.
  * O-8: a line's reservation may span multiple inventory lots, so outstanding
  * reserved quantity is netted per lot from the full transaction history before
- * writing the ship row(s) — symmetric to service_after_reject.ts's cancel netting.
+ * writing the cancel row(s).
+ *
+ * Approval state (approval_request.status -> terminal_rejected,
+ * approvable.approved_at guard) is set by the caller (on_rejected_dispatch) —
+ * this function only writes the ledger + inventory cache.
  *
  * @param tx - Prisma transaction client
- * @param entityId - ID of the approved purchase_per_item
- * @param approvableId - ID of the approvable record (unused: ship targets are
+ * @param entityId - ID of the rejected sales_order_line
+ * @param approvableId - ID of the approvable record (unused: cancel targets are
  *   found via the line's own inventory_transactionable_id, not the approvable)
- * @param approvedByUserId - ID of the user who approved (recorded on the ledger row)
+ * @param rejectedByUserId - ID of the user who rejected (recorded on the ledger row)
  */
-export async function afterApprove(
+export async function afterReject(
   tx: Tx,
   entityId: string,
   approvableId: string,
-  approvedByUserId: string,
+  rejectedByUserId: string,
 ): Promise<void> {
   void approvableId;
 
-  const item = await tx.purchase_per_item.findUnique({
+  const item = await tx.sales_order_line.findUnique({
     where: { id: entityId },
     select: { inventory_transactionable_id: true },
   });
@@ -53,7 +55,7 @@ export async function afterApprove(
   };
   const netByInv = new Map<string, NetEntry>();
   for (const t of txs) {
-    const key = `${t.product_id}|${t.location_id}|${t.lot_number ?? ''}|${t.expiration_date?.toISOString() ?? ''}`;
+    const key = `${t.product_id}|${t.location_id ?? ''}|${t.lot_number ?? ''}|${t.expiration_date?.toISOString() ?? ''}`;
     const existing = netByInv.get(key) ?? {
       product_id: t.product_id,
       location_id: t.location_id,
@@ -66,33 +68,33 @@ export async function afterApprove(
   }
 
   for (const reserve of netByInv.values()) {
-    // Nothing outstanding to ship for this lot (already shipped/cancelled, or never reserved).
+    // Nothing outstanding to cancel for this lot (already shipped/cancelled, or never reserved).
     if (reserve.net <= 0) continue;
 
-    // Idempotency guard: a ship tx for this exact lot under this bridge already exists.
-    const alreadyShipped = txs.some(
+    // Idempotency guard: a cancel tx for this exact lot under this bridge already exists.
+    const alreadyCancelled = txs.some(
       (t) =>
-        t.event_type === 'ship' &&
+        t.event_type === 'cancel' &&
         t.product_id === reserve.product_id &&
         t.location_id === reserve.location_id &&
         t.lot_number === reserve.lot_number &&
         (t.expiration_date?.getTime() ?? null) === (reserve.expiration_date?.getTime() ?? null),
     );
-    if (alreadyShipped) continue;
+    if (alreadyCancelled) continue;
 
     await tx.inventory_transaction.create({
       data: {
         inventory_transactionable_id: item.inventory_transactionable_id,
-        event_type: 'ship',
-        quantity_delta: -reserve.net, // O-4: ship is the only path that decrements physical inventory
+        event_type: 'cancel',
+        quantity_delta: 0, // O-4: cancel never touches physical inventory
         reserved_delta: -reserve.net,
         product_id: reserve.product_id,
         location_id: reserve.location_id,
         lot_number: reserve.lot_number,
         expiration_date: reserve.expiration_date,
-        created_by_id: approvedByUserId,
-        creator_id: approvedByUserId,
-        updater_id: approvedByUserId,
+        created_by_id: rejectedByUserId,
+        creator_id: rejectedByUserId,
+        updater_id: rejectedByUserId,
       },
     });
 
@@ -110,8 +112,8 @@ export async function afterApprove(
       await tx.inventory.update({
         where: { id: inventoryCache.id },
         data: {
-          quantity: { decrement: reserve.net }, // O-4: physical shipment
-          reserved_quantity: { decrement: reserve.net }, // O-4: reservation released
+          reserved_quantity: { decrement: reserve.net },
+          // quantity: unchanged (O-4: cancel quantity_delta = 0)
         },
       });
     }
