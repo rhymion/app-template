@@ -1551,7 +1551,7 @@ definitions:
       approvable:
         $ref: "#/definitions/approvable"
 
-  purchase_order:
+  purchase_order_tmp:
     x-nav:
       parent: procurement
       order: 1
@@ -2319,7 +2319,7 @@ definitions:
       - product
     properties:
       purchase_order:
-        $ref: "#/definitions/purchase_order"
+        $ref: "#/definitions/purchase_order_tmp"
       product:
         $ref: "#/definitions/product"
       approvable:
