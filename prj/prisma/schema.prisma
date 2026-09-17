@@ -299,6 +299,11 @@ enum ApprovalRequestStatus {
   rejected
   terminal_rejected
   withdrawn
+  // cmd_963 (app-generator): split invalidates the parent's current round
+  // instead of deleting its approval_request rows. canSubmitForApproval
+  // treats a round containing this status as permanently closed, same as
+  // terminal_rejected -- the parent's rows may never resubmit once split.
+  split_invalidated
 }
 
 model approval_request {
@@ -308,6 +313,11 @@ model approval_request {
   approval_flow_id   String
   approval_flow      approval_flow      @relation(fields: [approval_flow_id], references: [id])
   status             ApprovalRequestStatus @default(pending)
+  // cmd_844 (app-generator): identifies which submission ("round") this row
+  // belongs to -- every approval_request row created in the same submit
+  // transaction shares one round_id. See docs/knowledge/appendix/
+  // approval-flow.md multistage-round note.
+  round_id           String
   approval_histories approval_history[]
   created_at         DateTime           @default(now()) @db.Timestamptz(0)
   updated_at         DateTime           @updatedAt @db.Timestamptz(0)
@@ -1103,6 +1113,7 @@ enum LeaveRequestStatus {
   pending
   approved
   rejected
+  draft
 }
 
 model leave_request {
@@ -1512,6 +1523,7 @@ enum MaintenanceTicketStatus {
   open
   approved
   rejected
+  draft
 }
 
 enum MaintenanceTicketCategory {
