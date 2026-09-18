@@ -415,6 +415,10 @@ definitions:
           - rejected
           - terminal_rejected
           - withdrawn
+          # cmd_963 (app-generator): keep in sync with prisma/schema.prisma's
+          # ApprovalRequestStatus enum -- this json-schema enum drives the
+          # TS type emitted for approval_request's own `status` field.
+          - split_invalidated
       round_id: {}
 
   approvable:

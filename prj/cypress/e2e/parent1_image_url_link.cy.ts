@@ -39,7 +39,7 @@ describe('parent1.image_url (x-uri-kind: link) input wiring and data-loss guard'
       cy.clickButton('Add Parent1 Child1s');
       fillDataGridRow(0, { name: 'Child1', written_by: 'Tester' }, true, 'Parent1 Child1s');
       cy.clickButton('Add Parent1 Child2s');
-      fillDataGridRow(0, { name: 'Child2', end_date: '2025-01-16T00:00' }, true, 'Parent1 Child2s');
+      fillDataGridRow(0, { name: 'Child2', end_date: '2025-01-16' }, true, 'Parent1 Child2s');
       cy.clickButton('Save');
       cy.url().should('include', '/parent1');
       cy.url().should('not.include', '/parent1/');

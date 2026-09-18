@@ -33,8 +33,8 @@ describe('API: Sales Order Line — Split (cmd_305 FIX-B)', () => {
     cy.clearCookies();
     cy.login(TEST_CREDENTIALS.email, TEST_CREDENTIALS.password);
     cy.visit(`/en/sales_order_line/view/${itemId}`);
-    cy.get('button[aria-label="Submit"]').click();
-    cy.get('button[aria-label="Submit"]').should('not.exist');
+    cy.contains('button', 'Submit').click();
+    cy.contains('button', 'Submit').should('not.exist');
   }
 
   it('splits into children summing to the parent quantity: parent → split status, children get their own bridge (specified lot + auto-allocate)', () => {
