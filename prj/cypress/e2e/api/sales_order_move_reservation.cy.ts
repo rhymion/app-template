@@ -21,8 +21,8 @@ describe('moveReservation bespoke endpoint (B-5 Phase2d, G15)', () => {
     cy.clearCookies();
     cy.login(TEST_CREDENTIALS.email, TEST_CREDENTIALS.password);
     cy.visit(`/en/sales_order_line/view/${itemId}`);
-    cy.get('button[aria-label="Submit"]').click();
-    cy.get('button[aria-label="Submit"]').should('not.exist');
+    cy.contains('button', 'Submit').click();
+    cy.contains('button', 'Submit').should('not.exist');
   }
 
   it('O-8/O-4: moves a reservation off a depleted lot, spilling the re-reservation across two inventory lots', () => {

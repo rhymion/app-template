@@ -34,8 +34,8 @@ describe('API: Sales Order Line — Approve / Ship (cmd_309 item3)', () => {
     cy.clearCookies();
     cy.login(TEST_CREDENTIALS.email, TEST_CREDENTIALS.password);
     cy.visit(`/en/sales_order_line/view/${itemId}`);
-    cy.get('button[aria-label="Submit"]').click();
-    cy.get('button[aria-label="Submit"]').should('not.exist');
+    cy.contains('button', 'Submit').click();
+    cy.contains('button', 'Submit').should('not.exist');
   }
 
   function reserveAndApprove(quantity: number, invSeed: any, orderNo: string, flowSetup: any) {
