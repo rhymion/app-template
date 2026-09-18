@@ -1,7 +1,10 @@
 {
   "EntityLabel": {
+    "asn": "入荷予定通知",
     "booking": "予約",
     "dbTable": "DBテーブル",
+    "goodsReceipt": "入荷実績",
+    "goodsReceiptLine": "入荷実績明細",
     "inventory": "在庫",
     "inventoryAdjustment": "在庫調整",
     "inventoryMovement": "在庫移動",
@@ -13,15 +16,12 @@
     "procedure": "手順",
     "product": "製品",
     "purchaseOrder": "発注",
-    "purchasePerItem": "品目別購入",
-    "receivingAsn": "入荷予定通知",
-    "receivingPurchaseOrder": "発注",
-    "receivingReceipt": "入荷実績",
-    "receivingReceiptLine": "入荷実績明細",
     "resource": "リソース",
     "room": "客室",
     "roomReservation": "客室予約",
     "roomType": "客室タイプ",
+    "salesOrder": "発注",
+    "salesOrderLine": "品目別購入",
     "setting1": "設定1",
     "setting2": "設定2",
     "setting3": "設定3",
@@ -66,6 +66,7 @@
     "floor": "階数",
     "fromInventory": "移動元在庫",
     "gender": "性別",
+    "goodsReceipt": "入荷実績",
     "guestName": "宿泊者名",
     "imageUrl": "画像URL",
     "inventory": "在庫",
@@ -82,8 +83,8 @@
     "max": "最大",
     "maxLength": "最大長",
     "medicalCertificate": "診断書",
-    "orderedQuantity": "発注数量",
     "orderNo": "受注番号",
+    "orderedQuantity": "発注数量",
     "organization": "組織",
     "outstandingQuantity": "未消化数量",
     "parent": "親要素",
@@ -102,7 +103,6 @@
     "reason": "理由",
     "receiptNo": "入荷実績番号",
     "receiptQuantity": "入荷数量",
-    "receivingReceipt": "入荷実績",
     "reference": "参照",
     "regex": "正規表現",
     "required": "必須",
@@ -114,6 +114,7 @@
     "room": "客室",
     "roomNo": "客室番号",
     "roomType": "客室タイプ",
+    "salesOrder": "発注",
     "shippedQuantity": "出荷数量",
     "specSheetUrl": "仕様書URL",
     "startDate": "開始日",
@@ -142,8 +143,19 @@
     "copyToShiftsExplanation": "テンプレートをシフトにコピーします"
   },
   "Nav": {
+    "asn": "入荷予定通知",
     "booking": "予約",
     "dbTable": "DBテーブル",
+    "goodsReceipt": "入荷実績",
+    "goodsReceiptLine": "入荷実績明細",
+    "groups": {
+      "inventory_ops": "在庫・購買管理",
+      "stock_ledger": "在庫台帳",
+      "procurement": "購買・入荷",
+      "facilities": "施設予約",
+      "workforce": "勤怠管理",
+      "supply_requests": "支給品リクエスト"
+    },
     "inventory": "在庫",
     "inventoryAdjustment": "在庫調整",
     "inventoryMovement": "在庫移動",
@@ -154,29 +166,18 @@
     "parentOnly": "親のみ",
     "procedure": "手順",
     "product": "製品",
-    "purchaseOrder": "注文",
-    "purchasePerItem": "品目別購入",
-    "receivingAsn": "入荷予定通知",
-    "receivingPurchaseOrder": "発注",
-    "receivingReceipt": "入荷実績",
-    "receivingReceiptLine": "入荷実績明細",
+    "purchaseOrder": "発注",
     "resource": "リソース",
     "room": "客室",
     "roomReservation": "客室予約",
     "roomType": "客室タイプ",
+    "salesOrder": "注文",
+    "salesOrderLine": "品目別購入",
     "shift": "シフト",
     "shiftTemplate": "シフトテンプレート",
     "supplyPool": "支給品プール",
     "supplyRequest": "支給依頼",
-    "xxxxxXxxxx": "Xxxxx Xxxxx",
-    "groups": {
-      "inventory_ops": "在庫・購買管理",
-      "stock_ledger": "在庫台帳",
-      "procurement": "購買・入荷",
-      "facilities": "施設予約",
-      "workforce": "勤怠管理",
-      "supply_requests": "支給品リクエスト"
-    }
+    "xxxxxXxxxx": "Xxxxx Xxxxx"
   },
   "RoomStatus": {
     "available": "利用可能",
@@ -202,43 +203,43 @@
     "reserve": "予約",
     "ship": "出荷"
   },
-  "PurchasePerItemStatus": {
+  "SalesOrderLineStatus": {
     "pending": "保留",
     "rejected": "却下",
     "split": "分割"
   },
-  "ReceivingAsnLineStatus": {
+  "AsnLineStatus": {
     "cancelled": "キャンセル",
     "fully_matched": "全数照合済み",
     "outstanding": "未消化",
     "partially_matched": "一部照合済み"
   },
-  "ReceivingAsnStatus": {
+  "AsnStatus": {
     "cancelled": "キャンセル",
     "draft": "下書き",
     "matched": "照合済み",
     "partially_matched": "一部照合済み",
     "sent": "送信済み"
   },
-  "ReceivingPurchaseOrderLineStatus": {
+  "PurchaseOrderLineStatus": {
     "cancelled": "キャンセル",
     "fully_received": "全数受領済み",
     "outstanding": "未消化",
     "partially_received": "一部受領済み"
   },
-  "ReceivingPurchaseOrderStatus": {
+  "PurchaseOrderStatus": {
     "cancelled": "キャンセル",
     "draft": "下書き",
     "issued": "発行済み",
     "partially_received": "一部受領済み",
     "received": "受領済み"
   },
-  "ReceivingReceiptLineStatus": {
+  "GoodsReceiptLineStatus": {
     "pending": "保留",
     "rejected": "却下",
     "split": "分割"
   },
-  "ReceivingReceiptStatus": {
+  "GoodsReceiptStatus": {
     "cancelled": "キャンセル",
     "confirmed": "確定",
     "draft": "下書き"

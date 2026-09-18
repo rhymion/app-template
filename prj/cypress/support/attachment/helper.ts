@@ -1,6 +1,6 @@
 // Hand-written (not generator output — analogous to
-// cypress/support/purchase_order/reservation_helper.ts and
-// cypress/support/receiving_receipt/notification_helper.ts). Supports the
+// cypress/support/sales_order/reservation_helper.ts and
+// cypress/support/goods_receipt/notification_helper.ts). Supports the
 // resource/product attachment view/edit-boundary + permission + org-scope
 // regression spec (cmd_421 Batch4).
 import { prisma, createSessionUserWithPermission } from '../db-helpers';

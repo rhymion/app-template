@@ -1,13 +1,13 @@
 import { TEST_API_KEY } from '../../support/test-credentials';
 
 // cmd_296 Phase1: generic x-splittable split action, exercised against
-// receiving_receipt_line (quantityField=receipt_quantity, perPartRequired=
+// goods_receipt_line (quantityField=receipt_quantity, perPartRequired=
 // [inventory_id], parentField=parent_id). Covers the quantity invariant
 // (Σ(parts) == parent), the boundary cases, and approvable_id mandatory
 // (approved design — approvable is never deleted/null'd; only pending
 // approval_requests are removed and status flips to split).
 
-describe('API: Receiving Receipt Line — Split (cmd_296)', () => {
+describe('API: Goods Receipt Line — Split (cmd_296)', () => {
   beforeEach(() => {
     cy.task('db:reset');
     cy.task('db:seed');
@@ -15,10 +15,10 @@ describe('API: Receiving Receipt Line — Split (cmd_296)', () => {
   });
 
   function seedLineWithApproval(receiptQuantity = 5) {
-    return cy.task<any>('db:setupReceivingReceiptLineApprovalFlow').then((flowSetup) => {
+    return cy.task<any>('db:setupGoodsReceiptLineApprovalFlow').then((flowSetup) => {
       return cy.task<any>('db:seedReservationInventory', { quantity: 100 }).then((invSeed) => {
         return cy
-          .task<any>('db:populateReceivingReceiptLineWithApproval', {
+          .task<any>('db:populateGoodsReceiptLineWithApproval', {
             creatorId: flowSetup.approverUser.id,
             approvalFlowIds: [flowSetup.flowWithRole.id],
             // Align the line's own product/inventory with invSeed's lot so the
@@ -41,7 +41,7 @@ describe('API: Receiving Receipt Line — Split (cmd_296)', () => {
       const { line, inventory } = ctx;
       cy.request({
         method: 'POST',
-        url: `/api/receiving_receipt_line/${line.id}/actions/split`,
+        url: `/api/goods_receipt_line/${line.id}/actions/split`,
         body: {
           parts: [
             { receipt_quantity: 2, inventory_id: inventory.id },
@@ -53,7 +53,7 @@ describe('API: Receiving Receipt Line — Split (cmd_296)', () => {
         expect(res.body.ok).to.eq(true);
 
         // Parent: status flipped to split (1), approvable_id preserved (not null'd).
-        cy.task<any>('db:getReceivingReceiptLineById', { id: line.id }).then((parent) => {
+        cy.task<any>('db:getGoodsReceiptLineById', { id: line.id }).then((parent) => {
           expect(parent.status).to.eq('split');
           expect(parent.approvable_id).to.eq(line.approvable_id);
         });
@@ -71,7 +71,7 @@ describe('API: Receiving Receipt Line — Split (cmd_296)', () => {
 
         // Children: 2 rows, parent_id set, is_split_result=true, quantities preserved,
         // each with its own non-null approvable_id (fresh approvable per child).
-        cy.task<any>('db:getReceivingReceiptLineChildren', { parentId: line.id }).then((children) => {
+        cy.task<any>('db:getGoodsReceiptLineChildren', { parentId: line.id }).then((children) => {
           expect(children).to.have.length(2);
           const quantities = children.map((c: any) => c.receipt_quantity).sort();
           expect(quantities).to.deep.eq([2, 3]);
@@ -83,7 +83,7 @@ describe('API: Receiving Receipt Line — Split (cmd_296)', () => {
             expect(child.approvable_id).to.not.eq(line.approvable_id);
             expect(child.status).to.eq('pending'); // pending
             // inherited (non-overridden) parent fields carried over
-            expect(child.receiving_receipt_id).to.eq(line.receiving_receipt_id);
+            expect(child.goods_receipt_id).to.eq(line.goods_receipt_id);
             expect(child.product_id).to.eq(line.product_id);
           }
         });
@@ -96,7 +96,7 @@ describe('API: Receiving Receipt Line — Split (cmd_296)', () => {
       const { line, inventory } = ctx;
       cy.request({
         method: 'POST',
-        url: `/api/receiving_receipt_line/${line.id}/actions/split`,
+        url: `/api/goods_receipt_line/${line.id}/actions/split`,
         body: { parts: [{ receipt_quantity: 5, inventory_id: inventory.id }] },
         failOnStatusCode: false,
       }).then((res) => {
@@ -110,7 +110,7 @@ describe('API: Receiving Receipt Line — Split (cmd_296)', () => {
       const { line, inventory } = ctx;
       cy.request({
         method: 'POST',
-        url: `/api/receiving_receipt_line/${line.id}/actions/split`,
+        url: `/api/goods_receipt_line/${line.id}/actions/split`,
         body: {
           parts: [
             { receipt_quantity: 0, inventory_id: inventory.id },
@@ -129,7 +129,7 @@ describe('API: Receiving Receipt Line — Split (cmd_296)', () => {
       const { line, inventory } = ctx;
       cy.request({
         method: 'POST',
-        url: `/api/receiving_receipt_line/${line.id}/actions/split`,
+        url: `/api/goods_receipt_line/${line.id}/actions/split`,
         body: {
           parts: [
             { receipt_quantity: 2, inventory_id: inventory.id },
@@ -148,7 +148,7 @@ describe('API: Receiving Receipt Line — Split (cmd_296)', () => {
       const { line } = ctx;
       cy.request({
         method: 'POST',
-        url: `/api/receiving_receipt_line/${line.id}/actions/split`,
+        url: `/api/goods_receipt_line/${line.id}/actions/split`,
         body: {
           parts: [{ receipt_quantity: 2 }, { receipt_quantity: 3 }],
         },
@@ -160,7 +160,7 @@ describe('API: Receiving Receipt Line — Split (cmd_296)', () => {
   });
 
   it("cmd_307 FIX-β: splitting a receive-type entity never touches reserved_quantity or the 'Concurrent reservation conflict' path — children get an empty bridge only", () => {
-    // receiving_receipt_line has x-ledger-source event_type=receive: its
+    // goods_receipt_line has x-ledger-source event_type=receive: its
     // afterApprove hook ADDS inventory on approval, it never reserves
     // existing stock. Before FIX-β the split template unconditionally
     // reused the reserve-type inventory bridge logic (hardcoded
@@ -178,7 +178,7 @@ describe('API: Receiving Receipt Line — Split (cmd_296)', () => {
 
         cy.request({
           method: 'POST',
-          url: `/api/receiving_receipt_line/${line.id}/actions/split`,
+          url: `/api/goods_receipt_line/${line.id}/actions/split`,
           body: {
             parts: [
               { receipt_quantity: 2, inventory_id: inventory.id },
@@ -198,7 +198,7 @@ describe('API: Receiving Receipt Line — Split (cmd_296)', () => {
 
           // Children still get their own bridge (for afterApprove to write the
           // receive ledger row against later) but no inventory_transaction rows.
-          cy.task<any>('db:getReceivingReceiptLineChildren', { parentId: line.id }).then((children) => {
+          cy.task<any>('db:getGoodsReceiptLineChildren', { parentId: line.id }).then((children) => {
             expect(children).to.have.length(2);
             for (const child of children) {
               expect(child.inventory_transactionable_id).to.not.be.null;
@@ -219,7 +219,7 @@ describe('API: Receiving Receipt Line — Split (cmd_296)', () => {
       const { line, inventory } = ctx;
       cy.request({
         method: 'POST',
-        url: `/api/receiving_receipt_line/${line.id}/actions/split`,
+        url: `/api/goods_receipt_line/${line.id}/actions/split`,
         body: {
           parts: [
             { receipt_quantity: 1, inventory_id: inventory.id },
@@ -231,7 +231,7 @@ describe('API: Receiving Receipt Line — Split (cmd_296)', () => {
         expect(res.status).to.eq(400);
       });
       // Parent must remain unmodified after the rejected request.
-      cy.task<any>('db:getReceivingReceiptLineById', { id: line.id }).then((parent) => {
+      cy.task<any>('db:getGoodsReceiptLineById', { id: line.id }).then((parent) => {
         expect(parent.status).to.eq('pending');
       });
     });
@@ -248,7 +248,7 @@ describe('API: Receiving Receipt Line — Split (cmd_296)', () => {
       cy.task<any>('db:seedSecondProduct', { quantity: 10 }).then((otherProduct) => {
         cy.request({
           method: 'POST',
-          url: `/api/receiving_receipt_line/${line.id}/actions/split`,
+          url: `/api/goods_receipt_line/${line.id}/actions/split`,
           body: {
             parts: [
               { receipt_quantity: 2, inventory_id: otherProduct.inventory.id }, // wrong product's lot
@@ -260,10 +260,10 @@ describe('API: Receiving Receipt Line — Split (cmd_296)', () => {
           expect(res.status).to.eq(400);
           expect(res.body.error || res.body.message).to.match(/different product/i);
 
-          cy.task<any>('db:getReceivingReceiptLineById', { id: line.id }).then((parent) => {
+          cy.task<any>('db:getGoodsReceiptLineById', { id: line.id }).then((parent) => {
             expect(parent.status).to.eq('pending'); // unchanged — not split
           });
-          cy.task<any>('db:getReceivingReceiptLineChildren', { parentId: line.id }).then((children) => {
+          cy.task<any>('db:getGoodsReceiptLineChildren', { parentId: line.id }).then((children) => {
             expect(children).to.have.length(0);
           });
         });

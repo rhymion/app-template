@@ -1,29 +1,42 @@
 import { TEST_API_KEY, TEST_CREDENTIALS } from '../../support/test-credentials';
 
 // cmd_305 FIX-B follow-up (test-coverage-gap review): permanent,
-// entity-focused coverage for purchase_per_item's terminal-reject reservation
-// release (lib/purchase_per_item/service_after_reject.ts, invoked via
+// entity-focused coverage for sales_order_line's terminal-reject reservation
+// release (lib/sales_order_line/service_after_reject.ts, invoked via
 // on_rejected dispatch — FIX-C). This path already correctly undoes the O-6
 // ''→null denormalization at service_after_reject.ts:105 (unlike the split
 // template's parent-release block, which had the location=null bug fixed in
-// this same follow-up — see purchase_per_item_split.cy.ts). Previously this
-// flow only had ad-hoc coverage buried in purchase_order_reservation.cy.ts
+// this same follow-up — see sales_order_line_split.cy.ts). Previously this
+// flow only had ad-hoc coverage buried in sales_order_reservation.cy.ts
 // (14.4b_equiv); this file gives it a dedicated, permanent home and adds the
 // location=null case explicitly (the default/most common lot, and the same
 // shape of case the sibling split bug involved).
 
-const PO_API = '/api/purchase_order';
+const PO_API = '/api/sales_order';
 const INV_API = '/api/inventory';
 
-describe('API: Purchase Per Item — Terminal Reject Reservation Release (cmd_305 FIX-C)', () => {
+describe('API: Sales Order Line — Terminal Reject Reservation Release (cmd_305 FIX-C)', () => {
   beforeEach(() => {
     cy.task('db:reset');
     cy.task('db:seed');
     cy.task('db:grantAllPermissions');
   });
 
+  // cmd_856 [変更1]: see sales_order_line_approval_approve.cy.ts for the
+  // full rationale — sales_order_line now starts in 'draft' and needs an
+  // explicit submit (via the ApprovalSection "Submit" button's server
+  // action) before it has an approval_request at all.
+  function submitSalesOrderLineForApproval(itemId: string) {
+    Cypress.session.clearAllSavedSessions();
+    cy.clearCookies();
+    cy.login(TEST_CREDENTIALS.email, TEST_CREDENTIALS.password);
+    cy.visit(`/en/sales_order_line/view/${itemId}`);
+    cy.get('button[aria-label="Submit"]').click();
+    cy.get('button[aria-label="Submit"]').should('not.exist');
+  }
+
   function reserveAndReject(quantity: number, invSeed: any, orderNo: string) {
-    return cy.task<any>('db:setupPurchasePerItemSingleApprovalFlow').then((flowSetup) => {
+    return cy.task<any>('db:setupSalesOrderLineSingleApprovalFlow').then((flowSetup) => {
       return cy
         .request({
           method: 'POST',
@@ -39,8 +52,9 @@ describe('API: Purchase Per Item — Terminal Reject Reservation Release (cmd_30
           expect(poRes.status).to.eq(201);
           const orderId = poRes.body.id;
 
-          return cy.task<any>('db:getPurchasePerItemsForOrder', { purchase_order_id: orderId }).then((items) => {
+          return cy.task<any>('db:getSalesOrderLinesForOrder', { sales_order_id: orderId }).then((items) => {
             const item = items[0];
+            submitSalesOrderLineForApproval(item.id);
             return cy.task<any>('db:getPendingApprovalRequest', { approvable_id: item.approvable_id }).then((ar) => {
               expect(ar).to.not.be.null;
 
@@ -56,7 +70,12 @@ describe('API: Purchase Per Item — Terminal Reject Reservation Release (cmd_30
                 .then((rejectRes) => {
                   expect(rejectRes.status).to.eq(200);
                   expect(rejectRes.body.status).to.eq('terminal_rejected');
-                  return cy.wrap({ item, orderId });
+                  // Re-fetch: submitSalesOrderLineForApproval sets
+                  // inventory_transactionable_id server-side; the `item`
+                  // captured above pre-dates that write.
+                  return cy.task<any>('db:getSalesOrderLineById', { id: item.id }).then((freshItem) => {
+                    return cy.wrap({ item: freshItem, orderId });
+                  });
                 });
             });
           });
@@ -135,7 +154,7 @@ describe('API: Purchase Per Item — Terminal Reject Reservation Release (cmd_30
   });
 
   it('split child (own bridge, location=null lot) terminal reject also releases its reservation independently of the parent', () => {
-    cy.task<any>('db:setupPurchasePerItemSingleApprovalFlow').then((flowSetup) => {
+    cy.task<any>('db:setupSalesOrderLineSingleApprovalFlow').then((flowSetup) => {
       cy.task<any>('db:seedReservationInventory', { quantity: 20 }).then((seed) => {
         cy.request({
           method: 'POST',
@@ -149,20 +168,18 @@ describe('API: Purchase Per Item — Terminal Reject Reservation Release (cmd_30
         }).then((poRes) => {
           const orderId = poRes.body.id;
 
-          cy.task<any>('db:getPurchasePerItemsForOrder', { purchase_order_id: orderId }).then((items) => {
+          cy.task<any>('db:getSalesOrderLinesForOrder', { sales_order_id: orderId }).then((items) => {
             const parent = items[0];
 
-            Cypress.session.clearAllSavedSessions();
-            cy.clearCookies();
-            cy.login(TEST_CREDENTIALS.email, TEST_CREDENTIALS.password);
+            submitSalesOrderLineForApproval(parent.id);
             cy.request({
               method: 'POST',
-              url: `/api/purchase_per_item/${parent.id}/actions/split`,
+              url: `/api/sales_order_line/${parent.id}/actions/split`,
               body: { parts: [{ quantity: 4 }, { quantity: 6 }] },
             }).then((splitRes) => {
               expect(splitRes.status).to.eq(200);
 
-              cy.task<any>('db:getPurchasePerItemChildren', { parentId: parent.id }).then((children) => {
+              cy.task<any>('db:getSalesOrderLineChildren', { parentId: parent.id }).then((children) => {
                 const child = children[0];
 
                 cy.task<any>('db:getPendingApprovalRequest', { approvable_id: child.approvable_id }).then((ar: any) => {

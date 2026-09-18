@@ -12,23 +12,23 @@ async function getTestUser() {
 /**
  * Single-role approval_flow + approver user, for the hand-written API-level
  * approval specs (approve/reject/dispatch/split). Renamed from
- * setupReceivingReceiptLineApprovalFlow to avoid colliding with the
+ * setupGoodsReceiptLineApprovalFlow to avoid colliding with the
  * generated (multi-flow) helper of that name under the same cy.task key —
  * the collision made this narrow one shadow the generated one everywhere,
  * including the generated UI spec (cmd_322 RC5).
  */
-export async function setupReceivingReceiptLineSingleApprovalFlow() {
+export async function setupGoodsReceiptLineSingleApprovalFlow() {
   const { hashPassword } = require('../test-credentials');
   const testUser = await getTestUser();
   const hashedPw = await hashPassword('test-password');
 
   const approverRole = await prisma.role.create({
-    data: { name: `Test Receiving Receipt Line Approver Role ${Date.now()}`, creator_id: testUser.id, updater_id: testUser.id },
+    data: { name: `Test Goods Receipt Line Approver Role ${Date.now()}`, creator_id: testUser.id, updater_id: testUser.id },
   });
   const approverUser = await prisma.user.create({
     data: {
-      name: 'Test Receiving Receipt Line Approver User',
-      email: `test-receiving_receipt_line-approver-${Date.now()}@example.com`,
+      name: 'Test Goods Receipt Line Approver User',
+      email: `test-goods_receipt_line-approver-${Date.now()}@example.com`,
       password: hashedPw,
       creator_id: testUser.id,
       updater_id: testUser.id,
@@ -37,7 +37,7 @@ export async function setupReceivingReceiptLineSingleApprovalFlow() {
   });
   const flow = await prisma.approval_flow.create({
     data: {
-      entity_name: 'receiving_receipt_line',
+      entity_name: 'goods_receipt_line',
       requestor_role_id: null,
       approver_role_id: approverRole.id,
       creator_id: testUser.id,
@@ -49,14 +49,14 @@ export async function setupReceivingReceiptLineSingleApprovalFlow() {
 }
 
 /**
- * Directly seed a receiving_receipt + receiving_receipt_line (status=pending)
+ * Directly seed a goods_receipt + goods_receipt_line (status=pending)
  * with a pending approval_request tied to its approvable_id, for the
  * hand-written API-level approval specs. Renamed from
- * populateReceivingReceiptLineWithApproval (was registered under the same
+ * populateGoodsReceiptLineWithApproval (was registered under the same
  * cy.task name as the generated helper of that name — same collision class
- * as setupReceivingReceiptLineApprovalFlow, cmd_322 RC5).
+ * as setupGoodsReceiptLineApprovalFlow, cmd_322 RC5).
  */
-export async function populateReceivingReceiptLineSingleApproval(
+export async function populateGoodsReceiptLineSingleApproval(
   creatorId: string,
   approvalFlowIds: string[],
   opts?: { inventoryId?: string | null; productId?: string; receiptQuantity?: number },
@@ -74,7 +74,7 @@ export async function populateReceivingReceiptLineSingleApproval(
           data: {
             attachable_id: attachable.id,
             code: `RRL-PROD-${Date.now()}`,
-            name: 'Receiving Receipt Line Test Product',
+            name: 'Goods Receipt Line Test Product',
             price: 50,
             creator_id: testUser.id,
             updater_id: testUser.id,
@@ -82,7 +82,7 @@ export async function populateReceivingReceiptLineSingleApproval(
         });
       })();
 
-  const receipt = await prisma.receiving_receipt.create({
+  const receipt = await prisma.goods_receipt.create({
     data: {
       receipt_no: `RRL-${Date.now()}`,
       status: 'draft',
@@ -92,9 +92,9 @@ export async function populateReceivingReceiptLineSingleApproval(
   });
 
   const approvableItem = await prisma.approvable.create({ data: {} });
-  const line = await prisma.receiving_receipt_line.create({
+  const line = await prisma.goods_receipt_line.create({
     data: {
-      receiving_receipt_id: receipt.id,
+      goods_receipt_id: receipt.id,
       product_id: product.id,
       receipt_quantity: opts?.receiptQuantity ?? 5,
       status: 'pending',
@@ -115,20 +115,20 @@ export async function populateReceivingReceiptLineSingleApproval(
 }
 
 /**
- * Fetch a receiving_receipt_line row by id (cmd_296 split verification: parent
+ * Fetch a goods_receipt_line row by id (cmd_296 split verification: parent
  * status/approvable_id after split, child field checks).
  */
-export async function getReceivingReceiptLineById(id: string) {
-  const line = await prisma.receiving_receipt_line.findUnique({ where: { id } });
+export async function getGoodsReceiptLineById(id: string) {
+  const line = await prisma.goods_receipt_line.findUnique({ where: { id } });
   return JSON.parse(JSON.stringify(line));
 }
 
 /**
- * List receiving_receipt_line rows whose parent_id points at `parentId`
+ * List goods_receipt_line rows whose parent_id points at `parentId`
  * (cmd_296 split verification: child records created by the split action).
  */
-export async function getReceivingReceiptLineChildren(parentId: string) {
-  const children = await prisma.receiving_receipt_line.findMany({
+export async function getGoodsReceiptLineChildren(parentId: string) {
+  const children = await prisma.goods_receipt_line.findMany({
     where: { parent_id: parentId },
     orderBy: { created_at: 'asc' },
   });

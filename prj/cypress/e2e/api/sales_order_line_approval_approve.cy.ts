@@ -1,22 +1,42 @@
 import { TEST_API_KEY, TEST_CREDENTIALS } from '../../support/test-credentials';
 
-// item3 (cmd_309): purchase_per_item's approve path (afterApprove — 'ship')
+// item3 (cmd_309): sales_order_line's approve path (afterApprove — 'ship')
 // had no dedicated permanent coverage anywhere in the suite (only reject/
-// terminal-cancel was covered, in purchase_per_item_approval_dispatch.cy.ts).
+// terminal-cancel was covered, in sales_order_line_approval_dispatch.cy.ts).
 // This fills that gap: single-lot ship, multi-lot ship (reservation spans
 // two inventory lots via auto-allocate), and a split child's independent
 // ship — matching the approve×split-has/split-none combinations required by
 // cmd_309 item3(b).
 
-const PO_API = '/api/purchase_order';
+const PO_API = '/api/sales_order';
 const INV_API = '/api/inventory';
 
-describe('API: Purchase Per Item — Approve / Ship (cmd_309 item3)', () => {
+describe('API: Sales Order Line — Approve / Ship (cmd_309 item3)', () => {
   beforeEach(() => {
     cy.task('db:reset');
     cy.task('db:seed');
     cy.task('db:grantAllPermissions');
   });
+
+  // cmd_856 [変更1]: sales_order_line now has its own x-approval.submit_on
+  // and is created in 'draft' -- the DataGrid-nested create under
+  // sales_order deliberately skips approval_request creation for lines
+  // entities that declare their own submit_on (see
+  // _build_approval_lines_post_create_code). Reaching 'pending' (and
+  // getting an approval_request) requires the dedicated (re)submit action,
+  // which for an edit:false entity like this one only exists as the
+  // ApprovalSection "Submit" button's server action (submit_actions.ts) --
+  // there is no PUT route and no auto-generated api-level resubmit test
+  // (that generator path only fires for api:true entities). Drive it via
+  // the real UI action instead of guessing at the server-action wire format.
+  function submitSalesOrderLineForApproval(itemId: string) {
+    Cypress.session.clearAllSavedSessions();
+    cy.clearCookies();
+    cy.login(TEST_CREDENTIALS.email, TEST_CREDENTIALS.password);
+    cy.visit(`/en/sales_order_line/view/${itemId}`);
+    cy.get('button[aria-label="Submit"]').click();
+    cy.get('button[aria-label="Submit"]').should('not.exist');
+  }
 
   function reserveAndApprove(quantity: number, invSeed: any, orderNo: string, flowSetup: any) {
     return cy
@@ -34,8 +54,9 @@ describe('API: Purchase Per Item — Approve / Ship (cmd_309 item3)', () => {
         expect(poRes.status).to.eq(201);
         const orderId = poRes.body.id;
 
-        return cy.task<any>('db:getPurchasePerItemsForOrder', { purchase_order_id: orderId }).then((items) => {
+        return cy.task<any>('db:getSalesOrderLinesForOrder', { sales_order_id: orderId }).then((items) => {
           const item = items[0];
+          submitSalesOrderLineForApproval(item.id);
           return cy.task<any>('db:getPendingApprovalRequest', { approvable_id: item.approvable_id }).then((ar) => {
             expect(ar).to.not.be.null;
 
@@ -51,7 +72,12 @@ describe('API: Purchase Per Item — Approve / Ship (cmd_309 item3)', () => {
               .then((approveRes) => {
                 expect(approveRes.status).to.eq(200);
                 expect(approveRes.body.status).to.eq('approved');
-                return cy.wrap({ item, orderId });
+                // Re-fetch: submitSalesOrderLineForApproval sets
+                // inventory_transactionable_id server-side; the `item`
+                // captured above pre-dates that write.
+                return cy.task<any>('db:getSalesOrderLineById', { id: item.id }).then((freshItem) => {
+                  return cy.wrap({ item: freshItem, orderId });
+                });
               });
           });
         });
@@ -59,7 +85,7 @@ describe('API: Purchase Per Item — Approve / Ship (cmd_309 item3)', () => {
   }
 
   it('single-lot reservation: approve ships — quantity and reserved_quantity both decrement, one ship ledger row', () => {
-    cy.task<any>('db:setupPurchasePerItemSingleApprovalFlow').then((flowSetup) => {
+    cy.task<any>('db:setupSalesOrderLineSingleApprovalFlow').then((flowSetup) => {
       cy.task<any>('db:seedReservationInventory', { quantity: 10 }).then((seed) => {
         reserveAndApprove(4, seed, 'APPROVE-001', flowSetup).then((ctx: any) => {
           const { item } = ctx;
@@ -93,7 +119,7 @@ describe('API: Purchase Per Item — Approve / Ship (cmd_309 item3)', () => {
   });
 
   it('multi-lot reservation (auto-allocate spans two inventory lots): approve ships both lots independently', () => {
-    cy.task<any>('db:setupPurchasePerItemSingleApprovalFlow').then((flowSetup) => {
+    cy.task<any>('db:setupSalesOrderLineSingleApprovalFlow').then((flowSetup) => {
       // First lot only has 5 units — a quantity-12 order must spill onto a
       // second lot (O-8) to be satisfied.
       cy.task<any>('db:seedReservationInventory', { quantity: 5 }).then((seed) => {
@@ -139,7 +165,7 @@ describe('API: Purchase Per Item — Approve / Ship (cmd_309 item3)', () => {
   });
 
   it('split child (own bridge): approve ships the child independently of any sibling', () => {
-    cy.task<any>('db:setupPurchasePerItemSingleApprovalFlow').then((flowSetup) => {
+    cy.task<any>('db:setupSalesOrderLineSingleApprovalFlow').then((flowSetup) => {
       cy.task<any>('db:seedReservationInventory', { quantity: 20 }).then((seed) => {
         cy.request({
           method: 'POST',
@@ -153,20 +179,18 @@ describe('API: Purchase Per Item — Approve / Ship (cmd_309 item3)', () => {
         }).then((poRes) => {
           const orderId = poRes.body.id;
 
-          cy.task<any>('db:getPurchasePerItemsForOrder', { purchase_order_id: orderId }).then((items) => {
+          cy.task<any>('db:getSalesOrderLinesForOrder', { sales_order_id: orderId }).then((items) => {
             const parent = items[0];
 
-            Cypress.session.clearAllSavedSessions();
-            cy.clearCookies();
-            cy.login(TEST_CREDENTIALS.email, TEST_CREDENTIALS.password);
+            submitSalesOrderLineForApproval(parent.id);
             cy.request({
               method: 'POST',
-              url: `/api/purchase_per_item/${parent.id}/actions/split`,
+              url: `/api/sales_order_line/${parent.id}/actions/split`,
               body: { parts: [{ quantity: 4 }, { quantity: 6 }] },
             }).then((splitRes) => {
               expect(splitRes.status).to.eq(200);
 
-              cy.task<any>('db:getPurchasePerItemChildren', { parentId: parent.id }).then((children) => {
+              cy.task<any>('db:getSalesOrderLineChildren', { parentId: parent.id }).then((children) => {
                 const [childA, childB] = children;
 
                 cy.task<any>('db:getPendingApprovalRequest', { approvable_id: childA.approvable_id }).then((ar: any) => {
@@ -190,7 +214,7 @@ describe('API: Purchase Per Item — Approve / Ship (cmd_309 item3)', () => {
                     });
 
                     // Sibling child (still pending) must be unaffected.
-                    cy.task<any>('db:getPurchasePerItemById', { id: childB.id }).then((siblingAfter) => {
+                    cy.task<any>('db:getSalesOrderLineById', { id: childB.id }).then((siblingAfter) => {
                       expect(siblingAfter.status).to.eq('pending'); // pending
                     });
                     cy.task<any>('db:getInventoryTransactionsByBridge', {

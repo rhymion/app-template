@@ -17,7 +17,7 @@ export type AutocompleteFilterContext = {
 export function filterAutocompleteOptions(
   context: AutocompleteFilterContext,
 ): Record<string, unknown> {
-  // receiving_receipt_line's split action (cmd_424): narrow inventory
+  // goods_receipt_line's split action (cmd_424): narrow inventory
   // candidates to the same product as the line being split, so the picker
   // doesn't offer inventory rows for unrelated products.
   const productId = context.formValues?.product_id;

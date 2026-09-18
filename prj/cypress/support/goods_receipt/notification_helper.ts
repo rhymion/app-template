@@ -10,14 +10,14 @@ async function getTestUser() {
 }
 
 /**
- * Fixture for the receiving_receipt notification specs. Deliberately mirrors
+ * Fixture for the goods_receipt notification specs. Deliberately mirrors
  * the shape of the real gap this closes: a distinct requestor (creates the
- * receipt) and a distinct approver (holds the receiving_receipt_line
+ * receipt) and a distinct approver (holds the goods_receipt_line
  * approval_flow's approver role) so Trigger #2's excludeUserId logic has a
  * real, non-empty recipient to exclude-around — not the single-Administrator
  * setup where creator and sole approver coincide.
  */
-export async function setupReceivingReceiptNotificationFixture() {
+export async function setupGoodsReceiptNotificationFixture() {
   const { hashPassword } = require('../test-credentials');
   const testUser = await getTestUser();
   const hashedPw = await hashPassword('test-password');
@@ -74,7 +74,7 @@ export async function setupReceivingReceiptNotificationFixture() {
 
   const flow = await prisma.approval_flow.create({
     data: {
-      entity_name: 'receiving_receipt_line',
+      entity_name: 'goods_receipt_line',
       requestor_role_id: null,
       approver_role_id: approverRole.id,
       creator_id: testUser.id,

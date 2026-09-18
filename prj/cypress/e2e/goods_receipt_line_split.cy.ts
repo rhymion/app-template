@@ -1,11 +1,11 @@
 // cmd_296 Phase1: split UI (SplitActionSection), browser-driven. Exercises the
-// Split dialog on receiving_receipt_line's view page — trigger, per-part
+// Split dialog on goods_receipt_line's view page — trigger, per-part
 // quantity input, the inventory_id Autocomplete+lookup (D2 ruling — not a
 // plain TextField), the live remaining-quantity readout, submit-disabled
 // until remaining is 0, and post-submit reflection (router.refresh — D3).
 import { TEST_CREDENTIALS } from '../support/test-credentials';
 
-describe('UI: Receiving Receipt Line — Split (cmd_296)', () => {
+describe('UI: Goods Receipt Line — Split (cmd_296)', () => {
   beforeEach(() => {
     cy.task('db:reset');
     cy.task('db:seed');
@@ -13,9 +13,9 @@ describe('UI: Receiving Receipt Line — Split (cmd_296)', () => {
   });
 
   it('splits via the Split dialog: quantity inputs + inventory Autocomplete lookup, remaining validation, DB reflects split', () => {
-    cy.task<any>('db:setupReceivingReceiptLineSingleApprovalFlow').then((flowSetup) => {
+    cy.task<any>('db:setupGoodsReceiptLineSingleApprovalFlow').then((flowSetup) => {
       cy.task<any>('db:seedReservationInventory', { quantity: 100 }).then((invSeed) => {
-        cy.task<any>('db:populateReceivingReceiptLineSingleApproval', {
+        cy.task<any>('db:populateGoodsReceiptLineSingleApproval', {
           creatorId: flowSetup.approverUser.id,
           approvalFlowIds: [],
           // item3 cross-product guard: the split parts below select the seeded
@@ -36,7 +36,7 @@ describe('UI: Receiving Receipt Line — Split (cmd_296)', () => {
           });
           cy.login(TEST_CREDENTIALS.email, TEST_CREDENTIALS.password);
 
-          cy.visit(`/en/receiving_receipt_line/view/${line.id}`);
+          cy.visit(`/en/goods_receipt_line/view/${line.id}`);
 
           // Only the trigger button exists before the dialog opens.
           cy.contains('button', 'Split').click();
@@ -74,12 +74,20 @@ describe('UI: Receiving Receipt Line — Split (cmd_296)', () => {
 
           // Real-behavior confirmation: the browser-driven split actually
           // persisted (status flipped, approvable preserved, 2 children created).
-          cy.task<any>('db:getReceivingReceiptLineById', { id: line.id }).then((parent) => {
+          cy.task<any>('db:getGoodsReceiptLineById', { id: line.id }).then((parent) => {
             expect(parent.status).to.eq('split');
             expect(parent.approvable_id).to.eq(line.approvable_id);
           });
-          cy.task<any>('db:getReceivingReceiptLineChildren', { parentId: line.id }).then((children) => {
+          cy.task<any>('db:getGoodsReceiptLineChildren', { parentId: line.id }).then((children) => {
             expect(children).to.have.length(2);
+            // Confirms the Autocomplete+lookup selection (D2 ruling — not free
+            // text) actually persisted inventory_id, and that each row's typed
+            // quantity landed on the matching child (Row 0=2, Row 1=3, ordered
+            // by created_at asc per getGoodsReceiptLineChildren).
+            expect(children[0].receipt_quantity).to.eq(2);
+            expect(children[0].inventory_id).to.eq(inventory.id);
+            expect(children[1].receipt_quantity).to.eq(3);
+            expect(children[1].inventory_id).to.eq(inventory.id);
           });
         });
       });
@@ -94,10 +102,10 @@ describe('UI: Receiving Receipt Line — Split (cmd_296)', () => {
     // the item3 API test above uses) and asserts it never appears in the
     // picker — a real Prisma WHERE narrowing, not just default no-op stub
     // behavior (verified against a production `next build`/`next start`).
-    cy.task<any>('db:setupReceivingReceiptLineSingleApprovalFlow').then((flowSetup) => {
+    cy.task<any>('db:setupGoodsReceiptLineSingleApprovalFlow').then((flowSetup) => {
       cy.task<any>('db:seedReservationInventory', { quantity: 100 }).then((invSeed) => {
         cy.task<any>('db:seedSecondProduct', { quantity: 50 }).then(() => {
-          cy.task<any>('db:populateReceivingReceiptLineSingleApproval', {
+          cy.task<any>('db:populateGoodsReceiptLineSingleApproval', {
             creatorId: flowSetup.approverUser.id,
             approvalFlowIds: [],
             productId: invSeed.product.id,
@@ -113,7 +121,7 @@ describe('UI: Receiving Receipt Line — Split (cmd_296)', () => {
             });
             cy.login(TEST_CREDENTIALS.email, TEST_CREDENTIALS.password);
 
-            cy.visit(`/en/receiving_receipt_line/view/${line.id}`);
+            cy.visit(`/en/goods_receipt_line/view/${line.id}`);
             cy.contains('button', 'Split').click();
             cy.get('[role="dialog"]').should('be.visible');
 

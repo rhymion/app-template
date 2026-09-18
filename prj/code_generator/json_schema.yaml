@@ -83,7 +83,7 @@ x-ledger-entities:
 # group. `inventory_ops` demonstrates a genuine two-level hierarchy: it
 # splits into `stock_ledger` (physical stock tracking: inventory/location/
 # product plus the inventory_transaction/movement/adjustment ledger trio)
-# and `procurement` (the purchase_order -> receiving PO/ASN/receipt chain,
+# and `procurement` (the sales_order -> purchase_order/ASN/goods_receipt chain,
 # which itself drives the same inventory_domain ledger via
 # x-reservation.transaction.ledgerDomain above) — two distinct workflows
 # under one domain, not depth added for its own sake. Every other group
@@ -684,6 +684,33 @@ definitions:
         type: array
         items:
           $ref: "#/definitions/yyyyy_yyyyy"
+
+  # cmd_874/subtask_874f verification fixture: a restricted view of
+  # xxxxx_xxxxx showing/writable only for team=alpha rows. Proves
+  # x-filter-values end-to-end (list/detail/export/search hide non-alpha
+  # rows; PUT/DELETE on a non-alpha row 404; a legitimate PUT that moves a
+  # row's team out of alpha still succeeds, judged against the pre-image).
+  alpha_xxxxx_xxxxx:
+    x-generate:
+      list: true
+      view: true
+      new: false
+      edit: true
+      delete: true
+      invalidate: false
+      api: true
+      test: true
+    x-filter-values:
+      team: [alpha]
+    x-display:
+      table:
+        - name:
+            primary: true
+            width: 200
+        - team:
+            width: 150
+    allOf:
+      - $ref: "#/definitions/xxxxx_xxxxx"
 
   parent1_child1:
     fields:
@@ -1305,7 +1332,16 @@ definitions:
     fields:
       name: {}
 
-  inventory_transactionable: {}
+  inventory_transactionable:
+    x-generate:
+      list: false
+      view: false
+      new: false
+      edit: false
+      delete: false
+      invalidate: false
+      api: false
+      test: false
 
   inventory_transaction:
     x-nav:
@@ -1316,6 +1352,29 @@ definitions:
       edit: false
       delete: false
       invalidate: false     # O-1: entity level read-only (list/view only, no UI mutation)
+      api: true              # align with proj_g inventory_transaction x-generate
+      test: true             # align with proj_g inventory_transaction x-generate
+    # subtask_925d (2026-09-03): without x-display.table, page_list_context()
+    # (app-generator code_generator/generators.py) emits no displayFields/
+    # primaryField, so the generated list page falls back to
+    # DataGridClient's hardcoded name/description columns — fields this
+    # entity doesn't have — and the grid cell renders the raw row id
+    # instead of any readable label. That silently broke the
+    # generated UI e2e assertions (`Inventory Transaction 1`) the moment
+    # test:true (above) started generating/running them.
+    # product_id is a plain required string (not a real relation despite
+    # the _id suffix — see prisma/schema.prisma), unique per seeded row,
+    # so it's a safe non-FK primary (cf. proj_g's inventory_transaction
+    # comment on why an aliased FK primary breaks the generated spec).
+    x-display:
+      table:
+        - product_id:
+            primary: true
+            width: 200
+        - event_type:
+            width: 140
+        - quantity_delta:
+            width: 140
     fields:
       inventory_transactionable_id:
         pattern: "^c[a-z0-9]{24,}$"
@@ -1457,6 +1516,15 @@ definitions:
       event_type: adjust
       poolIdField: inventory_id           # 対象 inventory FK フィールド名
       quantity_delta_field: quantity_delta
+    # cmd_1029: quantity_delta must allow both directions -- a positive
+    # value adds stock (a count came out higher than the system's
+    # record), a negative value removes it (a write-off, damage, etc.).
+    # The generator's default minimum of 0 (generators.py `mn =
+    # prop.get('minimum', 0)`) silently blocked negative input from the
+    # New form -- declare an explicit minimum here so negative
+    # corrections can be entered. No business-level lower bound is
+    # documented, so the type's own lower bound (Int/int32) is used
+    # rather than an arbitrary business threshold.
     fields:
       inventory_id:
         pattern: "^c[a-z0-9]{24,}$"
@@ -1466,7 +1534,8 @@ definitions:
             - location.name
             - lot_number
             - expiration_date
-      quantity_delta: {}
+      quantity_delta:
+        minimum: -2147483648
       reason: {}
       status:
         enum:
@@ -1486,7 +1555,7 @@ definitions:
       approvable:
         $ref: "#/definitions/approvable"
 
-  purchase_order:
+  sales_order:
     x-nav:
       parent: procurement
       order: 1
@@ -1527,11 +1596,11 @@ definitions:
           - lot_number: asc
           - id: asc
       result:
-        parentField: purchase_order_id
+        parentField: sales_order_id
         lineTransactionableField: inventory_transactionable_id
       # No "actions" block: under strategy: ledger_transaction, ship/cancel are
-      # driven by the standard approve/reject flow on purchase_per_item.approvable_id
-      # (see purchase_per_item's x-approval below), not by bespoke action routes.
+      # driven by the standard approve/reject flow on sales_order_line.approvable_id
+      # (see sales_order_line's x-approval below), not by bespoke action routes.
     fields:
       order_no:
         minLength: 1
@@ -1547,7 +1616,7 @@ definitions:
       items:
         type: array
         items:
-          $ref: "#/definitions/purchase_per_item"
+          $ref: "#/definitions/sales_order_line"
 
   leave_request:
     x-nav:
@@ -1595,6 +1664,9 @@ definitions:
         set_fields:
           status: "rejected"
         emit_hook: false
+      on_withdrawn:
+        set_fields:
+          status: "draft"
     fields:
       user_id:
         pattern: "^c[a-z0-9]{24,}$"
@@ -1846,12 +1918,12 @@ definitions:
   # Receiving lifecycle (PO / ASN / Receipt).
   # ============================================================
 
-  receiving_purchase_order_line:
+  purchase_order_line:
     x-nav:
       parent: procurement
       order: 4
     fields:
-      receiving_purchase_order_id:
+      purchase_order_id:
         pattern: "^c[a-z0-9]{24,}$"
         x-relationship:
           labelField: order_no
@@ -1876,7 +1948,7 @@ definitions:
           - fully_received
           - cancelled
         default: outstanding
-  receiving_purchase_order:
+  purchase_order:
     x-nav:
       parent: procurement
       order: 3
@@ -1913,14 +1985,14 @@ definitions:
       lines:
         type: array
         items:
-          $ref: "#/definitions/receiving_purchase_order_line"
+          $ref: "#/definitions/purchase_order_line"
 
-  receiving_asn_line:
+  asn_line:
     x-nav:
       parent: procurement
       order: 6
     fields:
-      receiving_asn_id:
+      asn_id:
         pattern: "^c[a-z0-9]{24,}$"
         x-relationship:
           labelField: asn_no
@@ -1945,7 +2017,7 @@ definitions:
           - fully_matched
           - cancelled
         default: outstanding
-  receiving_asn:
+  asn:
     x-nav:
       parent: procurement
       order: 5
@@ -1984,13 +2056,13 @@ definitions:
       - lines
     properties:
       purchase_order:
-        $ref: "#/definitions/receiving_purchase_order"
+        $ref: "#/definitions/purchase_order"
       lines:
         type: array
         items:
-          $ref: "#/definitions/receiving_asn_line"
+          $ref: "#/definitions/asn_line"
 
-  receiving_receipt:
+  goods_receipt:
     x-nav:
       parent: procurement
       order: 7
@@ -2035,15 +2107,15 @@ definitions:
       - lines
     properties:
       purchase_order:
-        $ref: "#/definitions/receiving_purchase_order"
+        $ref: "#/definitions/purchase_order"
       asn:
-        $ref: "#/definitions/receiving_asn"
+        $ref: "#/definitions/asn"
       lines:
         type: array
         items:
-          $ref: "#/definitions/receiving_receipt_line"
+          $ref: "#/definitions/goods_receipt_line"
 
-  receiving_receipt_line:
+  goods_receipt_line:
     x-nav:
       parent: procurement
       order: 8
@@ -2067,7 +2139,7 @@ definitions:
         - product:
             primary: true
             width: 200
-        - receiving_receipt:
+        - goods_receipt:
             width: 150
         - inventory:
             width: 250
@@ -2098,12 +2170,12 @@ definitions:
       # Declared explicitly instead of adding x-relationship to parent_id,
       # which would pull it into unrelated generator paths (FormUpsert,
       # column_def, getters include) for an entity whose x-generate already
-      # disables new/edit (receiving_receipt_line_detail).
+      # disables new/edit (goods_receipt_line_detail).
       parentField: parent_id
       ledgerDomain: inventory_domain
       poolIdField: inventory_id
     fields:
-      receiving_receipt_id:
+      goods_receipt_id:
         pattern: "^c[a-z0-9]{24,}$"
         x-relationship:
           labelField: receipt_no
@@ -2132,7 +2204,7 @@ definitions:
         # autocomplete_filter.ts). Reaches split_action_section.tsx.jinja2's
         # SplitActionSection via this field's membership in x-splittable's
         # perPartRequired below — the FormUpsert path is unreachable here
-        # (receiving_receipt_line_detail has new:false/edit:false).
+        # (goods_receipt_line_detail has new:false/edit:false).
         x-autocomplete-context:
           - product_id
       approvable_id:
@@ -2150,8 +2222,8 @@ definitions:
         pattern: "^c[a-z0-9]{24,}$"
         x-relationship: {}
     properties:
-      receiving_receipt:
-        $ref: "#/definitions/receiving_receipt"
+      goods_receipt:
+        $ref: "#/definitions/goods_receipt"
       product:
         $ref: "#/definitions/product"
       inventory:
@@ -2161,7 +2233,7 @@ definitions:
       assignee:
         $ref: "#/definitions/user"
 
-  purchase_per_item:
+  sales_order_line:
     x-nav:
       parent: procurement
       order: 2
@@ -2184,7 +2256,7 @@ definitions:
         - product:
             primary: true
             width: 200
-        - purchase_order:
+        - sales_order:
             width: 150
         - inventory:
             width: 250
@@ -2193,11 +2265,16 @@ definitions:
         - status:
             width: 120
     x-approval:
+      submit_on:
+        status: pending
       on_approved:
         emit_hook: true
       on_rejected:
         terminal: true
         emit_hook: true
+      on_withdrawn:
+        set_fields:
+          status: draft
     x-splittable:
       quantityField: quantity
       parentField: parent_id
@@ -2206,7 +2283,7 @@ definitions:
       perPartRequired:
         - inventory_id
     fields:
-      purchase_order_id:
+      sales_order_id:
         pattern: "^c[a-z0-9]{24,}$"
         x-relationship:
           labelField: order_no
@@ -2217,10 +2294,11 @@ definitions:
         minimum: 1
       status:
         enum:
+          - draft
           - pending
           - split
           - rejected
-        default: pending
+        default: draft
       price:
         minimum: 0
       parent_id:
@@ -2244,8 +2322,8 @@ definitions:
     required:
       - product
     properties:
-      purchase_order:
-        $ref: "#/definitions/purchase_order"
+      sales_order:
+        $ref: "#/definitions/sales_order"
       product:
         $ref: "#/definitions/product"
       approvable:
@@ -2403,6 +2481,9 @@ definitions:
         set_fields:
           status: "rejected"
         emit_hook: false
+      on_withdrawn:
+        set_fields:
+          status: "draft"
     fields:
       category:
         default: general
@@ -2438,8 +2519,8 @@ definitions:
 
   # cmd_825/cmd_826: no entity in this schema combines edit:true with
   # terminal:true + submit_on -- the four terminal x-approval entities
-  # above (inventory_movement/inventory_adjustment/purchase_per_item/
-  # receiving_receipt_line) are all edit:false, so testing "terminal
+  # above (inventory_movement/inventory_adjustment/sales_order_line/
+  # goods_receipt_line) are all edit:false, so testing "terminal
   # rejection blocks resubmission" against them only proves the schema's
   # own edit lockout, not the generator's own guard (cmd_826 甲/戊). This
   # fixture is editable specifically so the generated resubmit tests
@@ -2491,6 +2572,12 @@ definitions:
         set_fields:
           status: "rejected"
         emit_hook: false
+      on_withdrawn:
+        set_fields:
+          status: "draft"
+    x-write-locked-values:
+      status:
+        - archived
     fields:
       title:
         minLength: 1
@@ -2502,6 +2589,7 @@ definitions:
           - approved
           - rejected
           - draft
+          - archived
       approvable_id:
         pattern: "^c[a-z0-9]{24,}$"
         x-relationship:
