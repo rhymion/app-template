@@ -225,7 +225,10 @@ model organization {
   resources   resource[]
   notes       note[]
   maintenance_tickets maintenance_ticket[]
-  app_settings app_setting[]
+  // Reverse side of app_setting's `@@unique([organization_id])` FK
+  // (app-generator issue #681): singular/optional, not an array -- the
+  // unique constraint caps this at 0-or-1 rows per organization.
+  app_setting app_setting?
 
   @@index([creator_id])
   @@index([updater_id])

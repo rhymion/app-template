@@ -5,6 +5,17 @@ Detailed change history will begin from the first versioned release.
 
 ## [Unreleased]
 
+### Fixed
+- **`organization.app_setting` relation was declared one-to-many
+  (`app_settings app_setting[]`) while `app_setting.organization_id`
+  carries `@@unique([organization_id])`** (app-generator issue #681) --
+  corrected to a singular optional relation field (`app_setting?`) in both
+  the `app-generator` submodule pointer bump and this repo's own
+  `prj/prisma/schema.prisma` copy. No migration/DDL impact: this is Prisma
+  relation metadata only, no physical column involved. This repo has no
+  generated `app_setting` CRUD pages/API (its own `json_schema.yaml` never
+  declared the entity), so the fix is schema-only here.
+
 ### Internal
 - **Added a real-DB regression fixture for the code generator's pre-edit-row
   handoff to `validateCustomRules()`** (`prj/lib/organization/service_validation_custom.ts`
