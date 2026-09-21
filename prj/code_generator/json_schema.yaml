@@ -114,8 +114,9 @@ x-nav-groups:
     icon: ShoppingCart
 
 # x-state-machines (Issue #696, Stage 1 PR1): top-level pointer
-# map, `{model}.{field}: path/to.mmd`. subtask_1121e opt-in target — see
-# state-transition-generator-design.md's input-placement section.
+# map, `{model}.{field}: path/to.mmd`. goods_receipt.status is the
+# opt-in target for this change — see state-transition-generator-design.md's
+# input-placement section.
 x-state-machines:
   goods_receipt.status: state_machines/goods_receipt_status.mmd
 
