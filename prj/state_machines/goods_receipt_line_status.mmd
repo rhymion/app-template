@@ -1,0 +1,6 @@
+stateDiagram-v2
+    [*] --> pending
+    pending --> split
+    pending --> rejected
+    split --> [*]
+    rejected --> [*]
