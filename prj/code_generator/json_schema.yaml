@@ -114,11 +114,15 @@ x-nav-groups:
     icon: ShoppingCart
 
 # x-state-machines (Issue #696, Stage 1 PR1): top-level pointer
-# map, `{model}.{field}: path/to.mmd`. goods_receipt.status is the
-# opt-in target for this change — see state-transition-generator-design.md's
-# input-placement section.
+# map, `{model}.{field}: path/to.mmd`. goods_receipt.status was
+# retargeted to goods_receipt_line.status: goods_receipt is
+# import-eligible with a writable embedded child (`lines`), which the
+# generator's Case E precondition guard now correctly rejects for state
+# machines; goods_receipt_line (the entity that actually owns the
+# approval workflow) is not import-eligible and passes the guard. See
+# state-transition-generator-design.md's input-placement section.
 x-state-machines:
-  goods_receipt.status: state_machines/goods_receipt_status.mmd
+  goods_receipt_line.status: state_machines/goods_receipt_line_status.mmd
 
 definitions:
   user:
