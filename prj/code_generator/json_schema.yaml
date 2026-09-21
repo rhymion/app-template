@@ -113,7 +113,7 @@ x-nav-groups:
     order: 40
     icon: ShoppingCart
 
-# x-state-machines (Issue #696, Stage 1 PR1, cmd_1121): top-level pointer
+# x-state-machines (Issue #696, Stage 1 PR1): top-level pointer
 # map, `{model}.{field}: path/to.mmd`. subtask_1121e opt-in target — see
 # state-transition-generator-design.md's input-placement section.
 x-state-machines:
