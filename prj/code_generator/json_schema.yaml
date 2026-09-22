@@ -113,6 +113,29 @@ x-nav-groups:
     order: 40
     icon: ShoppingCart
 
+# x-state-machines (Issue #696, Stage 1 PR1): top-level pointer
+# map, `{model}.{field}: path/to.mmd`. goods_receipt.status was
+# previously retargeted away (to goods_receipt_line.status only)
+# because the generator's entity-level "Case E" precondition guard
+# rejected goods_receipt for carrying a writable embedded child
+# (`lines`) on an import-eligible entity. That guard has since been
+# removed from the generator: whether an entity's CSV import route can
+# converge through service.ts and whether one of its fields can be
+# governed by a state-transition diagram are independent questions.
+# The narrower real concern (an unconverged import route bypassing
+# validateOnAdd/Update for a governed field) is now closed at the
+# field level in the generator instead, so both entities' status
+# fields carry a pointer again. See
+# state-transition-generator-design.md's input-placement section.
+# NOTE: this repo's app-generator submodule pointer has not been
+# bumped past the guard removal yet (deferred to a follow-up task, see
+# the accompanying commit message) — running generate-code against the
+# pointer currently pinned here will still fail Case E on
+# goods_receipt.status until that bump lands.
+x-state-machines:
+  goods_receipt.status: state_machines/goods_receipt_status.mmd
+  goods_receipt_line.status: state_machines/goods_receipt_line_status.mmd
+
 definitions:
   user:
     x-generate:
