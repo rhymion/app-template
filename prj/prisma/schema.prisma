@@ -4,8 +4,9 @@
 // Corresponding JSON schema version: 2.0
 
 generator client {
-  provider = "prisma-client"
-  output   = "../app/generated/prisma"
+  provider        = "prisma-client"
+  output          = "../app/generated/prisma"
+  previewFeatures = ["relationJoins"]
 }
 
 datasource db {
@@ -57,6 +58,14 @@ model user {
   // any UI/API setter (out of this stage's scope -- see that design doc's
   // Stage 2 section).
   api_key_expires_at        DateTime?
+  // Opt-in master switch for email notifications -- container only for
+  // now, no sending mechanism exists yet. Defaults to false: an unrelated
+  // user must actively opt in, never be opted in by default. A future
+  // per-category preference (e.g. "receive X but not Y") can be added as
+  // a separate table without touching this column -- this one stays the
+  // top-level on/off switch a per-category table would still have to
+  // respect.
+  email_notifications_enabled Boolean           @default(false)
   // Direct-attachment FK (cmd_793): the user's own uploaded avatar.
   // Nullable/SetNull, matching every other optional direct-attachment FK on
   // this page (docs/knowledge/schema-yaml-configuration.md "Direct
@@ -198,6 +207,7 @@ model user {
   @@index([creator_id])
   @@index([tenant_id])
   @@index([updater_id])
+  @@index([name])
 }
 
 model role {
@@ -234,7 +244,12 @@ model organization {
   resources   resource[]
   notes       note[]
   maintenance_tickets maintenance_ticket[]
-  app_settings app_setting[]
+  // Reverse side of app_setting's `@@unique([organization_id])` FK (issue #681):
+  // singular/optional, not an array -- the unique constraint caps this at
+  // 0-or-1 rows per organization, and Prisma's own 1:1 relation syntax
+  // requires the non-FK side to be `Model?`, not `Model[]`, for the client
+  // type to reflect that real cardinality instead of a misleading array.
+  app_setting app_setting?
 
   @@index([creator_id])
   @@index([updater_id])
@@ -339,6 +354,7 @@ model permission {
   @@index([creator_id])
   @@index([role_id])
   @@index([updater_id])
+  @@index([name])
 }
 
 model approvable {
@@ -381,6 +397,7 @@ model approval_flow {
   @@index([approver_role_id])
   @@index([requestor_role_id])
   @@index([updater_id])
+  @@index([entity_name])
 }
 
 enum ApprovalRequestStatus {
@@ -485,6 +502,8 @@ model inventory_transaction {
   @@index([created_by_id])
   @@index([creator_id])
   @@index([updater_id])
+  @@index([product_id])
+  @@index([quantity_delta])
 }
 
 model inventory_movement {
@@ -510,6 +529,7 @@ model inventory_movement {
   @@index([to_inventory_id])
   @@index([creator_id])
   @@index([updater_id])
+  @@index([quantity])
 }
 
 enum InventoryAdjustmentStatus {
@@ -538,6 +558,7 @@ model inventory_adjustment {
   @@index([inventory_id])
   @@index([creator_id])
   @@index([updater_id])
+  @@index([quantity_delta])
 }
 
 model comment {
@@ -571,6 +592,7 @@ model reaction {
   user_id    String
   user       user     @relation("ReactionUser", fields: [user_id], references: [id])
   created_at DateTime @default(now()) @db.Timestamptz(0)
+  updated_at DateTime @updatedAt @db.Timestamptz(0)
 
   @@unique([comment_id, user_id, type])
   @@index([comment_id])
@@ -649,6 +671,7 @@ model dashboard {
 
   @@index([creator_id])
   @@index([updater_id])
+  @@index([name])
 }
 
 enum DashboardWidgetChartType {
@@ -887,6 +910,7 @@ model xxxxx_xxxxx {
 
   @@index([creator_id])
   @@index([updater_id])
+  @@index([team])
 }
 
 model yyyyy_yyyyy {
@@ -1029,6 +1053,7 @@ model resource {
   @@index([creator_id])
   @@index([organization_id])
   @@index([updater_id])
+  @@index([name])
 }
 
 model booking {
@@ -1048,6 +1073,9 @@ model booking {
   @@index([creator_id])
   @@index([resource_id])
   @@index([updater_id])
+  @@index([end_time])
+  @@index([name])
+  @@index([start_time])
 }
 
 enum DayOfWeek {
@@ -1077,6 +1105,8 @@ model shift_template {
   @@index([creator_id])
   @@index([updater_id])
   @@index([user_id])
+  @@index([end_time])
+  @@index([start_time])
 }
 
 enum ShiftStatus {
@@ -1102,6 +1132,8 @@ model shift {
   @@index([creator_id])
   @@index([updater_id])
   @@index([user_id])
+  @@index([end_time])
+  @@index([start_time])
 }
 
 model product {
@@ -1137,6 +1169,8 @@ model product {
 
   @@index([creator_id])
   @@index([updater_id])
+  @@index([name])
+  @@index([price])
 }
 
 model inventory {
@@ -1165,6 +1199,7 @@ model inventory {
   @@index([location_id])
   @@index([product_id])
   @@index([updater_id])
+  @@index([quantity])
 }
 
 model location {
@@ -1181,6 +1216,7 @@ model location {
 
   @@index([creator_id])
   @@index([updater_id])
+  @@index([name])
 }
 
 model sales_order {
@@ -1199,6 +1235,7 @@ model sales_order {
   @@index([creator_id])
   @@index([customer_id])
   @@index([updater_id])
+  @@index([order_no])
 }
 
 enum SalesOrderLineStatus {
@@ -1239,6 +1276,7 @@ model sales_order_line {
   @@index([product_id])
   @@index([sales_order_id])
   @@index([updater_id])
+  @@index([quantity])
 }
 
 enum LeaveRequestStatus {
@@ -1273,6 +1311,8 @@ model leave_request {
   @@index([assignee_id])
   @@index([updater_id])
   @@index([user_id])
+  @@index([end_date])
+  @@index([start_date])
 }
 
 // ============================================================
@@ -1373,6 +1413,7 @@ model room {
   @@index([creator_id])
   @@index([room_type_id])
   @@index([updater_id])
+  @@index([room_no])
 }
 
 model room_reservation {
@@ -1395,6 +1436,9 @@ model room_reservation {
   @@index([room_id])
   @@index([room_type_id])
   @@index([updater_id])
+  @@index([check_in])
+  @@index([check_out])
+  @@index([guest_name])
 }
 
 // ============================================================
@@ -1425,6 +1469,7 @@ model purchase_order {
 
   @@index([creator_id])
   @@index([updater_id])
+  @@index([order_no])
 }
 
 enum PurchaseOrderLineStatus {
@@ -1478,6 +1523,7 @@ model asn {
   @@index([creator_id])
   @@index([purchase_order_id])
   @@index([updater_id])
+  @@index([asn_no])
 }
 
 enum AsnLineStatus {
@@ -1532,6 +1578,7 @@ model goods_receipt {
   @@index([purchase_order_id])
   @@index([asn_id])
   @@index([updater_id])
+  @@index([receipt_no])
 }
 
 enum GoodsReceiptLineStatus {
@@ -1574,6 +1621,7 @@ model goods_receipt_line {
   @@index([assignee_id])
   @@index([product_id])
   @@index([updater_id])
+  @@index([receipt_quantity])
 }
 
 model notification {
@@ -1602,6 +1650,7 @@ model asset {
   child_assets    asset[]   @relation("AssetParentChild")
   manual_url      String
   unit_cost       Decimal   @default(0) @db.Decimal(10, 2)
+  under_warranty  Boolean   @default(false)
   commissioned_at DateTime  @default(now()) @db.Timestamptz(0)
   components      asset_component[]
   created_at      DateTime  @default(now()) @db.Timestamptz(0)
@@ -1614,6 +1663,8 @@ model asset {
   @@index([creator_id])
   @@index([updater_id])
   @@index([parent_asset_id])
+  @@index([asset_tag])
+  @@index([unit_cost])
 }
 
 model asset_component {
@@ -1649,6 +1700,8 @@ model spare_part {
   @@index([creator_id])
   @@index([updater_id])
   @@index([related_product_id])
+  @@index([description])
+  @@index([name])
 }
 
 enum MaintenanceTicketStatus {
@@ -1711,4 +1764,5 @@ model approval_edit_terminal_test {
 
   @@index([creator_id])
   @@index([updater_id])
+  @@index([title])
 }
