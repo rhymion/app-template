@@ -2358,12 +2358,16 @@ definitions:
   # clicks, enum primary display, FK labelField mismatches, skipped
   # non-nullable URI fields, composite/dotted-path FK labels, Decimal
   # and date fields that are optional in the UI but non-nullable in
-  # the database, list tables with no declared primary column, and
-  # role-gated approval flows) under standing end-to-end coverage in
-  # a schema that stays put, instead of relying on the business
-  # schema (which changes shape over time) to happen to exercise
-  # them. Do not remove an individual trap without first confirming
-  # the corresponding generator defect is now covered elsewhere.
+  # the database, list tables with no declared primary column,
+  # role-gated approval flows, and -- as of cmd_1200 -- real-browser
+  # list-column filter/sort for `boolean` and `Decimal`-typed columns
+  # (app-generator#756/#759: a browser <input type="number"> round-trips
+  # a typed Decimal filter value through IEEE-754 before buildFilter ever
+  # sees it) under standing end-to-end coverage in a schema that stays
+  # put, instead of relying on the business schema (which changes shape
+  # over time) to happen to exercise them. Do not remove an individual
+  # trap without first confirming the corresponding generator defect is
+  # now covered elsewhere.
   # ============================================================
 
   asset:
@@ -2384,6 +2388,10 @@ definitions:
         - asset_tag:
             primary: true
             width: 200
+        - unit_cost:
+            width: 150
+        - under_warranty:
+            width: 150
     fields:
       asset_tag:
         minLength: 1
@@ -2396,6 +2404,7 @@ definitions:
       unit_cost: {}
       commissioned_at:
         format: date
+      under_warranty: {}
     required:
       - manual_url
       - components
