@@ -5,6 +5,16 @@ Detailed change history will begin from the first versioned release.
 
 ## [Unreleased]
 
+### Added
+- **`room_reservation` is now paid through Stripe Checkout** (`x-payment`). A reservation is
+  charged at the reserved room's Price (`room.stripe_price_id`) times the number of nights
+  (`prj/lib/payment/room_reservation_quantity.ts`, counted between UTC calendar dates). The
+  `payable` model and `PayableStatus` enum are mirrored into `prj/prisma/schema.prisma`, and
+  the migration includes the accumulated generator schema changes. `room.stripe_price_id`
+  defaults to an empty placeholder: checkout does not start until a real Price id is set on the
+  room. The generated specs for `room_reservation` are switched off
+  (`x-generate.test: false`) until the generator's tests support `x-payment` (app-generator #788).
+
 ### Internal
 - **Added a real-DB regression fixture for the code generator's pre-edit-row
   handoff to `validateCustomRules()`** (`prj/lib/organization/service_validation_custom.ts`
