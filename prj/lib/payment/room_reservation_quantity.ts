@@ -1,7 +1,7 @@
 // GENERATED ONCE — safe to edit (will not be overwritten on regeneration)
 //
-// x-payment: how many units of the room's Stripe Price a room_reservation is
-// charged for -- one unit per night.
+// x-payment: how many units of the room type's Stripe Price a room_reservation
+// is charged for -- one unit per night.
 //
 // Nights are counted between UTC calendar dates, not elapsed hours. The date
 // picker stores UTC midnight, but a REST call may carry any time of day, and

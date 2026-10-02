@@ -1829,6 +1829,13 @@ definitions:
       description:
         x-ui:
           rows: 4
+      # Stripe Price id charged per night for a reservation of a room of this
+      # type (x-payment on room_reservation reads it through room_type_id).
+      # Rooms of one type are not told apart by price. The default is an
+      # obvious placeholder: checkout refuses to start until a real Price id
+      # is set on the room type.
+      stripe_price_id:
+        default: ""
 
   room:
     x-nav:
@@ -1863,13 +1870,6 @@ definitions:
         enum:
           - available
           - maintenance
-      # Stripe Price id charged per night for a reservation of this room
-      # (x-payment on room_reservation reads it through room_id). The
-      # default is an obvious placeholder: checkout refuses to start until a
-      # real Price id is set on the room.
-      stripe_price_id:
-        default: ""
-
     required:
       - room_type
     properties:
