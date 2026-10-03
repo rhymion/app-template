@@ -1381,6 +1381,7 @@ model room_type {
   name              String
   capacity          Int?
   description       String?
+  stripe_price_id   String             @default("")
   rooms             room[]
   room_reservations room_reservation[]
   created_at        DateTime           @default(now()) @db.Timestamptz(0)
@@ -1406,7 +1407,6 @@ model room {
   room_type         room_type          @relation(fields: [room_type_id], references: [id], onDelete: Cascade)
   floor             Int?
   status            RoomStatus         @default(available)
-  stripe_price_id   String             @default("")
   room_reservations room_reservation[]
   asset_components  asset_component[] @relation("AssetComponentRoom")
   created_at        DateTime           @default(now()) @db.Timestamptz(0)
