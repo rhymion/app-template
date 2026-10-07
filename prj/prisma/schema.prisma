@@ -227,6 +227,8 @@ model role {
 
   @@index([creator_id])
   @@index([updater_id])
+  @@index([description])
+  @@index([name])
 }
 
 model organization {
@@ -253,6 +255,8 @@ model organization {
 
   @@index([creator_id])
   @@index([updater_id])
+  @@index([description])
+  @@index([name])
 }
 
 // Per-organization business date override -- container only for now: no
@@ -873,6 +877,7 @@ model db_table {
 
   @@index([creator_id])
   @@index([updater_id])
+  @@index([description])
 }
 
 enum FieldType {
@@ -916,6 +921,7 @@ model xxxxx_xxxxx {
   @@index([creator_id])
   @@index([updater_id])
   @@index([team])
+  @@index([description])
 }
 
 model yyyyy_yyyyy {
@@ -956,6 +962,7 @@ model parent1 {
   @@index([creator_id])
   @@index([organization_id])
   @@index([updater_id])
+  @@index([description])
 }
 
 model parent1_child1 {
@@ -1013,6 +1020,7 @@ model parent_only {
 
   @@index([creator_id])
   @@index([updater_id])
+  @@index([description])
 }
 
 model procedure {
@@ -1037,6 +1045,8 @@ model procedure {
   @@index([assignee_id])
   @@index([parent_id])
   @@index([updater_id])
+  @@index([description])
+  @@index([name])
 }
 
 model resource {
@@ -1340,6 +1350,8 @@ model supply_pool {
 
   @@index([creator_id])
   @@index([updater_id])
+  @@index([description])
+  @@index([name])
 }
 
 model supply_request {
@@ -1357,6 +1369,8 @@ model supply_request {
 
   @@index([creator_id])
   @@index([updater_id])
+  @@index([description])
+  @@index([name])
 }
 
 model supply_allocation {
@@ -1393,6 +1407,8 @@ model room_type {
 
   @@index([creator_id])
   @@index([updater_id])
+  @@index([description])
+  @@index([name])
 }
 
 enum RoomStatus {
