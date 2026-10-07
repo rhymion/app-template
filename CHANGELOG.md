@@ -18,6 +18,13 @@ Detailed change history will begin from the first versioned release.
   (`x-generate.test: false`) until the generator's tests support `x-payment` (app-generator #788).
 
 ### Internal
+- **Declared a primary list column on every list-view test-bed entity** (`role`, `organization`,
+  `permission`, `db_table`, `xxxxx_xxxxx`, `parent1`, `parent_only`, `procedure`, `supply_pool`,
+  `supply_request`, `room_type`, `spare_part`), as the generator now requires
+  (app-generator #844). Ten of them gain an explicit `x-display.table` of `name` (primary) and
+  `description`, which is what their default list already showed, so the rendered lists are
+  unchanged; the Prisma models gain the `@@index` entries the generator requires for those
+  columns (no migration is included).
 - **Added a real-DB regression fixture for the code generator's pre-edit-row
   handoff to `validateCustomRules()`** (`prj/lib/organization/service_validation_custom.ts`
   + `prj/test/flows/pre_edit_row_custom_validation.test.ts`). This was originally added

@@ -274,6 +274,13 @@ definitions:
         type: many-to-many
         target: user
     x-import-key: [name]
+    x-display:
+      table:
+        - name:
+            primary: true
+            width: 200
+        - description:
+            width: 400
     fields:
       name:
         minLength: 1
@@ -307,6 +314,13 @@ definitions:
     x-search:
       org_id_field: id
     x-import-key: [name]
+    x-display:
+      table:
+        - name:
+            primary: true
+            width: 200
+        - description:
+            width: 400
     fields:
       name:
         minLength: 1
@@ -340,6 +354,7 @@ definitions:
     x-display:
       table:
         - name:
+            primary: true
             width: 200
         - role:
             width: 200
@@ -645,6 +660,13 @@ definitions:
       invalidate: false
       api: true
       test: true
+    x-display:
+      table:
+        - name:
+            primary: true
+            width: 200
+        - description:
+            width: 400
     fields:
       name:
         minLength: 1
@@ -695,6 +717,13 @@ definitions:
       invalidate: false
       api: true
       test: true
+    x-display:
+      table:
+        - name:
+            primary: true
+            width: 200
+        - description:
+            width: 400
     fields:
       name:
         minLength: 1
@@ -787,6 +816,13 @@ definitions:
       invalidate: false
       api: true
       test: true
+    x-display:
+      table:
+        - name:
+            primary: true
+            width: 200
+        - description:
+            width: 400
     fields:
       name:
         minLength: 1
@@ -834,6 +870,13 @@ definitions:
       invalidate: false
       api: true
       test: true
+    x-display:
+      table:
+        - name:
+            primary: true
+            width: 200
+        - description:
+            width: 400
     fields:
       name:
         minLength: 1
@@ -997,6 +1040,13 @@ definitions:
       followed_by:
         type: many-to-many
         target: procedure
+    x-display:
+      table:
+        - name:
+            primary: true
+            width: 200
+        - description:
+            width: 400
     fields:
       name:
         minLength: 1
@@ -1751,6 +1801,13 @@ definitions:
       invalidate: false
       api: true
       test: true
+    x-display:
+      table:
+        - name:
+            primary: true
+            width: 200
+        - description:
+            width: 400
     fields:
       name:
         minLength: 1
@@ -1787,6 +1844,13 @@ definitions:
         allocationEntity: supply_allocation
         parentField: supply_request_id
         allocationAudit: false
+    x-display:
+      table:
+        - name:
+            primary: true
+            width: 200
+        - description:
+            width: 400
     fields:
       name:
         minLength: 1
@@ -1821,6 +1885,13 @@ definitions:
       invalidate: false
       api: true
       test: true
+    x-display:
+      table:
+        - name:
+            primary: true
+            width: 200
+        - description:
+            width: 400
     fields:
       name:
         minLength: 1
@@ -2465,6 +2536,7 @@ definitions:
         - related_product:
             width: 200
         - name:
+            primary: true
             width: 200
         - description:
             width: 200
