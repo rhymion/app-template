@@ -17,6 +17,15 @@ Detailed change history will begin from the first versioned release.
   one and leaving it empty otherwise. The generated specs for `room_reservation` are switched off
   (`x-generate.test: false`) until the generator's tests support `x-payment` (app-generator #788).
 
+### Changed
+- **The first-level menu is bundled into four groups** (`x-nav-groups`/`x-nav`): `administration`,
+  `inventory_ops` (now also holding `supply_requests`), `facilities` (now also holding
+  `workforce`) and a new `test_fixtures` group for the demo-only fixture entities. The sidebar root
+  and the mobile footer therefore show four group entries instead of a long flat list (the
+  built-in administration entities are declared into `administration`, so the footer no longer
+  lists each as its own tab); every entity stays reachable exactly once. Only the existing nav keys
+  are used.
+
 ### Internal
 - **Declared a primary list column on every list-view test-bed entity** (`role`, `organization`,
   `permission`, `db_table`, `xxxxx_xxxxx`, `parent1`, `parent_only`, `procedure`, `supply_pool`,

@@ -154,7 +154,8 @@
       "procurement": "購買・入荷",
       "facilities": "施設予約",
       "workforce": "勤怠管理",
-      "supply_requests": "支給品リクエスト"
+      "supply_requests": "支給品リクエスト",
+      "test_fixtures": "試験用データ"
     },
     "inventory": "在庫",
     "inventoryAdjustment": "在庫調整",
