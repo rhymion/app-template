@@ -17,6 +17,24 @@ Detailed change history will begin from the first versioned release.
   one and leaving it empty otherwise. The generated specs for `room_reservation` are switched off
   (`x-generate.test: false`) until the generator's tests support `x-payment` (app-generator #788).
 
+### Changed
+- **The first-level menu is bundled into four groups** (`x-nav-groups`/`x-nav`): `administration`,
+  `inventory_ops` (now also holding `supply_requests`), `facilities` (now also holding
+  `workforce`) and a new `test_fixtures` group for the demo-only fixture entities. The sidebar root
+  and the mobile footer therefore show four group entries instead of a long flat list (the
+  built-in administration entities are declared into `administration`, so the footer no longer
+  lists each as its own tab); every entity stays reachable exactly once. Only the existing nav keys
+  are used.
+
+### Removed
+- **Two redundant sample entities, `setting5` and `parent_only`, are removed.** `setting5` was a
+  proxy view whose flag combination (view/edit/api, no list/new/delete) and re-exposed child array
+  are already exercised end to end by app-generator's own `setting` entity and its
+  `self_only_setting_access_control` spec; `parent_only` was a flat entity with no distinguishing
+  feature. The `parent_only` Prisma model is removed from the snapshot (no migration is included;
+  one is written at deploy time and will drop the `parent_only` table in any database that still
+  has it).
+
 ### Internal
 - **Declared a primary list column on every list-view test-bed entity** (`role`, `organization`,
   `permission`, `db_table`, `xxxxx_xxxxx`, `parent1`, `parent_only`, `procedure`, `supply_pool`,

@@ -86,12 +86,19 @@ x-ledger-entities:
 # and `procurement` (the sales_order -> purchase_order/ASN/goods_receipt chain,
 # which itself drives the same inventory_domain ledger via
 # x-reservation.transaction.ledgerDomain above) — two distinct workflows
-# under one domain, not depth added for its own sake. Every other group
-# here is a single level. Entities not listed below (auth/admin/approval
-# scaffolding, generic bridge entities, and the demo-only
-# yyyyy_yyyyy/xxxxx_xxxxx/parent_only fixtures) intentionally stay
-# ungrouped and keep their existing flat nav entries.
+# under one domain, not depth added for its own sake. `supply_requests`
+# nests under `inventory_ops` and `workforce` nests under `facilities`, and
+# the demo-only fixtures (db_table, xxxxx_xxxxx, alpha_xxxxx_xxxxx, parent1,
+# setting1-4, procedure, approval_edit_terminal_test) sit in
+# `test_fixtures`, so the first level holds only Home plus four groups
+# (administration, inventory_ops, facilities, test_fixtures) and stays short
+# on narrow screens. The built-in administration entities are declared into
+# `administration` here too (as in the base schema), so the mobile footer
+# folds them into one tab instead of listing each as a root-level tab.
 x-nav-groups:
+  administration:
+    order: 900
+    icon: Settings
   inventory_ops:
     order: 10
     icon: Inventory2
@@ -107,11 +114,16 @@ x-nav-groups:
     order: 20
     icon: Assignment
   workforce:
-    order: 30
+    parent: facilities
+    order: 10
     icon: People
   supply_requests:
-    order: 40
+    parent: inventory_ops
+    order: 3
     icon: ShoppingCart
+  test_fixtures:
+    order: 50
+    icon: Widgets
 
 # x-state-machines (Issue #696, Stage 1 PR1): top-level pointer
 # map, `{model}.{field}: path/to.mmd`. goods_receipt.status was
@@ -138,6 +150,9 @@ x-state-machines:
 
 definitions:
   user:
+    x-nav:
+      parent: administration
+      order: 10
     x-generate:
       list: true
       view: true
@@ -256,6 +271,9 @@ definitions:
               $ref: "#/definitions/role"
 
   role:
+    x-nav:
+      parent: administration
+      order: 20
     x-generate:
       list: true
       view: true
@@ -298,6 +316,9 @@ definitions:
           $ref: "#/definitions/user"
 
   organization:
+    x-nav:
+      parent: administration
+      order: 40
     x-generate:
       list: true
       view: true
@@ -338,6 +359,9 @@ definitions:
           $ref: "#/definitions/user"
 
   permission:
+    x-nav:
+      parent: administration
+      order: 30
     x-generate:
       list: true
       view: true
@@ -375,6 +399,9 @@ definitions:
         $ref: "#/definitions/role"
 
   approval_flow:
+    x-nav:
+      parent: administration
+      order: 50
     x-generate:
       list: true
       view: true
@@ -598,6 +625,9 @@ definitions:
       order:
         default: 0
   dashboard:
+    x-nav:
+      parent: administration
+      order: 60
     x-generate:
       list: true
       view: true
@@ -651,6 +681,9 @@ definitions:
       required:
         default: true
   db_table:
+    x-nav:
+      parent: test_fixtures
+      order: 1
     x-generate:
       list: true
       view: true
@@ -708,6 +741,9 @@ definitions:
         default: true
       written_by: {}
   xxxxx_xxxxx:
+    x-nav:
+      parent: test_fixtures
+      order: 2
     x-generate:
       list: true
       view: true
@@ -743,6 +779,9 @@ definitions:
   # rows; PUT/DELETE on a non-alpha row 404; a legitimate PUT that moves a
   # row's team out of alpha still succeeds, judged against the pre-image).
   alpha_xxxxx_xxxxx:
+    x-nav:
+      parent: test_fixtures
+      order: 3
     x-generate:
       list: true
       view: true
@@ -807,6 +846,9 @@ definitions:
         minLength: 1
         maxLength: 100
   parent1:
+    x-nav:
+      parent: test_fixtures
+      order: 4
     x-generate:
       list: true
       view: true
@@ -860,30 +902,10 @@ definitions:
         items:
           $ref: "#/definitions/parent1_list"
 
-  parent_only:
-    x-generate:
-      list: true
-      view: true
-      new: true
-      edit: true
-      delete: true
-      invalidate: false
-      api: true
-      test: true
-    x-display:
-      table:
-        - name:
-            primary: true
-            width: 200
-        - description:
-            width: 400
-    fields:
-      name:
-        minLength: 1
-      description: {}
-      login_time: {}
-      logout_time: {}
   setting1:
+    x-nav:
+      parent: test_fixtures
+      order: 6
     x-generate:
       list: true
       view: true
@@ -905,6 +927,9 @@ definitions:
               $ref: "#/definitions/yyyyy_yyyyy"
 
   setting2:
+    x-nav:
+      parent: test_fixtures
+      order: 7
     x-generate:
       list: true
       view: true
@@ -921,6 +946,9 @@ definitions:
       - $ref: "#/definitions/xxxxx_xxxxx"
 
   setting3:
+    x-nav:
+      parent: test_fixtures
+      order: 8
     x-generate:
       list: true
       view: false
@@ -937,6 +965,9 @@ definitions:
       - $ref: "#/definitions/xxxxx_xxxxx"
 
   setting4:
+    x-nav:
+      parent: test_fixtures
+      order: 9
     x-generate:
       list: true
       view: false
@@ -948,30 +979,6 @@ definitions:
       test: true
     allOf:
       - $ref: "#/definitions/xxxxx_xxxxx"
-
-  setting5:
-    x-generate:
-      list: false
-      view: true
-      new: false
-      edit: true
-      delete: false
-      invalidate: false
-      api: true
-      test: true
-      fields:
-        - name
-        - yyyyy_yyyyys
-    allOf:
-      - $ref: "#/definitions/xxxxx_xxxxx"
-      - type: object
-        required:
-          - yyyyy_yyyyys
-        properties:
-          yyyyy_yyyyys:
-            type: array
-            items:
-              $ref: "#/definitions/yyyyy_yyyyy"
 
   setting6:
     x-generate:
@@ -1024,6 +1031,9 @@ definitions:
       - $ref: "#/definitions/xxxxx_xxxxx"
 
   procedure:
+    x-nav:
+      parent: test_fixtures
+      order: 10
     x-generate:
       list: true
       view: true
@@ -2648,6 +2658,9 @@ definitions:
   # reason for existing) can POST an explicit status: 'draft' override to
   # reach that state without touching the schema-wide default.
   approval_edit_terminal_test:
+    x-nav:
+      parent: test_fixtures
+      order: 11
     x-generate:
       list: true
       view: true
