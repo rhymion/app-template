@@ -89,7 +89,7 @@ x-ledger-entities:
 # under one domain, not depth added for its own sake. `supply_requests`
 # nests under `inventory_ops` and `workforce` nests under `facilities`, and
 # the demo-only fixtures (db_table, xxxxx_xxxxx, alpha_xxxxx_xxxxx, parent1,
-# parent_only, setting1-4, procedure, approval_edit_terminal_test) sit in
+# setting1-4, procedure, approval_edit_terminal_test) sit in
 # `test_fixtures`, so the first level holds only Home plus four groups
 # (administration, inventory_ops, facilities, test_fixtures) and stays short
 # on narrow screens. The built-in administration entities are declared into
@@ -902,32 +902,6 @@ definitions:
         items:
           $ref: "#/definitions/parent1_list"
 
-  parent_only:
-    x-nav:
-      parent: test_fixtures
-      order: 5
-    x-generate:
-      list: true
-      view: true
-      new: true
-      edit: true
-      delete: true
-      invalidate: false
-      api: true
-      test: true
-    x-display:
-      table:
-        - name:
-            primary: true
-            width: 200
-        - description:
-            width: 400
-    fields:
-      name:
-        minLength: 1
-      description: {}
-      login_time: {}
-      logout_time: {}
   setting1:
     x-nav:
       parent: test_fixtures
@@ -1005,30 +979,6 @@ definitions:
       test: true
     allOf:
       - $ref: "#/definitions/xxxxx_xxxxx"
-
-  setting5:
-    x-generate:
-      list: false
-      view: true
-      new: false
-      edit: true
-      delete: false
-      invalidate: false
-      api: true
-      test: true
-      fields:
-        - name
-        - yyyyy_yyyyys
-    allOf:
-      - $ref: "#/definitions/xxxxx_xxxxx"
-      - type: object
-        required:
-          - yyyyy_yyyyys
-        properties:
-          yyyyy_yyyyys:
-            type: array
-            items:
-              $ref: "#/definitions/yyyyy_yyyyy"
 
   setting6:
     x-generate:

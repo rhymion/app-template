@@ -114,8 +114,6 @@ model user {
   updated_xxxxx_xxxxxs      xxxxx_xxxxx[]       @relation("XxxxxXxxxxUpdater")
   created_parent1s          parent1[]           @relation("Parent1Creator")
   updated_parent1s          parent1[]           @relation("Parent1Updater")
-  created_parent_onlys      parent_only[]       @relation("ParentOnlyCreator")
-  updated_parent_onlys      parent_only[]       @relation("ParentOnlyUpdater")
   created_permissions       permission[]        @relation("PermissionCreator")
   updated_permissions       permission[]        @relation("PermissionUpdater")
   created_procedures        procedure[]         @relation("ProcedureCreator")
@@ -1004,24 +1002,6 @@ model parent1_list {
   parent1_id String
   parent1    parent1  @relation(fields: [parent1_id], references: [id], onDelete: Cascade)
   @@index([parent1_id])
-}
-
-model parent_only {
-  id          String    @id @default(cuid())
-  name        String    @unique
-  description String?
-  login_time  DateTime? @db.Timestamptz(0)
-  logout_time DateTime? @db.Timestamptz(0)
-  created_at  DateTime  @default(now()) @db.Timestamptz(0)
-  updated_at  DateTime  @updatedAt @db.Timestamptz(0)
-  creator_id  String
-  creator     user      @relation("ParentOnlyCreator", fields: [creator_id], references: [id])
-  updater_id  String
-  updater     user      @relation("ParentOnlyUpdater", fields: [updater_id], references: [id])
-
-  @@index([creator_id])
-  @@index([updater_id])
-  @@index([description])
 }
 
 model procedure {

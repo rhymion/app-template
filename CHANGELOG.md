@@ -26,6 +26,15 @@ Detailed change history will begin from the first versioned release.
   lists each as its own tab); every entity stays reachable exactly once. Only the existing nav keys
   are used.
 
+### Removed
+- **Two redundant sample entities, `setting5` and `parent_only`, are removed.** `setting5` was a
+  proxy view whose flag combination (view/edit/api, no list/new/delete) and re-exposed child array
+  are already exercised end to end by app-generator's own `setting` entity and its
+  `self_only_setting_access_control` spec; `parent_only` was a flat entity with no distinguishing
+  feature. The `parent_only` Prisma model is removed from the snapshot (no migration is included;
+  one is written at deploy time and will drop the `parent_only` table in any database that still
+  has it).
+
 ### Internal
 - **Declared a primary list column on every list-view test-bed entity** (`role`, `organization`,
   `permission`, `db_table`, `xxxxx_xxxxx`, `parent1`, `parent_only`, `procedure`, `supply_pool`,
