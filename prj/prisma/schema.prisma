@@ -148,6 +148,7 @@ model user {
   updated_sales_order_lines     sales_order_line[]      @relation("SalesOrderLineUpdater")
   created_comments          comment[]           @relation("CommentCreator")
   reactions                 reaction[]          @relation("ReactionUser")
+  mobile_sessions           mobile_session[]    @relation("UserMobileSessions")
   created_notes             note[]              @relation("NoteCreator")
   updated_notes             note[]              @relation("NoteUpdater")
   leave_requests            leave_request[]     @relation("LeaveRequestUser")
@@ -1644,6 +1645,20 @@ model goods_receipt_line {
   @@index([product_id])
   @@index([updater_id])
   @@index([receipt_quantity])
+}
+
+model mobile_session {
+  id                 String    @id @default(cuid())
+  user_id            String
+  user               user      @relation("UserMobileSessions", fields: [user_id], references: [id], onDelete: Cascade)
+  refresh_token_hash String    @unique
+  device_name        String?
+  last_used_at       DateTime  @default(now()) @db.Timestamptz(0)
+  expires_at         DateTime  @db.Timestamptz(0)
+  revoked_at         DateTime? @db.Timestamptz(0)
+  created_at         DateTime  @default(now()) @db.Timestamptz(0)
+
+  @@index([user_id])
 }
 
 model notification {
