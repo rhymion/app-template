@@ -12,7 +12,6 @@
     "leaveRequest": "休暇申請",
     "location": "保管場所",
     "parent1": "親1",
-    "parentOnly": "親のみ",
     "procedure": "手順",
     "product": "製品",
     "purchaseOrder": "発注",
@@ -26,7 +25,6 @@
     "setting2": "設定2",
     "setting3": "設定3",
     "setting4": "設定4",
-    "setting5": "設定5",
     "setting6": "設定6",
     "setting7": "設定7",
     "setting8": "設定8",
@@ -154,7 +152,8 @@
       "procurement": "購買・入荷",
       "facilities": "施設予約",
       "workforce": "勤怠管理",
-      "supply_requests": "支給品リクエスト"
+      "supply_requests": "支給品リクエスト",
+      "test_fixtures": "試験用データ"
     },
     "inventory": "在庫",
     "inventoryAdjustment": "在庫調整",
@@ -163,7 +162,6 @@
     "leaveRequest": "休暇申請",
     "location": "保管場所",
     "parent1": "親1",
-    "parentOnly": "親のみ",
     "procedure": "手順",
     "product": "製品",
     "purchaseOrder": "発注",

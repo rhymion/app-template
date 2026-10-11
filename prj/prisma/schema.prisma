@@ -114,8 +114,6 @@ model user {
   updated_xxxxx_xxxxxs      xxxxx_xxxxx[]       @relation("XxxxxXxxxxUpdater")
   created_parent1s          parent1[]           @relation("Parent1Creator")
   updated_parent1s          parent1[]           @relation("Parent1Updater")
-  created_parent_onlys      parent_only[]       @relation("ParentOnlyCreator")
-  updated_parent_onlys      parent_only[]       @relation("ParentOnlyUpdater")
   created_permissions       permission[]        @relation("PermissionCreator")
   updated_permissions       permission[]        @relation("PermissionUpdater")
   created_procedures        procedure[]         @relation("ProcedureCreator")
@@ -148,6 +146,7 @@ model user {
   updated_sales_order_lines     sales_order_line[]      @relation("SalesOrderLineUpdater")
   created_comments          comment[]           @relation("CommentCreator")
   reactions                 reaction[]          @relation("ReactionUser")
+  mobile_sessions           mobile_session[]    @relation("UserMobileSessions")
   created_notes             note[]              @relation("NoteCreator")
   updated_notes             note[]              @relation("NoteUpdater")
   leave_requests            leave_request[]     @relation("LeaveRequestUser")
@@ -323,7 +322,7 @@ model app_setting {
   organization  organization? @relation(fields: [organization_id], references: [id])
   business_date String
   is_pinned     Boolean       @default(false)
-  timezone      String        @default("UTC")
+  timezone      Timezone      @default(utc)
   // Scheduled-task operations (NULL = built-in default; see lib/scheduled-tasks/admin-view.ts):
   // minutes a `running` record may stay open before the admin page calls it stuck, and
   // minutes between predecessor rechecks for a task waiting on one.
@@ -340,6 +339,64 @@ model app_setting {
   @@index([organization_id])
   @@index([creator_id])
   @@index([updater_id])
+  @@index([timezone])
+}
+
+enum Timezone {
+  pacific_pago_pago
+  pacific_honolulu
+  pacific_marquesas
+  america_anchorage
+  america_los_angeles
+  america_denver
+  america_chicago
+  america_mexico_city
+  america_new_york
+  america_toronto
+  america_bogota
+  america_caracas
+  america_st_johns
+  america_sao_paulo
+  america_nuuk
+  atlantic_azores
+  utc
+  europe_london
+  europe_madrid
+  europe_paris
+  europe_berlin
+  europe_rome
+  africa_lagos
+  africa_cairo
+  africa_johannesburg
+  asia_jerusalem
+  europe_istanbul
+  europe_moscow
+  asia_tehran
+  asia_dubai
+  asia_kabul
+  asia_karachi
+  asia_kolkata
+  asia_kathmandu
+  asia_dhaka
+  asia_yangon
+  asia_bangkok
+  asia_jakarta
+  asia_shanghai
+  asia_hong_kong
+  asia_singapore
+  asia_manila
+  australia_perth
+  australia_eucla
+  asia_seoul
+  asia_tokyo
+  australia_adelaide
+  australia_sydney
+  australia_lord_howe
+  pacific_noumea
+  pacific_auckland
+  pacific_chatham
+  pacific_apia
+  pacific_kiritimati
 }
 
 model permission {
@@ -715,6 +772,7 @@ model dashboard_widget {
   stack_mode      DashboardWidgetStackMode?
   series_field    String?
   group_by_bucket DashboardWidgetGroupByBucket?
+  timezone        Timezone  @default(utc)
   filter_field    String?
   filter_value    String?
   order          Int       @default(0)
@@ -1003,24 +1061,6 @@ model parent1_list {
   parent1_id String
   parent1    parent1  @relation(fields: [parent1_id], references: [id], onDelete: Cascade)
   @@index([parent1_id])
-}
-
-model parent_only {
-  id          String    @id @default(cuid())
-  name        String    @unique
-  description String?
-  login_time  DateTime? @db.Timestamptz(0)
-  logout_time DateTime? @db.Timestamptz(0)
-  created_at  DateTime  @default(now()) @db.Timestamptz(0)
-  updated_at  DateTime  @updatedAt @db.Timestamptz(0)
-  creator_id  String
-  creator     user      @relation("ParentOnlyCreator", fields: [creator_id], references: [id])
-  updater_id  String
-  updater     user      @relation("ParentOnlyUpdater", fields: [updater_id], references: [id])
-
-  @@index([creator_id])
-  @@index([updater_id])
-  @@index([description])
 }
 
 model procedure {
@@ -1644,6 +1684,20 @@ model goods_receipt_line {
   @@index([product_id])
   @@index([updater_id])
   @@index([receipt_quantity])
+}
+
+model mobile_session {
+  id                 String    @id @default(cuid())
+  user_id            String
+  user               user      @relation("UserMobileSessions", fields: [user_id], references: [id], onDelete: Cascade)
+  refresh_token_hash String    @unique
+  device_name        String?
+  last_used_at       DateTime  @default(now()) @db.Timestamptz(0)
+  expires_at         DateTime  @db.Timestamptz(0)
+  revoked_at         DateTime? @db.Timestamptz(0)
+  created_at         DateTime  @default(now()) @db.Timestamptz(0)
+
+  @@index([user_id])
 }
 
 model notification {
