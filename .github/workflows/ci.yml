@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [master, main, develop]
+    branches: [master, main, develop, doreen/verify-1290h-e2e-fix]
   pull_request:
     branches: [master, main, develop]
 
