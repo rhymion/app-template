@@ -9,6 +9,20 @@ Steps marked **(Lord / ops)** change a deployed environment. They are performed
 by a person with access to it, never by an automated agent, and the migration
 file in this repository does not run itself against any deployed database.
 
+> **Warning: the privilege separation is NOT active until `app_runtime` exists.**
+> When the schema owner lacks CREATEROLE (typical for managed and preview
+> databases), the migration still succeeds but skips creating `app_runtime` and
+> all its grants. In that state the application, if it connects as the schema
+> owner, can still `TRUNCATE` `audit_log` or drop its trigger; only the row
+> trigger (blocking `UPDATE` / `DELETE`) and the digest chain remain. This is
+> not a safe end state for production.
+>
+> To activate it later, as a privileged user run `CREATE ROLE app_runtime LOGIN;`
+> and set its password, then as the schema owner re-run Parts 3 and 4 of
+> `prj/prisma/migrations/20261011235500_audit_log_append_only/migration.sql`
+> (idempotent; Part 4 must stay last), then point the app's `DATABASE_URL` at
+> `app_runtime`. Verify with the checks in "Checks after a deployment" below.
+
 ## What this repository contains
 
 | Piece | Where |
