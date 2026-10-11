@@ -3,6 +3,8 @@
   See docs/knowledge/audit-log-operations.md and, in app-generator,
   docs/knowledge/audit-log-append-only.md.
 
+  0. Part 0 creates audit_log_digest (no earlier migration does; it
+     matches the Prisma model, so a later `migrate diff` stays empty).
   1. Part 1 is app-generator's prisma/sql/audit_log_append_only.sql, verbatim:
      range-partitions audit_log on created_at, installs the row trigger that
      rejects UPDATE/DELETE on audit_log and audit_log_digest, and defines
@@ -21,6 +23,20 @@
   Run by the schema owner through `prisma migrate deploy`; never by the
   application connection.
 */
+
+-- Part 0: digest table (the Prisma model audit_log_digest)
+CREATE TABLE IF NOT EXISTS "audit_log_digest" (
+    "id" TEXT NOT NULL,
+    "period_start" TIMESTAMPTZ(0) NOT NULL,
+    "period_end" TIMESTAMPTZ(0) NOT NULL,
+    "row_count" INTEGER NOT NULL,
+    "digest" TEXT NOT NULL,
+    "previous_digest" TEXT,
+    "created_at" TIMESTAMPTZ(0) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "audit_log_digest_pkey" PRIMARY KEY ("id")
+);
+CREATE UNIQUE INDEX IF NOT EXISTS "audit_log_digest_period_start_key" ON "audit_log_digest"("period_start");
 
 -- Part 1: append-only template (verbatim)
 -- audit_log append-only template (idempotent; safe to run repeatedly).
@@ -138,42 +154,46 @@ $$;
 REVOKE EXECUTE ON FUNCTION audit_log_create_month_partition(timestamptz) FROM PUBLIC;
 
 -- Part 3: application role and ordinary rights
+-- Creating a role needs CREATEROLE, which a managed-database owner (preview
+-- or hosted Postgres) may not hold. Create it when allowed; otherwise skip
+-- Parts 3 and 4 with a notice and let the operator create the role and run
+-- docs/knowledge/audit-log-operations.md "Create the application role".
+-- Re-running the same statements later is safe (they are idempotent).
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'app_runtime') THEN
-    CREATE ROLE app_runtime LOGIN;
+    BEGIN
+      CREATE ROLE app_runtime LOGIN;
+    EXCEPTION WHEN insufficient_privilege THEN
+      RAISE NOTICE 'app_runtime not created (no CREATEROLE); create it manually and grant per the runbook';
+      RETURN;
+    END;
   END IF;
+
   EXECUTE format('GRANT CONNECT ON DATABASE %I TO app_runtime', current_database());
-END
-$$;
+  GRANT USAGE ON SCHEMA public TO app_runtime;
+  GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO app_runtime;
+  GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO app_runtime;
+  ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO app_runtime;
+  ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO app_runtime;
+  GRANT EXECUTE ON FUNCTION audit_log_create_month_partition(timestamptz) TO app_runtime;
 
-GRANT USAGE ON SCHEMA public TO app_runtime;
-GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO app_runtime;
-GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO app_runtime;
-ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO app_runtime;
-ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO app_runtime;
-GRANT EXECUTE ON FUNCTION audit_log_create_month_partition(timestamptz) TO app_runtime;
-
--- The migration history table is the owner's alone.
-DO $$
-BEGIN
+  -- The migration history table is the owner's alone.
   IF to_regclass('_prisma_migrations') IS NOT NULL THEN
     REVOKE ALL ON TABLE "_prisma_migrations" FROM app_runtime;
   END IF;
-END
-$$;
 
--- Part 4: narrow the audit tables last (SELECT + INSERT only; no UPDATE, DELETE or TRUNCATE)
-REVOKE ALL ON audit_log, audit_log_digest FROM app_runtime;
-GRANT SELECT, INSERT ON audit_log, audit_log_digest TO app_runtime;
-
-DO $$
-DECLARE
-  part regclass;
-BEGIN
-  FOR part IN SELECT inhrelid::regclass FROM pg_inherits WHERE inhparent = 'audit_log'::regclass LOOP
-    EXECUTE format('REVOKE ALL ON %s FROM app_runtime', part);
-    EXECUTE format('GRANT SELECT ON %s TO app_runtime', part);
-  END LOOP;
+  -- Part 4: narrow the audit tables last (SELECT + INSERT only; no UPDATE,
+  -- DELETE or TRUNCATE). Nothing may grant broadly after this point.
+  REVOKE ALL ON audit_log, audit_log_digest FROM app_runtime;
+  GRANT SELECT, INSERT ON audit_log, audit_log_digest TO app_runtime;
+  DECLARE
+    part regclass;
+  BEGIN
+    FOR part IN SELECT inhrelid::regclass FROM pg_inherits WHERE inhparent = 'audit_log'::regclass LOOP
+      EXECUTE format('REVOKE ALL ON %s FROM app_runtime', part);
+      EXECUTE format('GRANT SELECT ON %s TO app_runtime', part);
+    END LOOP;
+  END;
 END
 $$;

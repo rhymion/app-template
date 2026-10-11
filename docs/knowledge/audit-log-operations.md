@@ -39,7 +39,13 @@ Two roles are involved.
   - `_prisma_migrations`: no access.
   - TRUNCATE is not granted on any table.
 
-The migration creates the role without a password.
+The migration creates the role without a password, but only when the schema
+owner holds CREATEROLE. Managed databases (including preview databases) often
+do not; there the migration skips the role and every `app_runtime` grant with a
+notice and still succeeds. Create the role with SQL as a privileged user
+(`CREATE ROLE app_runtime LOGIN;`), then re-run the "Part 3" and "Part 4"
+statements of the migration (they are idempotent) as the schema owner, in that
+order.
 
 1. **(Lord / ops)** Run `prisma migrate deploy` against the deployed database as
    the schema owner.
