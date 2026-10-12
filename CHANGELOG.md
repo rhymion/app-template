@@ -115,6 +115,7 @@ Detailed change history will begin from the first versioned release.
   the comment was never updated for that switch. See `docs/vercel-automation-design.md` §18.
 
 ### Fixed
+- **An attachment id that does not belong to the edited record is now rejected** when saving attachments (`setAttachmentsForBridge`), including ids from another organization. The whole call is refused before any write. The `audit_log` partition-creation grant for the restricted app role is also corrected (app-generator bump to `2199d593`).
 - **`approval_flow` predecessor/successor list showed a different label on the View page than on
   the Edit page for the same row**, and picking a predecessor/successor offered candidates from
   every entity type instead of just the one the approval chain applies to. Both are fixed upstream
