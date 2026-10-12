@@ -144,6 +144,25 @@ x-nav-groups:
 # the accompanying commit message) — running generate-code against the
 # pointer currently pinned here will still fail Case E on
 # goods_receipt.status until that bump lands.
+# audit_log operations (docs/knowledge/audit-log-operations.md). Thin handlers
+# in lib/scheduled-tasks/<task_id>/ call lib/audit-log-ops/jobs.ts, the same
+# library functions scripts/audit-log-digest.ts uses. Exporting a month for
+# retirement only stages the file and its SHA-256; detaching and dropping a
+# partition stays a manual step by the schema owner.
+x-scheduled-tasks:
+  - task_id: audit_log_digest_close
+    handler: closeAuditLogDigestPeriod
+    interval: "0 1 * * *"
+  - task_id: audit_log_digest_verify
+    handler: verifyAuditLogDigest
+    interval: "15 1 * * *"
+    depends_on: [audit_log_digest_close]
+  - task_id: audit_log_ensure_partitions
+    handler: ensureAuditLogPartitions
+    interval: "0 2 * * *"
+  - task_id: audit_log_export_for_retirement
+    handler: exportAuditLogMonthForRetirement
+    interval: "0 3 1 * *"
 x-state-machines:
   goods_receipt.status: state_machines/goods_receipt_status.mmd
   goods_receipt_line.status: state_machines/goods_receipt_line_status.mmd
