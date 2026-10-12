@@ -32,6 +32,7 @@ export default function CopyShiftsButton({ permissions }: CopyShiftsButtonProps)
 
   // Set browser local timezone once on mount
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- browser-only value, unavailable during SSR
     setTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone);
   }, []);
 

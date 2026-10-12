@@ -6,6 +6,7 @@ Detailed change history will begin from the first versioned release.
 ## [Unreleased]
 
 ### Added
+- **Mobile app: insertion points for hand-written components** (app-generator bump to `7e593e17`). The Expo app mounts a native component of the same name wherever the Web screens mount `x-custom-components` / `x-custom-component`; the generated stubs render nothing until implemented. This app declares none, but `user` and `dashboard` now get native screens.
 - **audit_log operations kit.** A migration range-partitions `audit_log`, installs the append-only row trigger, creates the `app_runtime` role (SELECT/INSERT only on `audit_log` and `audit_log_digest`, ordinary rights elsewhere) and makes `audit_log_create_month_partition()` `SECURITY DEFINER`. Four scheduled tasks close and verify the digest chain, keep monthly partitions ahead, and stage a monthly export for manual retirement. Includes an S3 Object Lock storage adapter and a runbook (`docs/knowledge/audit-log-operations.md`). Applying the migration, switching `DATABASE_URL`/`DIRECT_URL` and provisioning storage are deployment steps.
 - **`room_reservation` is now paid through Stripe Checkout** (`x-payment`). A reservation is
   charged at the reserved room type's Price (`room_type.stripe_price_id`) times the number of nights
@@ -115,6 +116,7 @@ Detailed change history will begin from the first versioned release.
   the comment was never updated for that switch. See `docs/vercel-automation-design.md` §18.
 
 ### Fixed
+- **An attachment id that does not belong to the edited record is now rejected** when saving attachments (`setAttachmentsForBridge`), including ids from another organization. The whole call is refused before any write. The `audit_log` partition-creation grant for the restricted app role is also corrected (app-generator bump to `2199d593`).
 - **`approval_flow` predecessor/successor list showed a different label on the View page than on
   the Edit page for the same row**, and picking a predecessor/successor offered candidates from
   every entity type instead of just the one the approval chain applies to. Both are fixed upstream

@@ -54,7 +54,6 @@ export function useBookingOverlapValidation(values: Record<string, unknown>): st
       return;
     }
     if (start_time.isAfter(end_time) || start_time.isSame(end_time)) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setError(null);
       return;
     }
