@@ -2010,7 +2010,6 @@ definitions:
       invalidate: false
       api: true
       test: true
-      mobile: true
     x-display:
       table:
         - room_no:

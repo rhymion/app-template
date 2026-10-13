@@ -84,8 +84,11 @@ describe('validateCustomRules receives the pre-edit row', () => {
 
     await updateOrganization(actor.id, id, 'Acme Corp', '', [], null);
 
+    // The generated service normalizes an empty string to NULL for a nullable plain
+    // string (organization.description is String?), so a cleared description reads
+    // back as null.
     const after = await prisma.organization.findUnique({ where: { id } });
-    expect(after?.description).toBe('');
+    expect(after?.description).toBeNull();
   });
 
   it('allows an update that leaves an always-empty description empty (no prior value to protect)', async () => {
@@ -95,6 +98,7 @@ describe('validateCustomRules receives the pre-edit row', () => {
 
     const after = await prisma.organization.findUnique({ where: { id } });
     expect(after?.name).toBe('Acme Corp Renamed');
-    expect(after?.description).toBe('');
+    // Empty string is stored as NULL (see the previous test).
+    expect(after?.description).toBeNull();
   });
 });

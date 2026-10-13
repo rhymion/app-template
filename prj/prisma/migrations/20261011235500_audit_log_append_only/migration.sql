@@ -165,7 +165,7 @@ BEGIN
     BEGIN
       CREATE ROLE app_runtime LOGIN;
     EXCEPTION WHEN insufficient_privilege THEN
-      RAISE NOTICE 'app_runtime not created (no CREATEROLE); create it manually and grant per the runbook';
+      RAISE NOTICE 'app_runtime not created (no CREATEROLE); create it manually and grant per docs/knowledge/audit-log-operations.md';
       RETURN;
     END;
   END IF;

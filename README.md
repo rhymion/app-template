@@ -191,6 +191,11 @@ for the full explanation, including how to set your own permission mode
 (e.g. `bypassPermissions`) in a personal, gitignored
 `.claude/settings.local.json`.
 
+**Deploying with the restricted audit log role:** the deployment steps for
+`audit_log` (the `app_runtime` role, its password, the connection strings and
+the checks afterwards) are in
+[`docs/knowledge/audit-log-operations.md`](docs/knowledge/audit-log-operations.md).
+
 ---
 
 ## Usage as a Base Project
