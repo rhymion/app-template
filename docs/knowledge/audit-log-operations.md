@@ -63,12 +63,35 @@ order.
 
 1. **(Lord / ops)** Run `prisma migrate deploy` against the deployed database as
    the schema owner.
-2. **(Lord / ops)** Set the role's password: `ALTER ROLE app_runtime PASSWORD '...'`.
-3. **(Lord / ops)** Set the deployed environment variables:
-   - `DATABASE_URL` = connection string for `app_runtime` (used by the running app).
-   - `DIRECT_URL` = direct (unpooled) connection string for the schema owner
-     (read only by the Prisma CLI, i.e. `migrate deploy`; see `prisma.config.ts`).
-4. **(Lord / ops)** Limit who holds the owner credential and hosting-console
+2. **(Lord / ops)** Set the role's password. `CREATE ROLE ... LOGIN` sets none, so
+   until this step a connection as `app_runtime` fails with `password
+   authentication failed`. Use a plaintext `ALTER ROLE`, fed through standard
+   input so the password appears neither in the process arguments nor in the psql
+   history:
+   ```bash
+   # PG* variables point at the owner of the target database; type the SQL, then Ctrl-D
+   psql
+   ALTER ROLE app_runtime PASSWORD '<long random password>';
+   ```
+   Do not use psql's `\password`: it sends a hashed password, which Neon does not
+   accept. A role created with SQL needs a high-entropy password, so generate a
+   long random one.
+3. **(Lord / ops)** Set the deployed environment variables, assembled by hand
+   (the Neon console's Connect dialog lists only the roles Neon manages, so it
+   does not offer `app_runtime`):
+   - `DATABASE_URL` = connection string for `app_runtime` with the **pooled**
+     host (used by the running app).
+   - `DIRECT_URL` = connection string for the schema owner with the
+     **unpooled** host (read only by the Prisma CLI, i.e. `migrate deploy`; see
+     `prisma.config.ts`).
+4. **(Lord / ops)** Roles belong to a Neon branch. Repeat steps 1 to 3 for each
+   branch that serves an environment (staging and production each need their own
+   `app_runtime` and password).
+5. **(Lord / ops)** `scripts/vercel-setup.sh` and `scripts/vercel-env.sh inject`
+   set `DATABASE_URL` to the schema owner's pooled URL. After running either,
+   set `DATABASE_URL` for each Vercel environment back to the `app_runtime`
+   connection string.
+6. **(Lord / ops)** Limit who holds the owner credential and hosting-console
    access to the database.
 
 ## Scheduled tasks
@@ -129,10 +152,15 @@ whoever holds the schema-owner credential. No scheduled task does this.
 ## Checks after a deployment
 
 - `SELECT rolname FROM pg_roles WHERE rolname = 'app_runtime'` returns a row.
-- As `app_runtime`, `UPDATE audit_log ...`, `DELETE FROM audit_log` and
-  `TRUNCATE audit_log` each fail with "permission denied".
+- Connected as `app_runtime`, `SELECT current_user` returns `app_runtime`, and
+  `UPDATE audit_log ...`, `DELETE FROM audit_log` and `TRUNCATE audit_log` each
+  fail with "permission denied". When switching `PGUSER` in a shell, switch
+  `PGPASSWORD` too: a leftover owner password hides a wrong-password failure
+  behind a successful login as the owner.
 - The four tasks show `succeeded` on the scheduled-task admin page after their
-  first scheduled time.
+  first scheduled time. A run that fails with `The table public.scheduled_task_run
+  does not exist in the current database` means the migrations that created that
+  table were not applied to this database.
 
 ## Who holds access
 
