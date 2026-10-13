@@ -2851,6 +2851,11 @@ definitions:
       invalidate: false
       api: true
       test: false
+    x-custom-components:
+      - name: ApprovalSection
+        path: "@/components/_standard/ApprovalSection"
+        target:
+          - view
     x-display:
       table:
         - title:
