@@ -5,6 +5,8 @@ x-generator:
     default_scope: all
   mobile:
     enabled: true
+  audit-log-storage:
+    enabled: true
 
 # PII and Privacy Annotations
 x-pii:
