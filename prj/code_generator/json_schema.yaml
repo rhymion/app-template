@@ -737,6 +737,9 @@ definitions:
         type: array
         items:
           $ref: "#/definitions/dashboard_widget"
+        x-custom-component:
+          target:
+            - upsert
 
   field:
     fields:
