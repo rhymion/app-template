@@ -339,6 +339,7 @@ model app_setting {
   @@index([organization_id])
   @@index([creator_id])
   @@index([updater_id])
+  @@index([business_date])
   @@index([timezone])
 }
 

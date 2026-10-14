@@ -10,6 +10,7 @@
     "build": "npm --prefix app-generator run prj:sync && npm --prefix app-generator run build:full",
     "start": "npm --prefix app-generator run start",
     "test:e2e:build": "npm --prefix app-generator run prj:sync && npm --prefix app-generator run test:e2e:build",
+    "test:e2e:start": "npm --prefix app-generator run test:e2e:start",
     "test:e2e:cy:start": "npm --prefix app-generator run test:e2e:cy:start",
     "test:e2e:cy:api": "npm --prefix app-generator run test:e2e:cy:api",
     "lint": "npm --prefix app-generator run lint:prj",
