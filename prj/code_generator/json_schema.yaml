@@ -207,7 +207,7 @@ definitions:
         - additional_info:
             width: 250
     x-gdpr-mode: both
-    fields:
+    properties:
       name:
         minLength: 1
         x-pii: direct
@@ -237,15 +237,14 @@ definitions:
           target:
             - upsert
 
-    required:
-      - roles
-    properties:
       roles:
         type: array
         x-outputType: list
         items:
           $ref: "#/definitions/role"
 
+    required:
+      - roles
   setting:
     x-generate:
       list: false
@@ -277,17 +276,15 @@ definitions:
     # itself or any other entity's FK reference to `user`.
     x-self-only:
       admin_bypass: true
-    allOf:
-      - $ref: "#/definitions/user"
-      - type: object
-        required:
-          - roles
-        properties:
-          roles:
-            type: array
-            x-outputType: list
-            items:
-              $ref: "#/definitions/role"
+    x-view-of: user
+    required:
+      - roles
+    properties:
+      roles:
+        type: array
+        x-outputType: list
+        items:
+          $ref: "#/definitions/role"
 
   role:
     x-nav:
@@ -318,22 +315,21 @@ definitions:
             width: 200
         - description:
             width: 400
-    fields:
+    properties:
       name:
         minLength: 1
       description:
         x-ui:
           rows: 4
 
-    required:
-      - users
-    properties:
       users:
         type: array
         x-outputType: list
         items:
           $ref: "#/definitions/user"
 
+    required:
+      - users
   organization:
     x-nav:
       parent: administration
@@ -361,22 +357,21 @@ definitions:
             width: 200
         - description:
             width: 400
-    fields:
+    properties:
       name:
         minLength: 1
       description:
         x-ui:
           rows: 4
 
-    required:
-      - users
-    properties:
       users:
         type: array
         x-outputType: list
         items:
           $ref: "#/definitions/user"
 
+    required:
+      - users
   permission:
     x-nav:
       parent: administration
@@ -401,7 +396,7 @@ definitions:
             width: 200
         - role:
             width: 200
-    fields:
+    properties:
       name:
         minLength: 1
         x-entity-select: true
@@ -413,7 +408,6 @@ definitions:
       delete: {}
       import:
         default: false
-    properties:
       role:
         $ref: "#/definitions/role"
 
@@ -450,7 +444,7 @@ definitions:
             width: 150
         - approver_role:
             width: 150
-    fields:
+    properties:
       entity_name:
         minLength: 1
         x-entity-select: true
@@ -458,10 +452,6 @@ definitions:
         x-relationship: {}
       approver_role_id:
         x-relationship: {}
-    required:
-      - approver_role
-      - preceding_transitions
-    properties:
       requestor_role:
         $ref: "#/definitions/role"
       approver_role:
@@ -477,6 +467,9 @@ definitions:
         items:
           $ref: "#/definitions/approval_flow"
 
+    required:
+      - approver_role
+      - preceding_transitions
   approval_request:
     x-display:
       table:
@@ -484,7 +477,7 @@ definitions:
             width: 200
         - status:
             width: 100
-    fields:
+    properties:
       approvable_id:
         x-relationship:
           labelField: id
@@ -515,17 +508,16 @@ definitions:
       invalidate: false
       api: false
       test: false
-    fields:
-      rejection_reason: {}
-    required:
-      - approval_requests
     properties:
+      rejection_reason: {}
       approval_requests:
         type: array
         x-outputType: list
         items:
           $ref: "#/definitions/approval_request"
 
+    required:
+      - approval_requests
   commentable:
     x-generate:
       list: false
@@ -546,7 +538,7 @@ definitions:
           $ref: "#/definitions/comment"
 
   comment:
-    fields:
+    properties:
       message:
         minLength: 1
         x-mention: true
@@ -556,7 +548,7 @@ definitions:
       page: false
       embed: false
       api: custom
-    fields:
+    properties:
       type:
         enum:
           - like
@@ -594,7 +586,7 @@ definitions:
         $ref: "#/definitions/product"
 
   attachment:
-    fields:
+    properties:
       type:
         enum:
           - image
@@ -610,7 +602,7 @@ definitions:
         format: uri
       attachable_id: {}
   dashboard_widget:
-    fields:
+    properties:
       dashboard_id:
         x-relationship: {}
       name:
@@ -727,12 +719,9 @@ definitions:
         - name:
             primary: true
             width: 200
-    fields:
+    properties:
       name:
         minLength: 1
-    required:
-      - widgets
-    properties:
       widgets:
         type: array
         items:
@@ -741,8 +730,10 @@ definitions:
           target:
             - upsert
 
+    required:
+      - widgets
   field:
-    fields:
+    properties:
       name:
         minLength: 1
       type:
@@ -782,7 +773,7 @@ definitions:
             width: 200
         - description:
             width: 400
-    fields:
+    properties:
       name:
         minLength: 1
       description:
@@ -793,9 +784,6 @@ definitions:
         x-relationship:
           type: one-to-one_bridge
           labelField: id
-    required:
-      - fields
-    properties:
       fields:
         type: array
         items:
@@ -803,8 +791,10 @@ definitions:
       commentable:
         $ref: "#/definitions/commentable"
 
+    required:
+      - fields
   yyyyy_yyyyy:
-    fields:
+    properties:
       name:
         minLength: 1
       type:
@@ -842,14 +832,11 @@ definitions:
             width: 200
         - description:
             width: 400
-    fields:
+    properties:
       name:
         minLength: 1
       description: {}
       team: {}
-    required:
-      - yyyyy_yyyyys
-    properties:
       yyyyy_yyyyys:
         type: array
         items:
@@ -860,6 +847,8 @@ definitions:
   # x-filter-values end-to-end (list/detail/export/search hide non-alpha
   # rows; PUT/DELETE on a non-alpha row 404; a legitimate PUT that moves a
   # row's team out of alpha still succeeds, judged against the pre-image).
+    required:
+      - yyyyy_yyyyys
   alpha_xxxxx_xxxxx:
     x-nav:
       parent: test_fixtures
@@ -882,11 +871,10 @@ definitions:
             width: 200
         - team:
             width: 150
-    allOf:
-      - $ref: "#/definitions/xxxxx_xxxxx"
+    x-view-of: xxxxx_xxxxx
 
   parent1_child1:
-    fields:
+    properties:
       order: {}
       name:
         minLength: 1
@@ -913,7 +901,7 @@ definitions:
       written_by:
         maxLength: 100
   parent1_child2:
-    fields:
+    properties:
       name:
         minLength: 1
       required:
@@ -923,7 +911,7 @@ definitions:
       end_date:
         format: date
   parent1_list:
-    fields:
+    properties:
       name:
         minLength: 1
         maxLength: 100
@@ -947,7 +935,7 @@ definitions:
             width: 200
         - description:
             width: 400
-    fields:
+    properties:
       name:
         minLength: 1
         maxLength: 100
@@ -962,12 +950,6 @@ definitions:
       image_url:
         format: uri
         x-uri-kind: link
-    required:
-      - parent1_child1s
-      - parent1_child2s
-      - parent1_lists
-    x-import-key: [name]
-    properties:
       organization:
         $ref: "#/definitions/organization"
       parent1_child1s:
@@ -984,6 +966,11 @@ definitions:
         items:
           $ref: "#/definitions/parent1_list"
 
+    required:
+      - parent1_child1s
+      - parent1_child2s
+      - parent1_lists
+    x-import-key: [name]
   setting1:
     x-nav:
       parent: test_fixtures
@@ -997,16 +984,14 @@ definitions:
       invalidate: false
       api: true
       test: true
-    allOf:
-      - $ref: "#/definitions/xxxxx_xxxxx"
-      - type: object
-        required:
-          - yyyyy_yyyyys
-        properties:
-          yyyyy_yyyyys:
-            type: array
-            items:
-              $ref: "#/definitions/yyyyy_yyyyy"
+    x-view-of: xxxxx_xxxxx
+    required:
+      - yyyyy_yyyyys
+    properties:
+      yyyyy_yyyyys:
+        type: array
+        items:
+          $ref: "#/definitions/yyyyy_yyyyy"
 
   setting2:
     x-nav:
@@ -1024,8 +1009,7 @@ definitions:
       fields:
         - name
         - description
-    allOf:
-      - $ref: "#/definitions/xxxxx_xxxxx"
+    x-view-of: xxxxx_xxxxx
 
   setting3:
     x-nav:
@@ -1043,8 +1027,7 @@ definitions:
       fields:
         - name
         - description
-    allOf:
-      - $ref: "#/definitions/xxxxx_xxxxx"
+    x-view-of: xxxxx_xxxxx
 
   setting4:
     x-nav:
@@ -1059,8 +1042,7 @@ definitions:
       invalidate: false
       api: true
       test: true
-    allOf:
-      - $ref: "#/definitions/xxxxx_xxxxx"
+    x-view-of: xxxxx_xxxxx
 
   setting6:
     x-generate:
@@ -1072,16 +1054,14 @@ definitions:
       invalidate: false
       api: false
       test: true
-    allOf:
-      - $ref: "#/definitions/xxxxx_xxxxx"
-      - type: object
-        required:
-          - yyyyy_yyyyys
-        properties:
-          yyyyy_yyyyys:
-            type: array
-            items:
-              $ref: "#/definitions/yyyyy_yyyyy"
+    x-view-of: xxxxx_xxxxx
+    required:
+      - yyyyy_yyyyys
+    properties:
+      yyyyy_yyyyys:
+        type: array
+        items:
+          $ref: "#/definitions/yyyyy_yyyyy"
 
   setting7:
     x-generate:
@@ -1093,8 +1073,7 @@ definitions:
       invalidate: false
       api: false
       test: true
-    allOf:
-      - $ref: "#/definitions/xxxxx_xxxxx"
+    x-view-of: xxxxx_xxxxx
 
   setting8:
     x-generate:
@@ -1109,8 +1088,7 @@ definitions:
       fields:
         - name
         - description
-    allOf:
-      - $ref: "#/definitions/xxxxx_xxxxx"
+    x-view-of: xxxxx_xxxxx
 
   procedure:
     x-nav:
@@ -1139,7 +1117,7 @@ definitions:
             width: 200
         - description:
             width: 400
-    fields:
+    properties:
       name:
         minLength: 1
       description: {}
@@ -1149,11 +1127,6 @@ definitions:
       assignee_id:
         pattern: "^c[a-z0-9]{24,}$"
         x-relationship: {}
-    required:
-      - children
-      - preceded_by
-      - followed_by
-    properties:
       assignee:
         $ref: "#/definitions/user"
       parent:
@@ -1174,6 +1147,10 @@ definitions:
         items:
           $ref: "#/definitions/procedure"
 
+    required:
+      - children
+      - preceded_by
+      - followed_by
   resource:
     x-nav:
       parent: facilities
@@ -1211,7 +1188,7 @@ definitions:
         - organization:
             width: 200
       dashboard: true
-    fields:
+    properties:
       name:
         minLength: 1
       description: {}
@@ -1223,15 +1200,14 @@ definitions:
         x-relationship:
           type: one-to-one_bridge
           labelField: id
-    required:
-      - organization
-    x-import-key: [name]
-    properties:
       organization:
         $ref: "#/definitions/organization"
       attachable:
         $ref: "#/definitions/attachable"
 
+    required:
+      - organization
+    x-import-key: [name]
   booking:
     x-nav:
       parent: facilities
@@ -1260,7 +1236,7 @@ definitions:
         span: week
         row_by: resource
       dashboard: true
-    fields:
+    properties:
       name:
         minLength: 1
       resource_id:
@@ -1268,12 +1244,11 @@ definitions:
         x-relationship: {}
       start_time: {}
       end_time: {}
-    required:
-      - resource
-    properties:
       resource:
         $ref: "#/definitions/resource"
 
+    required:
+      - resource
   shift_template:
     x-nav:
       parent: workforce
@@ -1300,7 +1275,7 @@ definitions:
             width: 150
         - end_time:
             width: 150
-    fields:
+    properties:
       user_id:
         pattern: "^c[a-z0-9]{24,}$"
         x-relationship: {}
@@ -1317,12 +1292,11 @@ definitions:
         format: time
       end_time:
         format: time
-    required:
-      - user
-    properties:
       user:
         $ref: "#/definitions/user"
 
+    required:
+      - user
   shift:
     x-nav:
       parent: workforce
@@ -1348,7 +1322,7 @@ definitions:
       chart:
         span: week
         row_by: user
-    fields:
+    properties:
       user_id:
         pattern: "^c[a-z0-9]{24,}$"
         x-relationship: {}
@@ -1360,12 +1334,11 @@ definitions:
           - approved
           - cancelled
 
-    required:
-      - user
-    properties:
       user:
         $ref: "#/definitions/user"
 
+    required:
+      - user
   product:
     x-nav:
       parent: stock_ledger
@@ -1400,7 +1373,7 @@ definitions:
         - price:
             width: 100
       dashboard: true
-    fields:
+    properties:
       code:
         minLength: 1
       name:
@@ -1419,7 +1392,6 @@ definitions:
       spec_sheet_url:
         format: uri
         x-uri-kind: file
-    properties:
       attachable:
         $ref: "#/definitions/attachable"
 
@@ -1448,7 +1420,7 @@ definitions:
     x-readonly-fields:
       - quantity
       - reserved_quantity
-    fields:
+    properties:
       product_id:
         pattern: "^c[a-z0-9]{24,}$"
         x-relationship:
@@ -1465,15 +1437,14 @@ definitions:
       lot_number: {}
       expiration_date:
         format: date
-    required:
-      - product
-      - location
-    properties:
       product:
         $ref: "#/definitions/product"
       location:
         $ref: "#/definitions/location"
 
+    required:
+      - product
+      - location
   location:
     x-nav:
       parent: stock_ledger
@@ -1494,7 +1465,7 @@ definitions:
       table:
         - name:
             primary: true
-    fields:
+    properties:
       name: {}
 
   inventory_transactionable:
@@ -1540,7 +1511,7 @@ definitions:
             width: 140
         - quantity_delta:
             width: 140
-    fields:
+    properties:
       inventory_transactionable_id:
         pattern: "^c[a-z0-9]{24,}$"
       event_type:
@@ -1604,7 +1575,7 @@ definitions:
       fromPoolIdField: from_inventory_id   # 出庫側 inventory FK フィールド名
       toPoolIdField: to_inventory_id       # 入庫側 inventory FK フィールド名
       quantity_delta_field: quantity
-    fields:
+    properties:
       from_inventory_id:
         pattern: "^c[a-z0-9]{24,}$"
         x-relationship:
@@ -1635,7 +1606,6 @@ definitions:
           labelField: id
       inventory_transactionable_id:
         pattern: "^c[a-z0-9]{24,}$"
-    properties:
       from_inventory:
         $ref: "#/definitions/inventory"
       to_inventory:
@@ -1690,7 +1660,7 @@ definitions:
     # corrections can be entered. No business-level lower bound is
     # documented, so the type's own lower bound (Int/int32) is used
     # rather than an arbitrary business threshold.
-    fields:
+    properties:
       inventory_id:
         pattern: "^c[a-z0-9]{24,}$"
         x-relationship:
@@ -1714,7 +1684,6 @@ definitions:
           labelField: id
       inventory_transactionable_id:
         pattern: "^c[a-z0-9]{24,}$"
-    properties:
       inventory:
         $ref: "#/definitions/inventory"
       approvable:
@@ -1766,16 +1735,12 @@ definitions:
       # No "actions" block: under strategy: ledger_transaction, ship/cancel are
       # driven by the standard approve/reject flow on sales_order_line.approvable_id
       # (see sales_order_line's x-approval below), not by bespoke action routes.
-    fields:
+    properties:
       order_no:
         minLength: 1
       customer_id:
         pattern: "^c[a-z0-9]{24,}$"
         x-relationship: {}
-    required:
-      - customer
-      - items
-    properties:
       customer:
         $ref: "#/definitions/user"
       items:
@@ -1783,6 +1748,9 @@ definitions:
         items:
           $ref: "#/definitions/sales_order_line"
 
+    required:
+      - customer
+      - items
   leave_request:
     x-nav:
       parent: workforce
@@ -1832,7 +1800,7 @@ definitions:
       on_withdrawn:
         set_fields:
           status: "draft"
-    fields:
+    properties:
       user_id:
         pattern: "^c[a-z0-9]{24,}$"
         x-relationship: {}
@@ -1865,9 +1833,6 @@ definitions:
       assignee_id:
         pattern: "^c[a-z0-9]{24,}$"
         x-relationship: {}
-    required:
-      - user
-    properties:
       user:
         $ref: "#/definitions/user"
       approvable:
@@ -1880,6 +1845,8 @@ definitions:
   # quantityField lives on the request entity itself; no lines child.
   # ============================================================
 
+    required:
+      - user
   supply_pool:
     x-nav:
       parent: supply_requests
@@ -1900,7 +1867,7 @@ definitions:
             width: 200
         - description:
             width: 400
-    fields:
+    properties:
       name:
         minLength: 1
       description:
@@ -1943,7 +1910,7 @@ definitions:
             width: 200
         - description:
             width: 400
-    fields:
+    properties:
       name:
         minLength: 1
       description:
@@ -1955,7 +1922,7 @@ definitions:
     x-nav:
       parent: supply_requests
       order: 3
-    fields:
+    properties:
       supply_request_id:
         pattern: "^c[a-z0-9]{24,}$"
         x-relationship: {}
@@ -1984,7 +1951,7 @@ definitions:
             width: 200
         - description:
             width: 400
-    fields:
+    properties:
       name:
         minLength: 1
       capacity:
@@ -2020,7 +1987,7 @@ definitions:
             width: 200
         - room_type:
             width: 200
-    fields:
+    properties:
       room_no:
         minLength: 1
       room_type_id:
@@ -2032,12 +1999,11 @@ definitions:
         enum:
           - available
           - maintenance
-    required:
-      - room_type
-    properties:
       room_type:
         $ref: "#/definitions/room_type"
 
+    required:
+      - room_type
   room_reservation:
     x-payment: true
     x-nav:
@@ -2085,7 +2051,7 @@ definitions:
           - id: asc
       result:
         allocatedField: room_id
-    fields:
+    properties:
       guest_name:
         minLength: 1
       room_type_id:
@@ -2099,7 +2065,6 @@ definitions:
         format: date
       check_out:
         format: date
-    properties:
       room_type:
         $ref: "#/definitions/room_type"
       room:
@@ -2113,7 +2078,7 @@ definitions:
     x-nav:
       parent: procurement
       order: 4
-    fields:
+    properties:
       purchase_order_id:
         pattern: "^c[a-z0-9]{24,}$"
         x-relationship:
@@ -2159,7 +2124,7 @@ definitions:
             width: 200
         - status:
             width: 150
-    fields:
+    properties:
       order_no:
         minLength: 1
       status:
@@ -2170,19 +2135,18 @@ definitions:
           - received
           - cancelled
 
-    required:
-      - lines
-    properties:
       lines:
         type: array
         items:
           $ref: "#/definitions/purchase_order_line"
 
+    required:
+      - lines
   asn_line:
     x-nav:
       parent: procurement
       order: 6
-    fields:
+    properties:
       asn_id:
         pattern: "^c[a-z0-9]{24,}$"
         x-relationship:
@@ -2228,7 +2192,7 @@ definitions:
             width: 200
         - status:
             width: 150
-    fields:
+    properties:
       asn_no:
         minLength: 1
       purchase_order_id:
@@ -2243,9 +2207,6 @@ definitions:
           - matched
           - cancelled
 
-    required:
-      - lines
-    properties:
       purchase_order:
         $ref: "#/definitions/purchase_order"
       lines:
@@ -2253,6 +2214,8 @@ definitions:
         items:
           $ref: "#/definitions/asn_line"
 
+    required:
+      - lines
   goods_receipt:
     x-nav:
       parent: procurement
@@ -2276,7 +2239,7 @@ definitions:
             width: 150
     x-approval-lines:
       - lines
-    fields:
+    properties:
       receipt_no:
         minLength: 1
       purchase_order_id:
@@ -2294,9 +2257,6 @@ definitions:
           - confirmed
           - cancelled
       confirmed_at: {}
-    required:
-      - lines
-    properties:
       purchase_order:
         $ref: "#/definitions/purchase_order"
       asn:
@@ -2306,6 +2266,8 @@ definitions:
         items:
           $ref: "#/definitions/goods_receipt_line"
 
+    required:
+      - lines
   goods_receipt_line:
     x-nav:
       parent: procurement
@@ -2365,7 +2327,7 @@ definitions:
       parentField: parent_id
       ledgerDomain: inventory_domain
       poolIdField: inventory_id
-    fields:
+    properties:
       goods_receipt_id:
         pattern: "^c[a-z0-9]{24,}$"
         x-relationship:
@@ -2412,7 +2374,6 @@ definitions:
       assignee_id:
         pattern: "^c[a-z0-9]{24,}$"
         x-relationship: {}
-    properties:
       goods_receipt:
         $ref: "#/definitions/goods_receipt"
       product:
@@ -2473,7 +2434,7 @@ definitions:
       poolIdField: inventory_id
       perPartRequired:
         - inventory_id
-    fields:
+    properties:
       sales_order_id:
         pattern: "^c[a-z0-9]{24,}$"
         x-relationship:
@@ -2510,9 +2471,6 @@ definitions:
             - lot_number
             - expiration_date
 
-    required:
-      - product
-    properties:
       sales_order:
         $ref: "#/definitions/sales_order"
       product:
@@ -2538,6 +2496,8 @@ definitions:
   # now covered elsewhere.
   # ============================================================
 
+    required:
+      - product
   asset:
     x-nav:
       parent: stock_ledger
@@ -2560,7 +2520,7 @@ definitions:
             width: 150
         - under_warranty:
             width: 150
-    fields:
+    properties:
       asset_tag:
         minLength: 1
       parent_asset_id:
@@ -2573,10 +2533,6 @@ definitions:
       commissioned_at:
         format: date
       under_warranty: {}
-    required:
-      - manual_url
-      - components
-    properties:
       parent_asset:
         $ref: "#/definitions/asset"
       components:
@@ -2591,8 +2547,11 @@ definitions:
   # correctly via the dependency helper's `.name` alias — see the report for
   # the asset entity's own `linked_product`/`assigned_room` fields, which do
   # NOT reproduce the same defect at the top level).
+    required:
+      - manual_url
+      - components
   asset_component:
-    fields:
+    properties:
       asset_id:
         x-relationship:
           labelField: asset_tag
@@ -2631,19 +2590,18 @@ definitions:
             width: 200
         - description:
             width: 200
-    fields:
+    properties:
       name:
         minLength: 1
       description: {}
       related_product_id:
         pattern: "^c[a-z0-9]{24,}$"
         x-relationship: {}
-    required:
-      - related_product
-    properties:
       related_product:
         $ref: "#/definitions/product"
 
+    required:
+      - related_product
   maintenance_ticket:
     x-nav:
       parent: stock_ledger
@@ -2685,7 +2643,7 @@ definitions:
       on_withdrawn:
         set_fields:
           status: "draft"
-    fields:
+    properties:
       category:
         default: general
         x-enum-namespace: MaintenanceTicketCategory
@@ -2708,11 +2666,6 @@ definitions:
         x-relationship:
           type: one-to-one_bridge
           labelField: id
-    required:
-      - category
-      - status
-      - organization
-    properties:
       organization:
         $ref: "#/definitions/organization"
       approvable:
@@ -2738,6 +2691,10 @@ definitions:
   # submitted, then explicitly submitted" test (cmd_825, submit_on's whole
   # reason for existing) can POST an explicit status: 'draft' override to
   # reach that state without touching the schema-wide default.
+    required:
+      - category
+      - status
+      - organization
   approval_edit_terminal_test:
     x-nav:
       parent: test_fixtures
@@ -2782,7 +2739,7 @@ definitions:
     x-write-locked-values:
       status:
         - archived
-    fields:
+    properties:
       title:
         minLength: 1
       status:
@@ -2799,9 +2756,8 @@ definitions:
         x-relationship:
           type: one-to-one_bridge
           labelField: id
+      approvable:
+        $ref: "#/definitions/approvable"
     required:
       - title
       - status
-    properties:
-      approvable:
-        $ref: "#/definitions/approvable"
