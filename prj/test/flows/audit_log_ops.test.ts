@@ -18,7 +18,6 @@ import { PrismaPg } from '@prisma/adapter-pg';
 
 const { LocalDirectoryStorage } = await import('@/lib/audit-log-integrity/storage');
 const { closeDigestPeriods, verifyDigests, ensurePartitions, previousMonth, exportPreviousMonth } = await import('@/lib/audit-log-ops/jobs');
-const { S3ObjectLockStorage } = await import('@/lib/audit-log-ops/storage-s3');
 const { createAuditLogStorageFromEnv } = await import('@/lib/audit-log-ops/storage-factory');
 
 const MIGRATION = path.resolve(process.cwd(), '../prj/prisma/migrations/20261011235500_audit_log_append_only/migration.sql');
@@ -242,37 +241,15 @@ describe('audit_log operations kit', () => {
     });
   });
 
+  // The GCS and S3 adapters are unit-tested in app-generator (lib/audit-log-integrity/storage-*.test.ts).
   describe('storage', () => {
-    it('S3 adapter writes with Object Lock retention and is write-once', async () => {
-      const store = new Map<string, string>();
-      const puts: Array<{ ObjectLockMode: string; ObjectLockRetainUntilDate: Date; IfNoneMatch: string }> = [];
-      const client = {
-        async putObject(p: { Key: string; Body: string; ObjectLockMode: 'COMPLIANCE'; ObjectLockRetainUntilDate: Date; IfNoneMatch: '*'; Bucket: string; ContentType: string }) {
-          puts.push(p);
-          store.set(`${p.Bucket}/${p.Key}`, p.Body);
-        },
-        async getObject(p: { Bucket: string; Key: string }) {
-          return store.get(`${p.Bucket}/${p.Key}`) ?? null;
-        },
-      };
-      const s = new S3ObjectLockStorage(client, 'bucket', 30, () => new Date('2026-03-01T00:00:00Z'));
-      await s.put('a', 'one');
-      await s.put('a', 'one');
-      await expect(s.put('a', 'two')).rejects.toThrow(/Refusing to overwrite/);
-      expect(await s.get('a')).toBe('one');
-      expect(await s.get('missing')).toBeNull();
-      expect(puts).toHaveLength(1);
-      expect(puts[0].ObjectLockMode).toBe('COMPLIANCE');
-      expect(puts[0].ObjectLockRetainUntilDate.toISOString()).toBe('2026-03-31T00:00:00.000Z');
-      expect(() => new S3ObjectLockStorage(client, 'bucket', 0)).toThrow(/whole number of days/);
-    });
-
     it('factory chooses storage from the environment and fails closed when unset', async () => {
       const local = await createAuditLogStorageFromEnv({ AUDIT_LOG_STORAGE_DIR: storageDir });
       await local.put('k', 'v');
       expect(await local.get('k')).toBe('v');
       await expect(createAuditLogStorageFromEnv({})).rejects.toThrow(/not configured/);
       await expect(createAuditLogStorageFromEnv({ AUDIT_LOG_S3_BUCKET: 'b' })).rejects.toThrow(/required/);
+      await expect(createAuditLogStorageFromEnv({ AUDIT_LOG_GCS_BUCKET: 'b' })).rejects.toThrow(/required/);
     });
   });
 });

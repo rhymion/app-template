@@ -3,6 +3,10 @@ format-version: 2.0
 x-generator:
   search:
     default_scope: all
+  mobile:
+    enabled: true
+  audit-log-storage:
+    enabled: true
 
 # PII and Privacy Annotations
 x-pii:
@@ -469,7 +473,6 @@ definitions:
 
     required:
       - approver_role
-      - preceding_transitions
   approval_request:
     x-display:
       table:
@@ -2548,7 +2551,6 @@ definitions:
   # the asset entity's own `linked_product`/`assigned_room` fields, which do
   # NOT reproduce the same defect at the top level).
     required:
-      - manual_url
       - components
   asset_component:
     properties:
@@ -2645,12 +2647,14 @@ definitions:
           status: "draft"
     properties:
       category:
+        _required: true
         default: general
         x-enum-namespace: MaintenanceTicketCategory
         enum:
           - general
           - urgent
       status:
+        _required: true
         default: open
         x-enum-namespace: MaintenanceTicketStatus
         enum:
@@ -2692,8 +2696,6 @@ definitions:
   # reason for existing) can POST an explicit status: 'draft' override to
   # reach that state without touching the schema-wide default.
     required:
-      - category
-      - status
       - organization
   approval_edit_terminal_test:
     x-nav:
@@ -2743,6 +2745,7 @@ definitions:
       title:
         minLength: 1
       status:
+        _required: true
         default: pending
         x-enum-namespace: ApprovalEditTerminalTestStatus
         enum:
@@ -2759,5 +2762,3 @@ definitions:
       approvable:
         $ref: "#/definitions/approvable"
     required:
-      - title
-      - status

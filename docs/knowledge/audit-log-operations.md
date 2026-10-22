@@ -29,8 +29,9 @@ file in this repository does not run itself against any deployed database.
 |---|---|
 | Migration: partitioning, row trigger, `app_runtime` role, grants | `prj/prisma/migrations/20261011235500_audit_log_append_only/migration.sql` |
 | Four scheduled tasks | `x-scheduled-tasks` in `prj/code_generator/json_schema.yaml`; handlers in `prj/lib/scheduled-tasks/audit_log_*/` |
-| Job library shared with `npm run audit-log:digest` | `prj/lib/audit-log-ops/jobs.ts` |
-| Storage adapters (local directory, S3 Object Lock) | `prj/lib/audit-log-ops/storage-*.ts` |
+| Opt-in that generates the job library and the storage factory | `x-generator.audit-log-storage.enabled` in `prj/code_generator/json_schema.yaml` |
+| Job library and storage factory (generated into `lib/audit-log-ops/`) | app-generator `code_generator/templates/audit_log_jobs.ts.jinja2`, `audit_log_storage_factory.ts.jinja2` |
+| Storage adapters (local directory, GCS retention, S3 Object Lock) | app-generator `lib/audit-log-integrity/storage*.ts` |
 | Tests | `prj/test/flows/audit_log_ops.test.ts` |
 
 Test databases need nothing extra: `npm run test:e2e:build` and the other test
@@ -138,14 +139,22 @@ reported `blocked` and the other two still run.
   schema owner. The four tasks are written for the restricted role (SELECT and
   INSERT on `audit_log` and `audit_log_digest`, partition creation through the
   `SECURITY DEFINER` function); the owner credential does not belong in the
-  Job. The Job's secrets file also needs `AUDIT_LOG_S3_BUCKET`,
-  `AUDIT_LOG_S3_REGION`, `AUDIT_LOG_S3_RETENTION_DAYS` and the AWS credentials
-  the adapter reads, plus every other secret the handlers read. A local
-  directory (`AUDIT_LOG_STORAGE_DIR`) in a Job container disappears with the
-  container and must not be used.
-- `@aws-sdk/client-s3` installed in the Job image. The only write-once adapter
-  in this repository is S3 Object Lock; a GCS Bucket Lock adapter does not
-  exist.
+  Job. The Job's secrets file also needs `AUDIT_LOG_GCS_BUCKET`,
+  `AUDIT_LOG_GCS_RETENTION_DAYS` and `AUDIT_LOG_GCS_RETENTION_MODE` (see
+  "Storage" below), plus every other secret the handlers read.
+  `scripts/gcp-task-runner.sh` passes every key of that file through Secret
+  Manager, so the bucket name travels as a secret too; that is expected. A
+  local directory (`AUDIT_LOG_STORAGE_DIR`) in a Job container disappears with
+  the container and must not be used.
+- The Job's service account needs the storage permissions listed under
+  "Storage" below, in addition to Secret Manager access. app-generator Issue
+  #1008 tracks `scripts/gcp-task-runner.sh` granting it; until that is merged
+  and this repository's app-generator pointer includes it, grant the role by
+  hand. The credentials are the Job's service account (Application Default
+  Credentials); no key file is used.
+- `@google-cloud/storage` is a regular dependency, so the Job image (built
+  from the Dockerfile's `builder` stage, which carries the whole
+  `node_modules`) contains it. Not verified by building the image.
 - A time zone and schedule. With `TASK_RUNNER_TIME_ZONE=UTC` and
   `TASK_RUNNER_SCHEDULE="30 1 * * *"` the business date is the calendar date
   of the start and `export_for_retirement` runs on the night of the 1st. With
@@ -213,11 +222,11 @@ trigger disabled):
 | A row of the current day, before it is closed, is edited | Nothing |
 
 - Changes to past periods are caught on the next `verify`, however old.
-- The write-once copy in storage is the trust anchor. With S3 Object Lock in
-  compliance mode an attacker who rewrites the database cannot rewrite the
+- The write-once copy in storage is the trust anchor. With a bucket retention (GCS locked retention or S3 Object
+  Lock in compliance mode) an attacker who rewrites the database cannot rewrite the
   copy; with a local directory this guarantee does not exist. Object Lock
   protects a copy until its retention date, so set
-  `AUDIT_LOG_S3_RETENTION_DAYS` at least as long as the history that must stay
+  the retention days at least as long as the history that must stay
   verifiable.
 - The current day, until `close` has run (the day's end plus one hour), is not
   protected by the digest: the content at close time is what it records.
@@ -226,18 +235,103 @@ trigger disabled):
 
 ## Storage
 
-Digests and exports go to `AuditLogStorage`.
+Digests and exports go to `AuditLogStorage`. The factory
+(`lib/audit-log-ops/storage-factory.ts`, generated because
+`x-generator.audit-log-storage.enabled` is `true`) picks the storage from the
+environment, checking in this order:
 
-- `AUDIT_LOG_STORAGE_DIR`: a local directory. Tests and local runs only.
-- `AUDIT_LOG_S3_BUCKET`, `AUDIT_LOG_S3_REGION`, `AUDIT_LOG_S3_RETENTION_DAYS`:
-  an S3 bucket with Object Lock; every object is written in compliance mode with
-  a retention date. The adapter needs `@aws-sdk/client-s3` installed in the
-  deployment and credentials in the usual AWS environment variables.
+| Variable | Meaning |
+|---|---|
+| `AUDIT_LOG_GCS_BUCKET` | Use a GCS bucket. Also required: `AUDIT_LOG_GCS_RETENTION_DAYS` (whole days). |
+| `AUDIT_LOG_GCS_RETENTION_MODE` | `unlocked` (default) or `locked`. Set it explicitly in every environment. |
+| `AUDIT_LOG_GCS_AUTH` | Unset or `adc` (Application Default Credentials: Cloud Run, local `gcloud` login) or `vercel-oidc` (Vercel; see below). |
+| `AUDIT_LOG_S3_BUCKET` | Use an S3 bucket with Object Lock. Also required: `AUDIT_LOG_S3_REGION`, `AUDIT_LOG_S3_RETENTION_DAYS`. |
+| `AUDIT_LOG_STORAGE_DIR` | A local directory. Tests and local runs only. |
 
-**(Operator)** Choosing the storage provider, creating the bucket with Object
-Lock enabled, choosing the retention period and issuing credentials. Nothing in
-this repository creates cloud resources. Until storage is configured the digest
-and export tasks fail with "Audit log storage is not configured".
+When none is set, the digest and export tasks fail with "Audit log storage is
+not configured"; they never skip silently.
+
+### GCS (recommended)
+
+**Why per-object retention rather than Bucket Lock.** Each object is created
+with its own retain-until time (now plus `AUDIT_LOG_GCS_RETENTION_DAYS`).
+`unlocked` retention can be shortened or removed by a principal with the right
+permission, which makes it safe for a trial; `locked` retention can only be
+extended. Bucket Lock applies one retention period to every object and its lock
+is irreversible, so locking a trial bucket cannot be undone. Both are
+enforced by the bucket, not by this application.
+
+**What the adapter does.** A new object is written only when no live object
+with that name exists (`ifGenerationMatch: 0`). Writing the same body again is
+a no-op; a different body is refused. Only a 404 on read means "not found";
+a missing read grant (403) surfaces as an error instead of turning every
+write into a failure.
+
+**Permissions** (the runtime service account; read from the Cloud Storage IAM
+reference, not exercised against a bucket): `storage.objects.get`,
+`storage.objects.create`, `storage.objects.setRetention`,
+`storage.objects.update`. A custom role with these four on the bucket is the
+least privilege; whether `roles/storage.objectAdmin` is enough for
+`setRetention` is not confirmed, and `roles/storage.admin` is broader than
+needed. Whoever creates the bucket needs `storage.buckets.enableObjectRetention`
+once.
+
+**Set-up, in order (Operator; none of these commands has been run by an agent).**
+
+1. Create the bucket with Object Retention enabled; this cannot be disabled
+   afterwards. Use uniform bucket-level access and the region of the database.
+   ```bash
+   gcloud storage buckets create gs://<bucket> --project=<project> \
+     --location=<region> --uniform-bucket-level-access --enable-per-object-retention
+   ```
+2. Create the service account that the application uses on each platform and
+   grant it the four permissions on this bucket (bucket-level IAM binding with
+   a custom role). One account for Cloud Run (`task-runner`), one for Vercel.
+3. **Cloud Run Job** (Cloud Scheduler path): attach the Job's service account,
+   and put `AUDIT_LOG_GCS_BUCKET`, `AUDIT_LOG_GCS_RETENTION_DAYS` and
+   `AUDIT_LOG_GCS_RETENTION_MODE` into the Job's secrets file as described in
+   "Running the four tasks on GCP". No key file.
+4. **Vercel** (admin page path): Vercel has no ambient Google identity. Use
+   Vercel OIDC with Workload Identity Federation, so no long-lived key is
+   stored. Follow Vercel's guide "Connect to Google Cloud Platform (GCP)"
+   (vercel.com/docs/oidc/gcp): create a pool and an OIDC provider (issuer
+   `https://oidc.vercel.com/<team slug>`), create the service account, and let
+   the pool principal for this project and environment
+   (`owner:<team>:project:<project>:environment:<environment>`) impersonate it.
+   Then set these Vercel environment variables for **Preview** (and Production
+   when it applies): `GCP_PROJECT_ID`, `GCP_PROJECT_NUMBER`,
+   `GCP_SERVICE_ACCOUNT_EMAIL`, `GCP_WORKLOAD_IDENTITY_POOL_ID`,
+   `GCP_WORKLOAD_IDENTITY_POOL_PROVIDER_ID`, plus `AUDIT_LOG_GCS_AUTH=vercel-oidc`,
+   `AUDIT_LOG_GCS_BUCKET`, `AUDIT_LOG_GCS_RETENTION_DAYS`,
+   `AUDIT_LOG_GCS_RETENTION_MODE`. None of them is a secret. Redeploy: a
+   deployment reads the variables as they were when it was built. If a key
+   file is unavoidable, store it as a sensitive Vercel variable and never pass
+   it as a command-line argument, print it or commit it.
+5. For a trial, use a short `AUDIT_LOG_GCS_RETENTION_DAYS` (for example 1) and
+   `unlocked`. Objects cannot be deleted until their retain-until time passes,
+   even in `unlocked` mode, unless a principal with
+   `storage.objects.overrideUnlockedRetention` shortens it; plan the bucket's
+   clean-up accordingly. For production choose the retention to be at least as
+   long as the history that must stay verifiable, and `locked`.
+6. Run, from the admin page `/scheduled_task_run`, `audit_log_digest_close`
+   and then `audit_log_digest_verify` (the order matters: `verify` is
+   `blocked` until `close` has succeeded). The first `close` on a database
+   with history closes every day from the oldest row up to yesterday (UTC) in
+   one run; it writes one digest object per day.
+
+### S3
+
+`AUDIT_LOG_S3_BUCKET`, `AUDIT_LOG_S3_REGION`, `AUDIT_LOG_S3_RETENTION_DAYS`: an
+S3 bucket with Object Lock; every object is written in compliance mode with a
+retention date, using the usual AWS environment variables for credentials. The
+S3 path is not verified: no real S3 bucket has been used, and only the build
+trace of `@aws-sdk/client-s3` has been checked. It needs the bucket with Object
+Lock and `s3:PutObject`, `s3:GetObject` and `s3:ListBucket` (without
+`ListBucket`, a missing key reads as access denied rather than not found).
+
+**(Operator)** Choosing the storage provider, creating the bucket, choosing the
+retention period and issuing credentials. Nothing in this repository creates
+cloud resources.
 
 ## Retiring an old month (manual)
 
