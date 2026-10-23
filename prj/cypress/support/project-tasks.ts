@@ -79,6 +79,10 @@ export function getProjectTasks(): Record<string, (...args: any[]) => any> {
       const { getSalesOrderLineById } = require('./sales_order/reservation_helper');
       return await getSalesOrderLineById(params.id);
     },
+    async 'db:setSalesOrderLineStatus'(params: { id: string; status: string }) {
+      const { setSalesOrderLineStatus } = require('./sales_order/reservation_helper');
+      return await setSalesOrderLineStatus(params.id, params.status);
+    },
     async 'db:getSalesOrderLineChildren'(params: { parentId: string }) {
       const { getSalesOrderLineChildren } = require('./sales_order/reservation_helper');
       return await getSalesOrderLineChildren(params.parentId);

@@ -322,3 +322,12 @@ export async function getSalesOrderLineChildren(parentId: string) {
   });
   return JSON.parse(JSON.stringify(children));
 }
+
+/**
+ * Force a sales_order_line's status, to exercise the status guard of the
+ * moveReservation route for states the UI flow does not leave a reservation in.
+ */
+export async function setSalesOrderLineStatus(id: string, status: string) {
+  await prisma.sales_order_line.update({ where: { id }, data: { status } });
+  return null;
+}
