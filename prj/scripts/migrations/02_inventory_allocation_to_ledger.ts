@@ -94,9 +94,15 @@ async function main() {
   let migratedRows = 0;
   let skippedItems = 0;
 
+  // cmd_1072: purchase_per_item was renamed to sales_order_line -- only the
+  // two prisma.<model> accessors below are updated to keep this script
+  // compiling. The OldAllocationRow shape / raw SQL column names above
+  // describe the long-dropped `inventory_allocation` table as it existed
+  // when this one-time backfill actually ran; they're a historical record,
+  // not live schema, so they're deliberately left as-is.
   for (const [purchasePerItemId, allocations] of byItem) {
     const totalRemaining = allocations.reduce((sum, a) => sum + a.remaining_quantity, 0);
-    const item = await prisma.purchase_per_item.findUnique({
+    const item = await prisma.sales_order_line.findUnique({
       where: { id: purchasePerItemId },
       select: { id: true, inventory_transactionable_id: true },
     });
@@ -121,7 +127,6 @@ async function main() {
       for (const alloc of allocations) {
         const inv = await tx.inventory.findUnique({
           where: { id: alloc.inventory_id },
-          include: { location: true },
         });
         if (!inv) {
           throw new Error(`inventory ${alloc.inventory_id} referenced by inventory_allocation ${alloc.id} not found`);
@@ -134,7 +139,8 @@ async function main() {
             quantity_delta: 0, // O-4: reserve never touches physical quantity
             reserved_delta: alloc.remaining_quantity, // outstanding amount only (see comment above)
             product_id: inv.product_id,
-            location: inv.location?.name ?? '',
+            // cmd_562: location_id is an id-FK, not a name string.
+            location_id: inv.location_id,
             lot_number: inv.lot_number,
             expiration_date: inv.expiration_date,
             created_by_id: alloc.creator_id,
@@ -147,7 +153,7 @@ async function main() {
       }
 
       if (!item.inventory_transactionable_id) {
-        await tx.purchase_per_item.update({
+        await tx.sales_order_line.update({
           where: { id: purchasePerItemId },
           data: { inventory_transactionable_id: bridgeId },
         });
@@ -172,7 +178,6 @@ async function main() {
   for (const [inventoryId, expectedSum] of expectedByInventoryId) {
     const inv = await prisma.inventory.findUnique({
       where: { id: inventoryId },
-      include: { location: true },
     });
     if (!inv) continue; // inventory row itself no longer exists — nothing to reconcile
     const agg = await prisma.inventory_transaction.aggregate({
@@ -180,12 +185,13 @@ async function main() {
       where: {
         event_type: 'reserve',
         product_id: inv.product_id,
-        location: inv.location?.name ?? '',
+        // cmd_562: location_id is an id-FK, not a name string.
+        location_id: inv.location_id,
         lot_number: inv.lot_number,
         expiration_date: inv.expiration_date,
       },
     });
-    const actualSum = agg._sum.reserved_delta ?? 0;
+    const actualSum = agg._sum?.reserved_delta ?? 0;
     if (actualSum !== expectedSum) {
       mismatches++;
       console.error(`SUM MISMATCH inventory=${inventoryId}: expected ${expectedSum}, got ${actualSum}`);

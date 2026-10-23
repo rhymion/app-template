@@ -21,7 +21,7 @@
 //     read-only View page. Fixed by splitting into separate view (readOnly:
 //     true) and edit targets.
 //
-// IMPORTANT — bug3 fix landing status (see subtask_421f report for detail):
+// IMPORTANT — bug3 fix landing status (see the historical QC record for detail):
 // the schema half of the bug3 fix is commit 1a6890c on branch
 // doreen/cmd419-view-boundary-fix, which is NOT YET MERGED into this
 // branch's history as of this spec's authoring (that branch is being
@@ -91,7 +91,7 @@ describe('UI: resource attachments — view/edit boundary, save persistence, per
 
   // resource's FormView/FormUpsert pass showImages=true, showFiles=false
   // (an entity config choice, unrelated to the view/edit-boundary bug —
-  // confirmed in subtask_419b's production-build verification) — so this
+  // confirmed via an earlier production-build verification) — so this
   // entity's coverage below is images-only; file-type coverage lives in
   // the product describe block.
 

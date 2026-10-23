@@ -4,8 +4,9 @@
 // Corresponding JSON schema version: 2.0
 
 generator client {
-  provider = "prisma-client"
-  output   = "../app/generated/prisma"
+  provider        = "prisma-client"
+  output          = "../app/generated/prisma"
+  previewFeatures = ["relationJoins"]
 }
 
 datasource db {
@@ -49,7 +50,29 @@ model user {
   email                     String              @unique
   password                  String?
   api_key                   String?
-  image                     String?
+  // Stage 2 of the AI-agent-integration design (app-generator-project-docs
+  // planning/ai-agent-integration-design.md): optional expiry for any
+  // account's API key, human or agent -- no separate agent principal type.
+  // null preserves today's never-expires behavior for every existing key.
+  // Checked in lib/api-auth.ts's authenticateApiKey(); not yet exposed via
+  // any UI/API setter (out of this stage's scope -- see that design doc's
+  // Stage 2 section).
+  api_key_expires_at        DateTime?
+  // Opt-in master switch for email notifications -- container only for
+  // now, no sending mechanism exists yet. Defaults to false: an unrelated
+  // user must actively opt in, never be opted in by default. A future
+  // per-category preference (e.g. "receive X but not Y") can be added as
+  // a separate table without touching this column -- this one stays the
+  // top-level on/off switch a per-category table would still have to
+  // respect.
+  email_notifications_enabled Boolean           @default(false)
+  // Direct-attachment FK (cmd_793): the user's own uploaded avatar.
+  // Nullable/SetNull, matching every other optional direct-attachment FK on
+  // this page (docs/knowledge/schema-yaml-configuration.md "Direct
+  // Attachment FK") -- no longer populated from an OAuth provider's profile
+  // image (see lib/auth/create-user.ts).
+  image_id                  String?             @unique
+  image                     attachment?         @relation("UserImage", fields: [image_id], references: [id], onDelete: SetNull)
   emailVerified             DateTime?
   // 1.2: every user belongs to exactly one tenant. The `@default("default")`
   // matches the bootstrap tenant id seeded by scripts/seed-its.ts and the
@@ -66,6 +89,12 @@ model user {
   mfa_secret                String?
   mfa_enabled               Boolean             @default(false)
   mfa_recovery_codes        mfa_recovery_code[]
+  // Bumped whenever MFA is enabled (lib/mfa/enrollment.ts completeEnrollment).
+  // auth.ts's jwt() callback snapshots this into the JWT at sign-in and
+  // re-compares it on every subsequent request; a mismatch re-arms
+  // mfa_pending so an already-active session can't outlive a later MFA
+  // enable for up to JWT_MAX_AGE (cmd_527, docs/knowledge/authentication.md).
+  mfa_token_version          Int                 @default(0)
   accounts                  Account[]
   sessions                  Session[]
   created_at                DateTime            @default(now()) @db.Timestamptz(0)
@@ -78,15 +107,13 @@ model user {
   shift_templates           shift_template[]    @relation("ShiftTemplateUser")
   shifts                    shift[]             @relation("ShiftUser")
   organizations             organization[]      @relation("UserOrganizations")
-  purchase_orders           purchase_order[]    @relation("Buyer")
+  sales_orders              sales_order[]           @relation("Buyer")
   created_db_tables         db_table[]          @relation("DbTableCreator")
   updated_db_tables         db_table[]          @relation("DbTableUpdater")
   created_xxxxx_xxxxxs      xxxxx_xxxxx[]       @relation("XxxxxXxxxxCreator")
   updated_xxxxx_xxxxxs      xxxxx_xxxxx[]       @relation("XxxxxXxxxxUpdater")
   created_parent1s          parent1[]           @relation("Parent1Creator")
   updated_parent1s          parent1[]           @relation("Parent1Updater")
-  created_parent_onlys      parent_only[]       @relation("ParentOnlyCreator")
-  updated_parent_onlys      parent_only[]       @relation("ParentOnlyUpdater")
   created_permissions       permission[]        @relation("PermissionCreator")
   updated_permissions       permission[]        @relation("PermissionUpdater")
   created_procedures        procedure[]         @relation("ProcedureCreator")
@@ -113,12 +140,13 @@ model user {
   created_by_inventory_transactions inventory_transaction[] @relation("InventoryTransactionCreatedBy")
   created_inventory_transactions inventory_transaction[] @relation("InventoryTransactionCreator")
   updated_inventory_transactions inventory_transaction[] @relation("InventoryTransactionUpdater")
-  created_purchase_orders   purchase_order[]    @relation("PurchaseOrderCreator")
-  updated_purchase_orders   purchase_order[]    @relation("PurchaseOrderUpdater")
-  created_purchase_per_items   purchase_per_item[]    @relation("PurchasePerItemCreator")
-  updated_purchase_per_items   purchase_per_item[]    @relation("PurchasePerItemUpdater")
+  created_sales_orders          sales_order[]           @relation("SalesOrderCreator")
+  updated_sales_orders          sales_order[]           @relation("SalesOrderUpdater")
+  created_sales_order_lines     sales_order_line[]      @relation("SalesOrderLineCreator")
+  updated_sales_order_lines     sales_order_line[]      @relation("SalesOrderLineUpdater")
   created_comments          comment[]           @relation("CommentCreator")
   reactions                 reaction[]          @relation("ReactionUser")
+  mobile_sessions           mobile_session[]    @relation("UserMobileSessions")
   created_notes             note[]              @relation("NoteCreator")
   updated_notes             note[]              @relation("NoteUpdater")
   leave_requests            leave_request[]     @relation("LeaveRequestUser")
@@ -145,27 +173,40 @@ model user {
   updated_rooms                 room[]              @relation("RoomUpdater")
   created_room_reservations             room_reservation[]         @relation("RoomReservationCreator")
   updated_room_reservations             room_reservation[]         @relation("RoomReservationUpdater")
-  created_receiving_purchase_orders     receiving_purchase_order[] @relation("ReceivingPurchaseOrderCreator")
-  updated_receiving_purchase_orders     receiving_purchase_order[] @relation("ReceivingPurchaseOrderUpdater")
-  created_receiving_asns                receiving_asn[]            @relation("ReceivingAsnCreator")
-  updated_receiving_asns                receiving_asn[]            @relation("ReceivingAsnUpdater")
-  created_receiving_receipts            receiving_receipt[]        @relation("ReceivingReceiptCreator")
-  updated_receiving_receipts            receiving_receipt[]        @relation("ReceivingReceiptUpdater")
-  created_receiving_receipt_lines       receiving_receipt_line[]   @relation("ReceivingReceiptLineCreator")
-  updated_receiving_receipt_lines       receiving_receipt_line[]   @relation("ReceivingReceiptLineUpdater")
-  assigned_receiving_receipt_lines      receiving_receipt_line[]   @relation("ReceivingReceiptLineAssignee")
+  created_assets                 asset[]              @relation("AssetCreator")
+  updated_assets                 asset[]              @relation("AssetUpdater")
+  created_spare_parts            spare_part[]         @relation("SparePartCreator")
+  updated_spare_parts            spare_part[]         @relation("SparePartUpdater")
+  created_maintenance_tickets    maintenance_ticket[]  @relation("MaintenanceTicketCreator")
+  updated_maintenance_tickets    maintenance_ticket[]  @relation("MaintenanceTicketUpdater")
+  created_approval_edit_terminal_tests  approval_edit_terminal_test[] @relation("ApprovalEditTerminalTestCreator")
+  updated_approval_edit_terminal_tests  approval_edit_terminal_test[] @relation("ApprovalEditTerminalTestUpdater")
+  created_purchase_orders                purchase_order[]      @relation("PurchaseOrderCreator")
+  updated_purchase_orders                purchase_order[]      @relation("PurchaseOrderUpdater")
+  created_asns                           asn[]                 @relation("AsnCreator")
+  updated_asns                           asn[]                 @relation("AsnUpdater")
+  created_goods_receipts                 goods_receipt[]       @relation("GoodsReceiptCreator")
+  updated_goods_receipts                 goods_receipt[]       @relation("GoodsReceiptUpdater")
+  created_goods_receipt_lines            goods_receipt_line[]  @relation("GoodsReceiptLineCreator")
+  updated_goods_receipt_lines            goods_receipt_line[]  @relation("GoodsReceiptLineUpdater")
+  assigned_goods_receipt_lines           goods_receipt_line[]  @relation("GoodsReceiptLineAssignee")
   created_inventory_movements           inventory_movement[]       @relation("InventoryMovementCreator")
   updated_inventory_movements           inventory_movement[]       @relation("InventoryMovementUpdater")
   created_inventory_adjustments         inventory_adjustment[]     @relation("InventoryAdjustmentCreator")
   updated_inventory_adjustments         inventory_adjustment[]     @relation("InventoryAdjustmentUpdater")
   audit_logs                audit_log[]
+  idempotency_keys          idempotency_key[]
   anonymized_at             DateTime?            // Timestamp when PII was scrubbed (GDPR anonymization)
+  invalidated_at            DateTime?
   notifications             notification[]       @relation("NotificationUser")
+  created_app_settings      app_setting[]        @relation("AppSettingCreator")
+  updated_app_settings      app_setting[]        @relation("AppSettingUpdater")
 
   @@index([api_key])
   @@index([creator_id])
   @@index([tenant_id])
   @@index([updater_id])
+  @@index([name])
 }
 
 model role {
@@ -185,6 +226,8 @@ model role {
 
   @@index([creator_id])
   @@index([updater_id])
+  @@index([description])
+  @@index([name])
 }
 
 model organization {
@@ -201,9 +244,159 @@ model organization {
   parent1s    parent1[]
   resources   resource[]
   notes       note[]
+  maintenance_tickets maintenance_ticket[]
+  // Reverse side of app_setting's `@@unique([organization_id])` FK (issue #681):
+  // singular/optional, not an array -- the unique constraint caps this at
+  // 0-or-1 rows per organization, and Prisma's own 1:1 relation syntax
+  // requires the non-FK side to be `Model?`, not `Model[]`, for the client
+  // type to reflect that real cardinality instead of a misleading array.
+  app_setting app_setting?
 
   @@index([creator_id])
   @@index([updater_id])
+  @@index([description])
+  @@index([name])
+}
+
+// Per-organization business date override -- container only for now: no
+// read function, admin UI, scheduled-task wiring, or audit-log extension
+// exist yet, only this model. `organization_id` is nullable: a row with
+// `organization_id = NULL` is the tenant-wide default, used by any data
+// that has no organization, or whose organization has no `app_setting`
+// row of its own.
+// `@@unique([organization_id])` below covers "at most one row per org" (a
+// plain unique constraint works fine for actual non-null values).
+//
+// "At most one default row" (organization_id IS NULL) is a SEPARATE
+// invariant that cannot be expressed in this schema file at all, in two
+// stages that were each verified empirically against a real Postgres 18
+// test database rather than assumed:
+//   1. Prisma 7.10's `partialIndexes` preview feature does add a `where:`
+//      argument to `@@unique`/`@@index` (undocumented as of this writing --
+//      found by probing the schema validator's own error messages, not
+//      from any changelog). But `@@unique([organization_id], where: {
+//      organization_id: null })` still failed empirically: it lowers to
+//      plain `CREATE UNIQUE INDEX ... ON app_setting(organization_id)
+//      WHERE organization_id IS NULL`, and Postgres's default behavior
+//      treats every NULL as distinct from every other NULL even inside a
+//      partial index, so two organization_id-IS-NULL rows inserted
+//      through it were both accepted, not rejected -- disproving the
+//      constraint despite the schema looking correct. Prisma has no
+//      `nulls: NotDistinct` argument (confirmed: "No such argument" from
+//      the validator) to opt into Postgres 15+'s NULLS NOT DISTINCT
+//      behavior, so this cannot be fixed from inside the schema DSL.
+//   2. The actual fix -- a unique index on a constant expression, filtered
+//      by the same predicate, so the indexed value is a real (non-null)
+//      literal that Postgres compares by ordinary equality instead of by
+//      NULL identity -- has no representation in Prisma's schema DSL at
+//      all (`@@unique`'s field list only accepts model fields, not
+//      expressions), so it must be raw SQL:
+//        CREATE UNIQUE INDEX app_setting_default_row_unique
+//          ON app_setting ((true)) WHERE organization_id IS NULL;
+//      Verified against a real Postgres 18 container: a first
+//      organization_id-IS-NULL insert succeeds, a second is rejected with
+//      "duplicate key value violates unique constraint ... Key
+//      ((true))=(t) already exists"; a plain `db push` re-run afterwards
+//      left this raw index untouched (not dropped as drift) since
+//      Prisma's diff only pushes forward what schema.prisma declares.
+// This index is deliberately NOT included in this task's own migration --
+// see docs/knowledge/appendix/business-date-container.md for the full SQL
+// and when it is meant to be applied.
+// `creator_id`/`updater_id` stay NOT NULL, matching every other audited
+// common model in this schema (tenant/user/role/organization/permission/
+// approval_flow/dashboard all pair a required creator_id with a required
+// updater_id): a future default row's creator_id/updater_id must be the
+// pre-existing "Scheduled Task System" actor (SCHEDULED_TASK_ACTOR_EMAIL,
+// lib/scheduled-tasks/system-actor.ts), the same way scripts/seed-
+// baseline.ts already resolves an actor for every other seeded row, not a
+// null value.
+// `organization_id` (not `org_id`) follows this schema's own FK naming
+// convention (docs/knowledge/prisma-schema-conventions.md §3: every
+// x-relationship FK field needs a matching `<name>_id` column paired with
+// a `<name>` relation field derived by stripping the `_id` suffix) and is
+// the literal column name code_generator/validate.py's
+// `_REQUIRED_INDEX_COLUMNS` requires an index on.
+model app_setting {
+  id            String        @id @default(cuid())
+  organization_id String?
+  organization  organization? @relation(fields: [organization_id], references: [id])
+  business_date String?
+  is_pinned     Boolean       @default(false)
+  timezone      Timezone      @default(utc)
+  // Scheduled-task operations (NULL = built-in default; see lib/scheduled-tasks/admin-view.ts):
+  // minutes a `running` record may stay open before the admin page calls it stuck, and
+  // minutes between predecessor rechecks for a task waiting on one.
+  scheduled_task_stuck_after_minutes Int?
+  scheduled_task_recheck_minutes     Int?
+  created_at    DateTime      @default(now()) @db.Timestamptz(0)
+  updated_at    DateTime      @updatedAt @db.Timestamptz(0)
+  creator_id    String
+  creator       user          @relation("AppSettingCreator", fields: [creator_id], references: [id])
+  updater_id    String
+  updater       user          @relation("AppSettingUpdater", fields: [updater_id], references: [id])
+
+  @@unique([organization_id])
+  @@index([organization_id])
+  @@index([creator_id])
+  @@index([updater_id])
+  @@index([timezone])
+}
+
+enum Timezone {
+  pacific_pago_pago
+  pacific_honolulu
+  pacific_marquesas
+  america_anchorage
+  america_los_angeles
+  america_denver
+  america_chicago
+  america_mexico_city
+  america_new_york
+  america_toronto
+  america_bogota
+  america_caracas
+  america_st_johns
+  america_sao_paulo
+  america_nuuk
+  atlantic_azores
+  utc
+  europe_london
+  europe_madrid
+  europe_paris
+  europe_berlin
+  europe_rome
+  africa_lagos
+  africa_cairo
+  africa_johannesburg
+  asia_jerusalem
+  europe_istanbul
+  europe_moscow
+  asia_tehran
+  asia_dubai
+  asia_kabul
+  asia_karachi
+  asia_kolkata
+  asia_kathmandu
+  asia_dhaka
+  asia_yangon
+  asia_bangkok
+  asia_jakarta
+  asia_shanghai
+  asia_hong_kong
+  asia_singapore
+  asia_manila
+  australia_perth
+  australia_eucla
+  asia_seoul
+  asia_tokyo
+  australia_adelaide
+  australia_sydney
+  australia_lord_howe
+  pacific_noumea
+  pacific_auckland
+  pacific_chatham
+  pacific_apia
+  pacific_kiritimati
 }
 
 model permission {
@@ -227,6 +420,7 @@ model permission {
   @@index([creator_id])
   @@index([role_id])
   @@index([updater_id])
+  @@index([name])
 }
 
 model approvable {
@@ -235,10 +429,12 @@ model approvable {
   creator           user?              @relation("ApprovableCreator", fields: [creator_id], references: [id])
   approval_requests approval_request[]
   leave_request     leave_request?
-  purchase_per_item purchase_per_item?
-  receiving_receipt_line receiving_receipt_line?
+  sales_order_line   sales_order_line?
+  goods_receipt_line     goods_receipt_line?
   inventory_movement   inventory_movement?
   inventory_adjustment inventory_adjustment?
+  maintenance_ticket   maintenance_ticket?
+  approval_edit_terminal_test approval_edit_terminal_test?
   approved_at       DateTime?          @db.Timestamptz(0)
   rejection_reason  String?
 
@@ -267,6 +463,7 @@ model approval_flow {
   @@index([approver_role_id])
   @@index([requestor_role_id])
   @@index([updater_id])
+  @@index([entity_name])
 }
 
 enum ApprovalRequestStatus {
@@ -274,6 +471,12 @@ enum ApprovalRequestStatus {
   approved
   rejected
   terminal_rejected
+  withdrawn
+  // cmd_963 (app-generator): split invalidates the parent's current round
+  // instead of deleting its approval_request rows. canSubmitForApproval
+  // treats a round containing this status as permanently closed, same as
+  // terminal_rejected -- the parent's rows may never resubmit once split.
+  split_invalidated
 }
 
 model approval_request {
@@ -283,11 +486,19 @@ model approval_request {
   approval_flow_id   String
   approval_flow      approval_flow      @relation(fields: [approval_flow_id], references: [id])
   status             ApprovalRequestStatus @default(pending)
+  // cmd_844 (app-generator upstream): identifies which submission ("round")
+  // this row belongs to -- every approval_request row created in the same
+  // submit transaction shares one round_id (cuid, generated once per
+  // submission). Backfilled to round_id = id for pre-migration rows (each
+  // is its own independent round). See app-generator's
+  // docs/knowledge/appendix/approval-flow.md §16.12.
+  round_id           String
   approval_histories approval_history[]
   created_at         DateTime           @default(now()) @db.Timestamptz(0)
   updated_at         DateTime           @updatedAt @db.Timestamptz(0)
   @@index([approvable_id])
   @@index([approval_flow_id])
+  @@index([round_id])
 }
 
 model approval_history {
@@ -315,8 +526,8 @@ model commentable {
 
 model inventory_transactionable {
   id                     String                  @id @default(cuid())
-  purchase_per_item      purchase_per_item?
-  receiving_receipt_line receiving_receipt_line?
+  sales_order_line       sales_order_line?
+  goods_receipt_line     goods_receipt_line?
   inventory_movement     inventory_movement?
   inventory_adjustment   inventory_adjustment?
   inventory_transactions inventory_transaction[]
@@ -340,7 +551,7 @@ model inventory_transaction {
   quantity_delta                Int
   reserved_delta                Int
   product_id                    String
-  location                      String
+  location_id                   String
   lot_number                    String?
   expiration_date               DateTime?                 @db.Timestamptz(0)
   approved_via                  String?
@@ -357,6 +568,8 @@ model inventory_transaction {
   @@index([created_by_id])
   @@index([creator_id])
   @@index([updater_id])
+  @@index([product_id])
+  @@index([quantity_delta])
 }
 
 model inventory_movement {
@@ -382,6 +595,7 @@ model inventory_movement {
   @@index([to_inventory_id])
   @@index([creator_id])
   @@index([updater_id])
+  @@index([quantity])
 }
 
 enum InventoryAdjustmentStatus {
@@ -410,6 +624,7 @@ model inventory_adjustment {
   @@index([inventory_id])
   @@index([creator_id])
   @@index([updater_id])
+  @@index([quantity_delta])
 }
 
 model comment {
@@ -443,6 +658,7 @@ model reaction {
   user_id    String
   user       user     @relation("ReactionUser", fields: [user_id], references: [id])
   created_at DateTime @default(now()) @db.Timestamptz(0)
+  updated_at DateTime @updatedAt @db.Timestamptz(0)
 
   @@unique([comment_id, user_id, type])
   @@index([comment_id])
@@ -489,8 +705,20 @@ model attachment {
   path                    String
   encrypted_original_name String?
   name_iv                 String?
-  attachable_id           String
-  attachable              attachable @relation(fields: [attachable_id], references: [id], onDelete: Cascade)
+  // Nullable: a direct-attachment FK (x-relationship type:direct, e.g.
+  // product.warranty_card_id) creates an attachment row with no attachable
+  // bridge owner at all -- attachable_id stays null for that row's whole
+  // life. onDelete: SetNull (not Cascade) because a null attachable_id is a
+  // normal, permanent state here, not a transient one pending cleanup.
+  attachable_id           String?
+  attachable              attachable? @relation(fields: [attachable_id], references: [id], onDelete: SetNull)
+  product_warranty_card             product?       @relation("ProductWarrantyCard")
+  leave_request_medical_certificate leave_request? @relation("LeaveRequestMedicalCertificate")
+  // Direct-attachment FK reverse field (cmd_793) -- hand-written, not
+  // generator-injected (validate_direct_attachment_reverse_fields checks
+  // this at generate time). See docs/knowledge/schema-yaml-configuration.md
+  // "Direct Attachment FK".
+  user_image              user?      @relation("UserImage")
   created_at              DateTime   @default(now()) @db.Timestamptz(0)
   updated_at              DateTime   @updatedAt @db.Timestamptz(0)
   @@index([attachable_id])
@@ -509,6 +737,7 @@ model dashboard {
 
   @@index([creator_id])
   @@index([updater_id])
+  @@index([name])
 }
 
 enum DashboardWidgetChartType {
@@ -538,11 +767,12 @@ model dashboard_widget {
   dashboard      dashboard @relation(fields: [dashboard_id], references: [id], onDelete: Cascade)
   name            String
   entity_name     String
-  chart_type      DashboardWidgetChartType
+  chart_type      DashboardWidgetChartType @default(column)
   group_by_field  String
   stack_mode      DashboardWidgetStackMode?
   series_field    String?
   group_by_bucket DashboardWidgetGroupByBucket?
+  timezone        Timezone  @default(utc)
   filter_field    String?
   filter_value    String?
   order          Int       @default(0)
@@ -558,8 +788,18 @@ model dashboard_widget {
 // constraint — deleting a user does not cascade-delete their audit history.
 // `actor_user_id` is nullable because some events (rejected sign-in with an
 // unknown email, system-triggered actions) have no resolved actor.
+//
+// Append-only is enforced in layers (docs/knowledge/audit-log-append-only.md):
+// a Prisma Client guard (lib/audit-log-integrity/guard.ts), a row trigger and
+// privilege template (prisma/sql/audit_log_append_only.sql), and a digest
+// chain over closed periods. `metadata` never contains personal data.
+//
+// The table is range-partitioned on `created_at` by that SQL template, which
+// needs the partition key in the primary key; Prisma cannot declare
+// partitioning, and `prisma db push` / `migrate dev` leave a partitioned
+// parent table alone.
 model audit_log {
-  id            String   @id @default(cuid())
+  id            String   @default(cuid())
   actor_user_id String?
   actor_user    user?    @relation(fields: [actor_user_id], references: [id], onDelete: Restrict)
   action        String
@@ -568,8 +808,60 @@ model audit_log {
   metadata      Json?
   created_at    DateTime @default(now()) @db.Timestamptz(0)
 
+  @@id([id, created_at])
   @@index([actor_user_id])
   @@index([target_table, target_id])
+  @@index([created_at])
+}
+
+// One digest per closed audit_log period (SHA-256 over the period's rows,
+// chained to the previous period's digest). Append-only like audit_log: the
+// SQL template adds the same trigger. See docs/knowledge/audit-log-append-only.md.
+model audit_log_digest {
+  id              String   @id @default(cuid())
+  period_start    DateTime @unique @db.Timestamptz(0)
+  period_end      DateTime @db.Timestamptz(0)
+  row_count       Int
+  digest          String
+  previous_digest String?
+  created_at      DateTime @default(now()) @db.Timestamptz(0)
+}
+
+// One-day idempotency-key cache for external API create calls
+// (ai-agent-integration-design.md "Idempotency keys and rate limiting —
+// resolved design"). A row is written in the SAME transaction as the
+// record it guards -- unlike Redis, Postgres can commit or roll back both
+// together, so a crash mid-write can never leave the key and the record
+// out of sync (the structural reason this is a table, not a cache — see
+// the design doc's "why the table wins"). Scope: single-record create
+// endpoints only -- update/delete already converge to the same end state
+// on retry, and CSV import already has its own key-column dedup.
+//
+// Retention is enforced logically (a row older than one day is treated as
+// expired at lookup time, in lib/idempotency.ts), not by a scheduled
+// deletion job -- the design ruling deliberately does not add a new
+// scheduling mechanism for a housekeeping delete. A stale row is simply
+// overwritten the next time its (key, actor, entity) tuple is reused.
+model idempotency_key {
+  id              String   @id @default(cuid())
+  key             String
+  actor_user_id   String
+  actor_user      user     @relation(fields: [actor_user_id], references: [id], onDelete: Cascade)
+  // The entity name the key was scoped to (route template's `parent`
+  // identifier, e.g. 'invoice') -- the same caller may reuse one key value
+  // across different endpoints without collision.
+  target_entity   String
+  // SHA-256 hex of the request body actually submitted. A retry with the
+  // same key but a different body is a client bug, not a legitimate
+  // replay -- rejected as a conflict rather than silently served the first
+  // request's stale result (see lib/idempotency.ts).
+  request_hash    String
+  response_status Int
+  response_body   Json
+  created_at      DateTime @default(now()) @db.Timestamptz(0)
+
+  @@unique([key, actor_user_id, target_entity], name: "idempotency_key_actor_target")
+  @@index([actor_user_id])
   @@index([created_at])
 }
 
@@ -667,6 +959,7 @@ model db_table {
 
   @@index([creator_id])
   @@index([updater_id])
+  @@index([description])
 }
 
 enum FieldType {
@@ -709,6 +1002,8 @@ model xxxxx_xxxxx {
 
   @@index([creator_id])
   @@index([updater_id])
+  @@index([team])
+  @@index([description])
 }
 
 model yyyyy_yyyyy {
@@ -730,8 +1025,8 @@ model yyyyy_yyyyy {
 model parent1 {
   id              String           @id @default(cuid())
   name            String           @unique
-  organization_id String
-  organization    organization     @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+  organization_id String?
+  organization    organization?    @relation(fields: [organization_id], references: [id], onDelete: SetNull)
   description     String?
   price           Int
   due_date        DateTime         @db.Timestamptz(0)
@@ -749,6 +1044,7 @@ model parent1 {
   @@index([creator_id])
   @@index([organization_id])
   @@index([updater_id])
+  @@index([description])
 }
 
 model parent1_child1 {
@@ -791,23 +1087,6 @@ model parent1_list {
   @@index([parent1_id])
 }
 
-model parent_only {
-  id          String    @id @default(cuid())
-  name        String    @unique
-  description String?
-  login_time  DateTime? @db.Timestamptz(0)
-  logout_time DateTime? @db.Timestamptz(0)
-  created_at  DateTime  @default(now()) @db.Timestamptz(0)
-  updated_at  DateTime  @updatedAt @db.Timestamptz(0)
-  creator_id  String
-  creator     user      @relation("ParentOnlyCreator", fields: [creator_id], references: [id])
-  updater_id  String
-  updater     user      @relation("ParentOnlyUpdater", fields: [updater_id], references: [id])
-
-  @@index([creator_id])
-  @@index([updater_id])
-}
-
 model procedure {
   id          String      @id @default(cuid())
   name        String
@@ -830,6 +1109,8 @@ model procedure {
   @@index([assignee_id])
   @@index([parent_id])
   @@index([updater_id])
+  @@index([description])
+  @@index([name])
 }
 
 model resource {
@@ -851,6 +1132,7 @@ model resource {
   @@index([creator_id])
   @@index([organization_id])
   @@index([updater_id])
+  @@index([name])
 }
 
 model booking {
@@ -870,6 +1152,9 @@ model booking {
   @@index([creator_id])
   @@index([resource_id])
   @@index([updater_id])
+  @@index([end_time])
+  @@index([name])
+  @@index([start_time])
 }
 
 enum DayOfWeek {
@@ -899,6 +1184,8 @@ model shift_template {
   @@index([creator_id])
   @@index([updater_id])
   @@index([user_id])
+  @@index([end_time])
+  @@index([start_time])
 }
 
 enum ShiftStatus {
@@ -924,6 +1211,8 @@ model shift {
   @@index([creator_id])
   @@index([updater_id])
   @@index([user_id])
+  @@index([end_time])
+  @@index([start_time])
 }
 
 model product {
@@ -934,11 +1223,22 @@ model product {
   barcode            String?
   attachable_id      String              @unique
   attachable         attachable          @relation(fields: [attachable_id], references: [id])
+  // Nullable, not required: an existing `product` table may already have
+  // rows, and an ADD COLUMN ... NOT NULL with no default fails a migration
+  // against non-empty data. The REQUIRED direct-attachment FK code path is
+  // covered instead by the generator's own direct_attachment_gate fixture
+  // (a from-scratch fixture DB has no such constraint), not by this
+  // consumer schema.
+  warranty_card_id   String?             @unique
+  warranty_card      attachment?         @relation("ProductWarrantyCard", fields: [warranty_card_id], references: [id], onDelete: SetNull)
+  spec_sheet_url     String?
   inventories                    inventory[]
-  purchase_per_items             purchase_per_item[]
-  receiving_purchase_order_lines receiving_purchase_order_line[]
-  receiving_asn_lines            receiving_asn_line[]
-  receiving_receipt_lines        receiving_receipt_line[]
+  sales_order_lines              sales_order_line[]
+  purchase_order_lines            purchase_order_line[]
+  asn_lines                       asn_line[]
+  goods_receipt_lines             goods_receipt_line[]
+  asset_components               asset_component[] @relation("AssetComponentProduct")
+  spare_parts                    spare_part[] @relation("SparePartRelatedProduct")
   created_at                     DateTime                        @default(now()) @db.Timestamptz(0)
   updated_at         DateTime            @updatedAt @db.Timestamptz(0)
   creator_id         String
@@ -948,16 +1248,18 @@ model product {
 
   @@index([creator_id])
   @@index([updater_id])
+  @@index([name])
+  @@index([price])
 }
 
 model inventory {
   id                String    @id @default(cuid())
   product_id        String
   product           product   @relation(fields: [product_id], references: [id], onDelete: Cascade)
-  quantity          Int
+  quantity          Int       @default(0)
   reserved_quantity Int       @default(0)
-  location_id       String?
-  location          location? @relation(fields: [location_id], references: [id])
+  location_id       String
+  location          location  @relation(fields: [location_id], references: [id])
   lot_number        String?
   expiration_date   DateTime?
   created_at        DateTime  @default(now()) @db.Timestamptz(0)
@@ -966,8 +1268,8 @@ model inventory {
   creator           user      @relation("InventoryCreator", fields: [creator_id], references: [id])
   updater_id        String
   updater           user      @relation("InventoryUpdater", fields: [updater_id], references: [id])
-  receiving_receipt_lines receiving_receipt_line[] @relation("ReceiptLineInventory")
-  purchase_per_items purchase_per_item[]
+  goods_receipt_lines goods_receipt_line[] @relation("ReceiptLineInventory")
+  sales_order_lines sales_order_line[]
   movements_from    inventory_movement[]   @relation("InventoryMovementFrom")
   movements_to      inventory_movement[]   @relation("InventoryMovementTo")
   adjustments       inventory_adjustment[]
@@ -976,6 +1278,7 @@ model inventory {
   @@index([location_id])
   @@index([product_id])
   @@index([updater_id])
+  @@index([quantity])
 }
 
 model location {
@@ -988,72 +1291,78 @@ model location {
   creator     user        @relation("LocationCreator", fields: [creator_id], references: [id])
   updater_id  String
   updater     user        @relation("LocationUpdater", fields: [updater_id], references: [id])
+  invalidated_at            DateTime?
 
   @@index([creator_id])
   @@index([updater_id])
+  @@index([name])
 }
 
-model purchase_order {
+model sales_order {
   id          String              @id @default(cuid())
   order_no    String
   customer_id String
   customer    user                @relation("Buyer", fields: [customer_id], references: [id])
-  items       purchase_per_item[]
+  items       sales_order_line[]
   created_at  DateTime            @default(now()) @db.Timestamptz(0)
   updated_at  DateTime            @updatedAt @db.Timestamptz(0)
   creator_id  String
-  creator     user                @relation("PurchaseOrderCreator", fields: [creator_id], references: [id])
+  creator     user                @relation("SalesOrderCreator", fields: [creator_id], references: [id])
   updater_id  String
-  updater     user                @relation("PurchaseOrderUpdater", fields: [updater_id], references: [id])
+  updater     user                @relation("SalesOrderUpdater", fields: [updater_id], references: [id])
 
   @@index([creator_id])
   @@index([customer_id])
   @@index([updater_id])
+  @@index([order_no])
 }
 
-enum PurchasePerItemStatus {
+enum SalesOrderLineStatus {
+  draft
   pending
   split
   rejected
 }
 
-model purchase_per_item {
+model sales_order_line {
   id                    String                 @id @default(cuid())
-  purchase_order_id     String
-  purchase_order        purchase_order         @relation(fields: [purchase_order_id], references: [id], onDelete: Cascade)
+  sales_order_id        String
+  sales_order           sales_order            @relation(fields: [sales_order_id], references: [id], onDelete: Cascade)
   product_id            String
   product               product                @relation(fields: [product_id], references: [id], onDelete: Cascade)
   quantity              Int
-  status                PurchasePerItemStatus  @default(pending)
+  status                SalesOrderLineStatus   @default(draft)
   price                 Int?
   approvable_id                 String                    @unique
   approvable                    approvable                @relation(fields: [approvable_id], references: [id])
   inventory_transactionable_id  String?                    @unique
   inventory_transactionable     inventory_transactionable? @relation(fields: [inventory_transactionable_id], references: [id])
   parent_id            String?
-  parent               purchase_per_item?   @relation("PurchasePerItemSplit", fields: [parent_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  children             purchase_per_item[]  @relation("PurchasePerItemSplit")
+  parent               sales_order_line?   @relation("SalesOrderLineSplit", fields: [parent_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  children             sales_order_line[]  @relation("SalesOrderLineSplit")
   inventory_id         String?
   inventory            inventory?        @relation(fields: [inventory_id], references: [id])
   created_at           DateTime          @default(now()) @db.Timestamptz(0)
   updated_at           DateTime          @updatedAt @db.Timestamptz(0)
   creator_id           String?
-  creator              user?             @relation("PurchasePerItemCreator", fields: [creator_id], references: [id])
+  creator              user?             @relation("SalesOrderLineCreator", fields: [creator_id], references: [id])
   updater_id           String?
-  updater              user?             @relation("PurchasePerItemUpdater", fields: [updater_id], references: [id])
+  updater              user?             @relation("SalesOrderLineUpdater", fields: [updater_id], references: [id])
 
   @@index([creator_id])
   @@index([inventory_id])
   @@index([parent_id])
   @@index([product_id])
-  @@index([purchase_order_id])
+  @@index([sales_order_id])
   @@index([updater_id])
+  @@index([quantity])
 }
 
 enum LeaveRequestStatus {
   pending
   approved
   rejected
+  draft
 }
 
 model leave_request {
@@ -1066,6 +1375,8 @@ model leave_request {
   status        LeaveRequestStatus @default(pending)
   approvable_id String     @unique
   approvable    approvable @relation(fields: [approvable_id], references: [id])
+  medical_certificate_id String?     @unique
+  medical_certificate    attachment? @relation("LeaveRequestMedicalCertificate", fields: [medical_certificate_id], references: [id], onDelete: SetNull)
   created_at    DateTime   @default(now()) @db.Timestamptz(0)
   updated_at    DateTime   @updatedAt @db.Timestamptz(0)
   creator_id    String
@@ -1079,6 +1390,8 @@ model leave_request {
   @@index([assignee_id])
   @@index([updater_id])
   @@index([user_id])
+  @@index([end_date])
+  @@index([start_date])
 }
 
 // ============================================================
@@ -1101,6 +1414,8 @@ model supply_pool {
 
   @@index([creator_id])
   @@index([updater_id])
+  @@index([description])
+  @@index([name])
 }
 
 model supply_request {
@@ -1118,6 +1433,8 @@ model supply_request {
 
   @@index([creator_id])
   @@index([updater_id])
+  @@index([description])
+  @@index([name])
 }
 
 model supply_allocation {
@@ -1142,6 +1459,7 @@ model room_type {
   name              String
   capacity          Int?
   description       String?
+  stripe_price_id   String             @default("")
   rooms             room[]
   room_reservations room_reservation[]
   created_at        DateTime           @default(now()) @db.Timestamptz(0)
@@ -1153,6 +1471,8 @@ model room_type {
 
   @@index([creator_id])
   @@index([updater_id])
+  @@index([description])
+  @@index([name])
 }
 
 enum RoomStatus {
@@ -1168,6 +1488,7 @@ model room {
   floor             Int?
   status            RoomStatus         @default(available)
   room_reservations room_reservation[]
+  asset_components  asset_component[] @relation("AssetComponentRoom")
   created_at        DateTime           @default(now()) @db.Timestamptz(0)
   updated_at        DateTime           @updatedAt @db.Timestamptz(0)
   creator_id        String
@@ -1178,6 +1499,7 @@ model room {
   @@index([creator_id])
   @@index([room_type_id])
   @@index([updater_id])
+  @@index([room_no])
 }
 
 model room_reservation {
@@ -1200,13 +1522,16 @@ model room_reservation {
   @@index([room_id])
   @@index([room_type_id])
   @@index([updater_id])
+  @@index([check_in])
+  @@index([check_out])
+  @@index([guest_name])
 }
 
 // ============================================================
-// x-receiving: Receiving lifecycle (PO / ASN / Receipt)
+// Procurement lifecycle (PO / ASN / Goods Receipt)
 // ============================================================
 
-enum ReceivingPurchaseOrderStatus {
+enum PurchaseOrderStatus {
   draft
   issued
   partially_received
@@ -1214,50 +1539,51 @@ enum ReceivingPurchaseOrderStatus {
   cancelled
 }
 
-model receiving_purchase_order {
+model purchase_order {
   id                             String                           @id @default(cuid())
   order_no                       String
-  status                         ReceivingPurchaseOrderStatus     @default(draft)
-  lines                          receiving_purchase_order_line[]
-  receiving_asns                 receiving_asn[]
-  receiving_receipts             receiving_receipt[]
+  status                         PurchaseOrderStatus              @default(draft)
+  lines                          purchase_order_line[]
+  asns                           asn[]
+  goods_receipts                 goods_receipt[]
   created_at                     DateTime                         @default(now()) @db.Timestamptz(0)
   updated_at                     DateTime                         @updatedAt @db.Timestamptz(0)
   creator_id                     String
-  creator                        user                             @relation("ReceivingPurchaseOrderCreator", fields: [creator_id], references: [id])
+  creator                        user                             @relation("PurchaseOrderCreator", fields: [creator_id], references: [id])
   updater_id                     String
-  updater                        user                             @relation("ReceivingPurchaseOrderUpdater", fields: [updater_id], references: [id])
+  updater                        user                             @relation("PurchaseOrderUpdater", fields: [updater_id], references: [id])
 
   @@index([creator_id])
   @@index([updater_id])
+  @@index([order_no])
 }
 
-enum ReceivingPurchaseOrderLineStatus {
+enum PurchaseOrderLineStatus {
   outstanding
   partially_received
   fully_received
   cancelled
 }
 
-model receiving_purchase_order_line {
-  id                          String                   @id @default(cuid())
-  receiving_purchase_order_id String
-  receiving_purchase_order    receiving_purchase_order @relation(fields: [receiving_purchase_order_id], references: [id], onDelete: Cascade)
-  product_id                  String
-  product                     product                  @relation(fields: [product_id], references: [id], onDelete: Cascade)
-  ordered_quantity            Int
-  done_quantity               Int                      @default(0)
-  cancelled_quantity          Int                      @default(0)
-  outstanding_quantity        Int                      @default(0)
-  status                      ReceivingPurchaseOrderLineStatus @default(outstanding)
-  created_at                  DateTime                 @default(now()) @db.Timestamptz(0)
-  updated_at                  DateTime                 @updatedAt @db.Timestamptz(0)
+model purchase_order_line {
+  id                 String                   @id @default(cuid())
+  purchase_order_id  String
+  purchase_order     purchase_order           @relation(fields: [purchase_order_id], references: [id], onDelete: Cascade)
+  product_id         String
+  product            product                  @relation(fields: [product_id], references: [id], onDelete: Cascade)
+  ordered_quantity   Int
+  done_quantity      Int                      @default(0)
+  cancelled_quantity Int                      @default(0)
+  outstanding_quantity Int                    @default(0)
+  status             PurchaseOrderLineStatus @default(outstanding)
+  created_at         DateTime                 @default(now()) @db.Timestamptz(0)
+  updated_at         DateTime                 @updatedAt @db.Timestamptz(0)
 
-  @@index([receiving_purchase_order_id])
+  @@index([purchase_order_id])
   @@index([product_id])
 }
 
-enum ReceivingAsnStatus {
+enum AsnStatus {
   draft
   sent
   partially_matched
@@ -1265,120 +1591,137 @@ enum ReceivingAsnStatus {
   cancelled
 }
 
-model receiving_asn {
-  id                 String                    @id @default(cuid())
-  asn_no             String
-  purchase_order_id  String?
-  purchase_order     receiving_purchase_order? @relation(fields: [purchase_order_id], references: [id])
-  status             ReceivingAsnStatus        @default(draft)
-  lines              receiving_asn_line[]
-  receiving_receipts receiving_receipt[]
-  created_at         DateTime                  @default(now()) @db.Timestamptz(0)
-  updated_at         DateTime                  @updatedAt @db.Timestamptz(0)
-  creator_id         String
-  creator            user                      @relation("ReceivingAsnCreator", fields: [creator_id], references: [id])
-  updater_id         String
-  updater            user                      @relation("ReceivingAsnUpdater", fields: [updater_id], references: [id])
+model asn {
+  id                String                    @id @default(cuid())
+  asn_no            String
+  purchase_order_id String?
+  purchase_order    purchase_order?           @relation(fields: [purchase_order_id], references: [id])
+  status            AsnStatus                 @default(draft)
+  lines             asn_line[]
+  goods_receipts    goods_receipt[]
+  created_at        DateTime                  @default(now()) @db.Timestamptz(0)
+  updated_at        DateTime                  @updatedAt @db.Timestamptz(0)
+  creator_id        String
+  creator           user                      @relation("AsnCreator", fields: [creator_id], references: [id])
+  updater_id        String
+  updater           user                      @relation("AsnUpdater", fields: [updater_id], references: [id])
 
   @@index([creator_id])
   @@index([purchase_order_id])
   @@index([updater_id])
+  @@index([asn_no])
 }
 
-enum ReceivingAsnLineStatus {
+enum AsnLineStatus {
   outstanding
   partially_matched
   fully_matched
   cancelled
 }
 
-model receiving_asn_line {
-  id                   String        @id @default(cuid())
-  receiving_asn_id     String
-  receiving_asn        receiving_asn @relation(fields: [receiving_asn_id], references: [id], onDelete: Cascade)
+model asn_line {
+  id                   String    @id @default(cuid())
+  asn_id               String
+  asn                  asn       @relation(fields: [asn_id], references: [id], onDelete: Cascade)
   product_id           String
-  product              product       @relation(fields: [product_id], references: [id], onDelete: Cascade)
+  product              product   @relation(fields: [product_id], references: [id], onDelete: Cascade)
   shipped_quantity     Int
-  done_quantity        Int           @default(0)
-  cancelled_quantity   Int           @default(0)
-  outstanding_quantity Int           @default(0)
-  status               ReceivingAsnLineStatus @default(outstanding)
-  created_at           DateTime      @default(now()) @db.Timestamptz(0)
-  updated_at           DateTime      @updatedAt @db.Timestamptz(0)
+  done_quantity        Int       @default(0)
+  cancelled_quantity   Int       @default(0)
+  outstanding_quantity Int       @default(0)
+  status               AsnLineStatus @default(outstanding)
+  created_at           DateTime  @default(now()) @db.Timestamptz(0)
+  updated_at           DateTime  @updatedAt @db.Timestamptz(0)
 
-  @@index([receiving_asn_id])
+  @@index([asn_id])
   @@index([product_id])
 }
 
-enum ReceivingReceiptStatus {
+enum GoodsReceiptStatus {
   draft
   confirmed
   cancelled
 }
 
-model receiving_receipt {
+model goods_receipt {
   id                String                    @id @default(cuid())
   receipt_no        String
   purchase_order_id String?
-  purchase_order    receiving_purchase_order? @relation(fields: [purchase_order_id], references: [id])
+  purchase_order    purchase_order?           @relation(fields: [purchase_order_id], references: [id])
   asn_id            String?
-  asn               receiving_asn?            @relation(fields: [asn_id], references: [id])
-  status            ReceivingReceiptStatus    @default(draft)
+  asn               asn?                      @relation(fields: [asn_id], references: [id])
+  status            GoodsReceiptStatus        @default(draft)
   confirmed_at      DateTime?                 @db.Timestamptz(0)
-  lines             receiving_receipt_line[]
+  lines             goods_receipt_line[]
   created_at        DateTime                  @default(now()) @db.Timestamptz(0)
   updated_at        DateTime                  @updatedAt @db.Timestamptz(0)
   creator_id        String
-  creator           user                      @relation("ReceivingReceiptCreator", fields: [creator_id], references: [id])
+  creator           user                      @relation("GoodsReceiptCreator", fields: [creator_id], references: [id])
   updater_id        String
-  updater           user                      @relation("ReceivingReceiptUpdater", fields: [updater_id], references: [id])
+  updater           user                      @relation("GoodsReceiptUpdater", fields: [updater_id], references: [id])
 
   @@index([creator_id])
   @@index([purchase_order_id])
   @@index([asn_id])
   @@index([updater_id])
+  @@index([receipt_no])
 }
 
-enum ReceivingReceiptLineStatus {
+enum GoodsReceiptLineStatus {
   pending
   split
   rejected
 }
 
-model receiving_receipt_line {
+model goods_receipt_line {
   id                   String            @id @default(cuid())
-  receiving_receipt_id String
-  receiving_receipt    receiving_receipt @relation(fields: [receiving_receipt_id], references: [id], onDelete: Cascade)
+  goods_receipt_id     String
+  goods_receipt        goods_receipt     @relation(fields: [goods_receipt_id], references: [id], onDelete: Cascade)
   product_id           String
   product              product           @relation(fields: [product_id], references: [id], onDelete: Cascade)
   receipt_quantity     Int
-  status               ReceivingReceiptLineStatus @default(pending)
+  status               GoodsReceiptLineStatus @default(pending)
   inventory_id         String?
   inventory            inventory?        @relation("ReceiptLineInventory", fields: [inventory_id], references: [id])
   approvable_id        String           @unique
   approvable           approvable       @relation(fields: [approvable_id], references: [id])
   parent_id            String?
-  parent               receiving_receipt_line?   @relation("ReceiptLineSplit", fields: [parent_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  children             receiving_receipt_line[]  @relation("ReceiptLineSplit")
+  parent               goods_receipt_line?   @relation("ReceiptLineSplit", fields: [parent_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  children             goods_receipt_line[]  @relation("ReceiptLineSplit")
   is_split_result      Boolean           @default(false)
   inventory_transactionable_id String?                     @unique
   inventory_transactionable    inventory_transactionable? @relation(fields: [inventory_transactionable_id], references: [id])
   created_at           DateTime          @default(now()) @db.Timestamptz(0)
   updated_at           DateTime          @updatedAt @db.Timestamptz(0)
   creator_id           String?
-  creator              user?             @relation("ReceivingReceiptLineCreator", fields: [creator_id], references: [id])
+  creator              user?             @relation("GoodsReceiptLineCreator", fields: [creator_id], references: [id])
   updater_id           String?
-  updater              user?             @relation("ReceivingReceiptLineUpdater", fields: [updater_id], references: [id])
+  updater              user?             @relation("GoodsReceiptLineUpdater", fields: [updater_id], references: [id])
   assignee_id          String?
-  assignee             user?             @relation("ReceivingReceiptLineAssignee", fields: [assignee_id], references: [id])
+  assignee             user?             @relation("GoodsReceiptLineAssignee", fields: [assignee_id], references: [id])
 
-  @@index([receiving_receipt_id])
+  @@index([goods_receipt_id])
   @@index([inventory_id])
   @@index([parent_id])
   @@index([creator_id])
   @@index([assignee_id])
   @@index([product_id])
   @@index([updater_id])
+  @@index([receipt_quantity])
+}
+
+model mobile_session {
+  id                 String    @id @default(cuid())
+  user_id            String
+  user               user      @relation("UserMobileSessions", fields: [user_id], references: [id], onDelete: Cascade)
+  refresh_token_hash String    @unique
+  device_name        String?
+  last_used_at       DateTime  @default(now()) @db.Timestamptz(0)
+  expires_at         DateTime  @db.Timestamptz(0)
+  revoked_at         DateTime? @db.Timestamptz(0)
+  created_at         DateTime  @default(now()) @db.Timestamptz(0)
+
+  @@index([user_id])
 }
 
 model notification {
@@ -1392,4 +1735,161 @@ model notification {
 
   @@index([user_id, read])
   @@index([user_id, created_at(sort: Desc)])
+}
+
+// ============================================================
+// Permanent regression fixtures (see json_schema.yaml comment above
+// the `asset` / `spare_part` / `maintenance_ticket` definitions).
+// ============================================================
+
+model asset {
+  id              String    @id @default(cuid())
+  asset_tag       String
+  parent_asset_id String?
+  parent_asset    asset?    @relation("AssetParentChild", fields: [parent_asset_id], references: [id])
+  child_assets    asset[]   @relation("AssetParentChild")
+  manual_url      String
+  unit_cost       Decimal   @default(0) @db.Decimal(10, 2)
+  under_warranty  Boolean   @default(false)
+  commissioned_at DateTime  @default(now()) @db.Timestamptz(0)
+  components      asset_component[]
+  created_at      DateTime  @default(now()) @db.Timestamptz(0)
+  updated_at      DateTime  @updatedAt @db.Timestamptz(0)
+  creator_id      String
+  creator         user      @relation("AssetCreator", fields: [creator_id], references: [id])
+  updater_id      String
+  updater         user      @relation("AssetUpdater", fields: [updater_id], references: [id])
+
+  @@index([creator_id])
+  @@index([updater_id])
+  @@index([parent_asset_id])
+  @@index([asset_tag])
+  @@index([unit_cost])
+}
+
+model asset_component {
+  id                     String   @id @default(cuid())
+  asset_id               String
+  asset                  asset    @relation(fields: [asset_id], references: [id], onDelete: Cascade)
+  note                   String
+  component_product_id   String
+  component_product      product  @relation("AssetComponentProduct", fields: [component_product_id], references: [id])
+  component_room_id      String?
+  component_room         room?    @relation("AssetComponentRoom", fields: [component_room_id], references: [id])
+  created_at             DateTime @default(now()) @db.Timestamptz(0)
+  updated_at             DateTime @updatedAt @db.Timestamptz(0)
+
+  @@index([asset_id])
+  @@index([component_product_id])
+  @@index([component_room_id])
+}
+
+model spare_part {
+  id                 String   @id @default(cuid())
+  name               String
+  description        String?
+  related_product_id String
+  related_product     product @relation("SparePartRelatedProduct", fields: [related_product_id], references: [id])
+  created_at  DateTime @default(now()) @db.Timestamptz(0)
+  updated_at  DateTime @updatedAt @db.Timestamptz(0)
+  creator_id  String
+  creator     user     @relation("SparePartCreator", fields: [creator_id], references: [id])
+  updater_id  String
+  updater     user     @relation("SparePartUpdater", fields: [updater_id], references: [id])
+
+  @@index([creator_id])
+  @@index([updater_id])
+  @@index([related_product_id])
+  @@index([description])
+  @@index([name])
+}
+
+enum MaintenanceTicketStatus {
+  open
+  approved
+  rejected
+  draft
+}
+
+enum MaintenanceTicketCategory {
+  general
+  urgent
+}
+
+model maintenance_ticket {
+  id              String                    @id @default(cuid())
+  category        MaintenanceTicketCategory @default(general)
+  status          MaintenanceTicketStatus @default(open)
+  organization_id String
+  organization    organization            @relation(fields: [organization_id], references: [id])
+  approvable_id   String                  @unique
+  approvable      approvable              @relation(fields: [approvable_id], references: [id])
+  created_at      DateTime                @default(now()) @db.Timestamptz(0)
+  updated_at      DateTime                @updatedAt @db.Timestamptz(0)
+  creator_id      String
+  creator         user                    @relation("MaintenanceTicketCreator", fields: [creator_id], references: [id])
+  updater_id      String
+  updater         user                    @relation("MaintenanceTicketUpdater", fields: [updater_id], references: [id])
+
+  @@index([creator_id])
+  @@index([updater_id])
+  @@index([organization_id])
+}
+
+// cmd_825/cmd_826: permanent regression fixture -- an editable (edit:true)
+// terminal:true x-approval entity, so the generated resubmit tests exercise
+// the edge-trigger's own positive-predicate guard rather than merely a
+// schema's edit:false lockout. See code_generator/json_schema.yaml's
+// approval_edit_terminal_test entry for the full rationale.
+enum ApprovalEditTerminalTestStatus {
+  pending
+  approved
+  rejected
+  draft
+  archived
+}
+
+model approval_edit_terminal_test {
+  id            String                         @id @default(cuid())
+  title         String
+  status        ApprovalEditTerminalTestStatus @default(pending)
+  approvable_id String                         @unique
+  approvable    approvable                     @relation(fields: [approvable_id], references: [id])
+  created_at    DateTime                       @default(now()) @db.Timestamptz(0)
+  updated_at    DateTime                       @updatedAt @db.Timestamptz(0)
+  creator_id    String
+  creator       user                           @relation("ApprovalEditTerminalTestCreator", fields: [creator_id], references: [id])
+  updater_id    String
+  updater       user                           @relation("ApprovalEditTerminalTestUpdater", fields: [updater_id], references: [id])
+
+  @@index([creator_id])
+  @@index([updater_id])
+  @@index([title])
+}
+
+// x-payment record lifecycle (generated when any entity declares
+// x-payment: true). One row per payable record: `pending` from the moment the
+// record is created until Stripe confirms payment, then `paid` (kept as the
+// permanent payment record). A record that is never paid is deleted together
+// with its row here. entity_name/record_id point at the paying entity's row by
+// value, deliberately without a foreign key, because the table serves every
+// x-payment entity at once. See lib/payment/.
+enum PayableStatus {
+  pending
+  paid
+}
+
+model payable {
+  id                         String        @id @default(cuid())
+  entity_name                String
+  record_id                  String
+  status                     PayableStatus @default(pending)
+  stripe_checkout_session_id String        @unique
+  amount                     Int?
+  currency                   String        @default("usd")
+  created_at                 DateTime      @default(now()) @db.Timestamptz(0)
+  paid_at                    DateTime?     @db.Timestamptz(0)
+
+  @@unique([entity_name, record_id])
+  @@index([status])
 }

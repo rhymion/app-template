@@ -1,0 +1,234 @@
+import { TEST_API_KEY, TEST_CREDENTIALS } from '../../support/test-credentials';
+
+const API_BASE = '/api/sales_order';
+const INV_API = '/api/inventory';
+
+describe('moveReservation bespoke endpoint (B-5 Phase2d, G15)', () => {
+  beforeEach(() => {
+    cy.task('db:reset');
+    cy.task('db:seed');
+    cy.task('db:grantAllPermissions');
+  });
+
+  // cmd_869a: sales_order_line now has its own x-approval.submit_on
+  // (cmd_856) -- moveReservation operates on an existing reservation
+  // (item.inventory_transactionable_id), which is only created once the
+  // line is submitted for approval (edit:false entity -> ApprovalSection
+  // "Submit" button's server action is the only way to reach it). Same
+  // pattern as sales_order_line_split.cy.ts / sales_order_reservation.cy.ts.
+  function submitSalesOrderLineForApproval(itemId: string) {
+    Cypress.session.clearAllSavedSessions();
+    cy.clearCookies();
+    cy.login(TEST_CREDENTIALS.email, TEST_CREDENTIALS.password);
+    cy.visit(`/en/sales_order_line/view/${itemId}`);
+    cy.contains('button', 'Submit').click();
+    cy.contains('button', 'Submit').should('not.exist');
+  }
+
+  it('O-8/O-4: moves a reservation off a depleted lot, spilling the re-reservation across two inventory lots', () => {
+    cy.task('db:setupSalesOrderLineSingleApprovalFlow');
+    // Lot 1: default location (seedReservationInventory's shared "Reservation
+    // Test Location" — location_id is a required FK, cmd_562) — quantity 5,
+    // so the initial order reserves the full quantity from this single lot
+    // (no other lot exists yet).
+    cy.task<any>('db:seedReservationInventory', { quantity: 5 }).then((seed) => {
+      cy.request({
+        method: 'POST',
+        url: API_BASE,
+        headers: { 'X-API-Key': TEST_API_KEY },
+        body: {
+          order_no: 'MOVE-001',
+          customer_id: seed.customer.id,
+          items: [{ product_id: seed.product.id, quantity: 5, price: null }],
+        },
+      }).then((res) => {
+        expect(res.status).to.eq(201);
+        const orderId = res.body.id;
+
+        cy.task<any>('db:getSalesOrderLinesForOrder', { sales_order_id: orderId }).then((preSubmitItems) => {
+          submitSalesOrderLineForApproval(preSubmitItems[0].id);
+
+        cy.request({
+          url: `${INV_API}/${seed.inventory.id}`,
+          headers: { 'X-API-Key': TEST_API_KEY },
+        }).then((preRes) => {
+          expect(preRes.body.quantity).to.eq(5);
+          expect(preRes.body.reserved_quantity).to.eq(5);
+        });
+
+        // Simulate lot 1's physical stock being depleted elsewhere to 2 (below
+        // the 5 the move needs to re-reserve) and add a second lot (location
+        // 'LOT-B', quantity 6) so the re-reservation must spill across both.
+        cy.task('db:setInventoryQuantity', { inventory_id: seed.inventory.id, quantity: 2 });
+        cy.task<any>('db:seedSecondInventoryLot', {
+          product_id: seed.product.id,
+          quantity: 6,
+          location: 'LOT-B',
+        }).then((lot2) => {
+          cy.task<any>('db:getSalesOrderLinesForOrder', { sales_order_id: orderId }).then((items) => {
+            const item = items[0];
+            expect(item.inventory_transactionable_id).to.not.be.null;
+
+            cy.task<any[]>('db:getInventoryTransactionsByBridge', {
+              inventory_transactionable_id: item.inventory_transactionable_id,
+            }).then((txsBeforeMove) => {
+            const beforeIds = new Set(txsBeforeMove.map((t) => t.id));
+
+            Cypress.session.clearAllSavedSessions();
+            cy.clearCookies();
+            cy.login(TEST_CREDENTIALS.email, TEST_CREDENTIALS.password);
+            cy.request({
+              method: 'POST',
+              url: `${API_BASE}/${orderId}/actions/moveReservation`,
+              body: { sales_order_line_id: item.id },
+            }).then((moveRes) => {
+              expect(moveRes.status).to.eq(200);
+              expect(moveRes.body.message).to.eq('Reservation moved successfully');
+
+              // O-8: the 5 units are now split — 2 re-reserved on lot 1 (all its
+              // depleted capacity), 3 re-reserved on the new lot 2.
+              cy.request({
+                url: `${INV_API}/${seed.inventory.id}`,
+                headers: { 'X-API-Key': TEST_API_KEY },
+              }).then((lot1Res) => {
+                // O-4: quantity is never touched by reserve/cancel — only the
+                // depletion we injected manually changed it; the move itself
+                // must leave it at 2.
+                expect(lot1Res.body.quantity).to.eq(2);
+                expect(lot1Res.body.reserved_quantity).to.eq(2);
+              });
+              cy.request({
+                url: `${INV_API}/${lot2.id}`,
+                headers: { 'X-API-Key': TEST_API_KEY },
+              }).then((lot2Res) => {
+                expect(lot2Res.body.quantity).to.eq(6); // O-4: unchanged
+                expect(lot2Res.body.reserved_quantity).to.eq(3);
+              });
+
+              // Ledger proof: cancel(-5) on lot 1's original reserve, plus
+              // reserve(+2) on lot 1 and reserve(+3) on lot 2 — net = +5 - 5 + 2 + 3 = 5.
+              cy.task<any>('db:getInventoryTransactionsByBridge', {
+                inventory_transactionable_id: item.inventory_transactionable_id,
+              }).then((allTxs: any[]) => {
+                expect(allTxs.length).to.eq(4); // original reserve(5) + cancel(-5) + reserve(2) + reserve(3)
+
+                // Isolate the txs the move itself created (exclude the pre-existing
+                // initial reserve tx captured in txsBeforeMove).
+                const newTxs = allTxs.filter((t) => !beforeIds.has(t.id));
+                expect(newTxs.length).to.eq(3);
+
+                const cancelTx = newTxs.find((t) => t.event_type === 'cancel');
+                expect(cancelTx).to.exist;
+                expect(cancelTx.reserved_delta).to.eq(-5);
+                expect(cancelTx.quantity_delta).to.eq(0);
+                // cmd_562: location is now a required id-FK — lot 1's cancel tx
+                // carries lot 1's real location_id (was null/'' pre-migration).
+                expect(cancelTx.location_id).to.eq(seed.inventory.location_id);
+
+                const newReserveTxs = newTxs.filter((t) => t.event_type === 'reserve');
+                expect(newReserveTxs.length).to.eq(2);
+                expect(newReserveTxs.every((t) => t.quantity_delta === 0)).to.be.true; // O-4
+                const byLot1 = newReserveTxs.filter((t) => t.location_id === seed.inventory.location_id);
+                const byLot2 = newReserveTxs.filter((t) => t.location_id === lot2.location_id);
+                expect(byLot1.length).to.eq(1);
+                expect(byLot1[0].reserved_delta).to.eq(2);
+                expect(byLot2.length).to.eq(1);
+                expect(byLot2[0].reserved_delta).to.eq(3);
+
+                const netSum = allTxs.reduce((s, t) => s + t.reserved_delta, 0);
+                expect(netSum).to.eq(5); // outstanding reservation unchanged by the move
+              });
+            });
+            });
+          });
+        });
+        });
+      });
+    });
+  });
+
+  it('409 INSUFFICIENT_INVENTORY: rolls back atomically when no lot combination covers the reservation', () => {
+    cy.task('db:setupSalesOrderLineSingleApprovalFlow');
+    cy.task<any>('db:seedReservationInventory', { quantity: 5 }).then((seed) => {
+      cy.request({
+        method: 'POST',
+        url: API_BASE,
+        headers: { 'X-API-Key': TEST_API_KEY },
+        body: {
+          order_no: 'MOVE-002',
+          customer_id: seed.customer.id,
+          items: [{ product_id: seed.product.id, quantity: 5, price: null }],
+        },
+      }).then((res) => {
+        expect(res.status).to.eq(201);
+        const orderId = res.body.id;
+
+        cy.task<any>('db:getSalesOrderLinesForOrder', { sales_order_id: orderId }).then((preSubmitItems) => {
+          const itemId = preSubmitItems[0].id;
+          // Submit first so the item actually holds a reservation (5 units,
+          // the lot's full quantity) for the move to act on.
+          submitSalesOrderLineForApproval(itemId);
+
+        cy.task<any>('db:getSalesOrderLinesForOrder', { sales_order_id: orderId }).then((items) => {
+          const item = items[0];
+          expect(item.inventory_transactionable_id).to.not.be.null;
+
+          // Deplete lot 1 to 1 unit of available capacity with no other lot to spill onto.
+          cy.task('db:setInventoryQuantity', { inventory_id: seed.inventory.id, quantity: 1 });
+
+          cy.request({
+            method: 'POST',
+            url: `${API_BASE}/${orderId}/actions/moveReservation`,
+            body: { sales_order_line_id: item.id },
+            failOnStatusCode: false,
+          }).then((moveRes) => {
+            expect(moveRes.status).to.eq(409);
+            expect(moveRes.body.code).to.eq('INSUFFICIENT_INVENTORY');
+            expect(moveRes.body.available).to.eq(1);
+            expect(moveRes.body.required).to.eq(5);
+
+            // Rollback proof: the original reservation is untouched — no cancel tx
+            // was committed, and lot 1's reserved_quantity still reflects the
+            // pre-move 5 units (approvable stays pending; this was never a reject).
+            cy.task<any>('db:getInventoryTransactionsByBridge', {
+              inventory_transactionable_id: item.inventory_transactionable_id,
+            }).then((txs: any[]) => {
+              expect(txs.length).to.eq(1); // only the original reserve — cancel rolled back
+              expect(txs[0].event_type).to.eq('reserve');
+            });
+          });
+        });
+        });
+      });
+    });
+  });
+
+  it('404: rejects a sales_order_line_id that does not belong to the given sales_order', () => {
+    cy.task<any>('db:seedReservationInventory', { quantity: 5 }).then((seed) => {
+      cy.request({
+        method: 'POST',
+        url: API_BASE,
+        headers: { 'X-API-Key': TEST_API_KEY },
+        body: {
+          order_no: 'MOVE-003',
+          customer_id: seed.customer.id,
+          items: [{ product_id: seed.product.id, quantity: 5, price: null }],
+        },
+      }).then((res) => {
+        const orderId = res.body.id;
+
+        Cypress.session.clearAllSavedSessions();
+        cy.clearCookies();
+        cy.login(TEST_CREDENTIALS.email, TEST_CREDENTIALS.password);
+        cy.request({
+          method: 'POST',
+          url: `${API_BASE}/${orderId}/actions/moveReservation`,
+          body: { sales_order_line_id: 'nonexistent-id' },
+          failOnStatusCode: false,
+        }).then((moveRes) => {
+          expect(moveRes.status).to.eq(404);
+        });
+      });
+    });
+  });
+});

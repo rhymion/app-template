@@ -213,7 +213,7 @@ your-app/           ← app-template のフォーク
 
 ### prj:sync の流れ
 
-`dev`・`build`・`generate-code`・`test:e2e:build`（すべてルートの `package.json`）は最初に `prj:sync`(`npm --prefix app-generator run prj:sync`、実体は `app-generator/scripts/prj_sync.py`)を実行し、`prj/.` を `app-generator/` に上書きコピーしつつ `messages/*.json` はdeep-mergeします（あなたの値が衝突時優先・未定義キーは保持され、単純上書きのように失われません）。Vercel デプロイ経路も同じ仕組みを使います — `app-generator/vercel.json` の `vercel-build` も `prj:sync` を実行するため、ローカルとデプロイ先で同期処理が一致しています(統一の経緯は[§17.6](./docs/vercel-automation-design.md#176-scriptssync-prjsh-retired-cmd_485)参照)。手動で呼び出すことも可能ですが、通常は不要です — 同期処理は上記コマンドに既に含まれています：
+`dev`・`build`・`generate-code`・`test:e2e:build`（すべてルートの `package.json`）は最初に `prj:sync`(`npm --prefix app-generator run prj:sync`、実体は `app-generator/scripts/prj_sync.py`)を実行し、`prj/.` を `app-generator/` に上書きコピーしつつ `messages/*.json` はdeep-mergeします（あなたの値が衝突時優先・未定義キーは保持され、単純上書きのように失われません）。Vercel デプロイ経路も同じ仕組みを使います — `app-generator/vercel.json` の `vercel-build` も `prj:sync` を実行するため、ローカルとデプロイ先で同期処理が一致しています(統一の経緯は[§17.6](./docs/vercel-automation-design.md#176-scriptssync-prjsh-retired-pr-26)参照)。手動で呼び出すことも可能ですが、通常は不要です — 同期処理は上記コマンドに既に含まれています：
 
 ```bash
 npm run sync   # 他の操作なしで prj/ → app-generator/ をコピー/マージ
@@ -223,7 +223,7 @@ npm run sync   # 他の操作なしで prj/ → app-generator/ をコピー/マ�
 
 ### Vercel デプロイ
 
-**このリポジトリのルートに `vercel.json` を追加してはならない。** このリポジトリの実運用デプロイはすべて Vercel の Project Settings → Root Directory を `app-generator/` に設定しており、Vercel はそこから `vercel.json` を読み込みます — ルート直下の `vercel.json` は冗長であるだけでなく、ビルドを実際に壊します（Root Directory 設定による1回と、古いルート設定内の `--prefix app-generator` による1回、パス解決が二重に走るため）。確認済みの故障モードは [docs/vercel-automation-design.md §17.5](./docs/vercel-automation-design.md#175-confirmed-rule-cmd_485-a-root-level-verceljson-must-never-exist-in-this-repository) を参照。
+**このリポジトリのルートに `vercel.json` を追加してはならない。** このリポジトリの実運用デプロイはすべて Vercel の Project Settings → Root Directory を `app-generator/` に設定しており、Vercel はそこから `vercel.json` を読み込みます — ルート直下の `vercel.json` は冗長であるだけでなく、ビルドを実際に壊します（Root Directory 設定による1回と、古いルート設定内の `--prefix app-generator` による1回、パス解決が二重に走るため）。確認済みの故障モードは [docs/vercel-automation-design.md §17.5](./docs/vercel-automation-design.md#175-confirmed-rule-pr-26-a-root-level-verceljson-must-never-exist-in-this-repository) を参照。
 
 フォーク後、[初回セットアップ](#初回セットアップ) を終えたら：
 

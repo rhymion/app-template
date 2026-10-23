@@ -1,7 +1,7 @@
 -- Class A Batch A1: Int -> Prisma nativeEnum for 6 fields.
 -- Prisma's default USING cast cannot cast integer directly to an enum type,
 -- so each column is migrated via ADD new column -> CASE WHEN backfill ->
--- DROP old -> RENAME, per subtask_446i design (standard_pattern_non_nullable_*).
+-- DROP old -> RENAME, per the design record (standard_pattern_non_nullable_*).
 
 -- CreateEnum
 CREATE TYPE "ApprovalRequestStatus" AS ENUM ('Pending', 'Approved', 'Rejected', 'TerminalRejected');

@@ -18,7 +18,7 @@
       "Bash(npm run test:e2e:cy:ui)",
       "Bash(npm run db:push)",
       "Bash(npm run db:generate)",
-      "Bash(npm run db:seed-tenant)",
+      "Bash(npm run db:seed-baseline)",
       "Bash(npm run docker:up:test)",
       "Bash(npm run docker:down:test)",
       "Bash(npm audit --omit=dev --audit-level=high)",

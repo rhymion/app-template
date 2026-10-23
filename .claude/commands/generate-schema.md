@@ -7,62 +7,19 @@ This is a **generate-schema** task for app-template.
 
 Refer to `@app-generator/.claude/commands/generate-schema.md` for the full procedure.
 
+The Scenario & Confirmation Protocol and most of the Completion gate below
+are shared across consumer repos and canonicalized in
+`app-generator/docs/consumer-commands/generate-schema.md` — see
+`app-generator/docs/knowledge/consumer-commands-canonical-source.md` for
+which parts are canonical vs. kept local to this repo (measured facts and
+one documented behavioral divergence do not collapse into the shared text).
+
 Task: $ARGUMENTS
 
 ## Scenario & Confirmation Protocol
 
-### Scenario A — Fresh start (default schema only)
-
-No custom models or entities have been added yet. The repository contains only the
-default Prisma models (`user`, `organization`, `role`, `permission`, etc.) and
-default JSON schema entities.
-
-- Describe the application domain and the models/entities you want to create.
-- The AI applies the six confirmation rules below before proceeding.
-
-### Scenario B — Add to existing schema
-
-Custom models and/or entities already exist. You are extending the schema with new ones.
-
-- Describe what you want to add (new Prisma model, new JSON entity, or both).
-- The AI applies the six confirmation rules below before adding anything.
-
----
-
-### Confirmation rules (AI must verify before acting)
-
-**① Default model/entity preservation**
-Keep all default Prisma models and JSON schema entities unless explicitly instructed
-otherwise. If deletion is requested, explain the risks (broken relations, cascade effects)
-and ask for confirmation before deleting.
-
-**② Naming convention**
-New model and entity names must be singular lowercase (e.g., `product`, `purchase_order`).
-If the user specifies a plural or uppercase name, explain the standard rule and the risks
-of non-standard naming, then ask for confirmation before proceeding.
-
-**③ ID type — String CUID only**
-The primary ID is always `String @id @default(cuid())`. If the user requests a different
-type (e.g., integer), keep it as a non-primary unique field instead. Explain this
-constraint and confirm with the user.
-
-**④ Existing feature first**
-If a built-in feature (comment, attachment, reaction, approval, etc.) can largely satisfy
-the requirement, recommend using it. Explain that labels and display names are easily
-changed without altering the model structure. Confirm before creating a custom model.
-
-**⑤ JSON schema array display**
-Confirm whether to show an independent entity's list on another entity's detail page.
-Default: do NOT add a user-created item list to the user detail page unless explicitly
-requested. For other relationships (e.g., show `resource` list on `organization` detail?),
-always confirm.
-
-**⑥ Fast-track option**
-Offer the user the option to skip all confirmation prompts and let the AI choose the best
-approach autonomously. In fast-track mode the AI generates and presents the result;
-the user follows up with adjustments after reviewing the generated application.
-
----
+See `app-generator/docs/consumer-commands/generate-schema.md §Scenario &
+Confirmation Protocol` (Scenarios A/B and confirmation rules ①–⑦).
 
 ## app-template constraints
 
@@ -73,19 +30,45 @@ the user follows up with adjustments after reviewing the generated application.
 
 ## Completion gate
 
-Run in this order (mirrors `app-generator/.claude/commands/generate-schema.md §Completion gate`):
+See `app-generator/docs/consumer-commands/generate-schema.md §Completion
+gate` for the full step list and rationale (why pytest/vitest are dropped,
+why `lint` delegates to `lint:prj` instead of app-generator's own `lint`,
+why `npm audit` stays). Required steps, in order:
 
-1. `npm --prefix app-generator run test:pytest` — Python unit tests for code generator
-2. `npm --prefix app-generator run test:vitest` — vitest unit/component tests
-3. `npm run test:e2e:build`  — prj:sync + docker:up:test + generate-code + db:push + db:generate + db:seed-tenant + build
-4. `npm --prefix app-generator run check:generated` — generated code matches templates/schema
-5. `npm run test:e2e:cy:api` — API Cypress specs only
-6. `npm run lint`
-7. `npm --prefix app-generator audit --omit=dev --audit-level=high`
+1. `npm run lint`
+2. `npm run test:e2e:build`
+3. `npm --prefix app-generator run check:generated`
+4. `npm run test:e2e:cy:api`
+5. `npm --prefix app-generator audit --omit=dev --audit-level=high`
 
-Steps 1 and 2 run unconditionally rather than relying on a prose "unchanged"
-exemption with no mechanism to verify it — see
-`app-generator/docs/knowledge/gate-exemption-must-be-machine-checkable.md`
-(cmd_498). This task type's own scope rule already forbids touching
-`app-generator/`, so in practice these two steps are cheap confirmations
-that the rule was actually followed, not a source of new failures.
+### app-template specifics (measured facts — kept local, not canonical)
+
+- `prj/` currently contains 32 TS/TSX files (16 Cypress spec/support files,
+  16 application source files), none named `*.test.ts`/`*.spec.ts` — this
+  is why vitest has nothing new to discover here (see the canonical file
+  for the general reasoning).
+
+- **Fail-closed on measurement, not on empty result**: `lint:prj` exits
+  non-zero if `prj:sync` could not be observed running against a real
+  `../prj` — no `../prj` sibling directory at all, or a `../prj` that
+  exists but from which `prj:sync` synced zero files of any kind. It does
+  **not** fail merely because none of the files `prj:sync` did observe and
+  sync happen to be `.ts`/`.tsx` — a `prj/` that holds only e.g.
+  schema/SQL/migration files and no hand-written TypeScript is a legitimate
+  state, not a temporary gap to be treated as red (2026-08-15 product
+  decision). This repo's own `lint:prj` semantics — confirm against
+  `app-generator/scripts/lint_prj_synced.py` directly if in doubt, since
+  the canonical file flags this as a point where consumers may genuinely
+  diverge.
+
+- Verified end-to-end against this repo's actual `prj/` content (cmd_683,
+  same unmodified schema as cmd_682's measurement): `npm run lint` reports
+  32 `.ts`/`.tsx` files synced from `prj/` and **exits 0**.
+
+- This repo's own `.github/workflows/ci.yml` defines exactly one job
+  (`E2E Tests`: `test:e2e:build` then `test:e2e:cy:start`). It has no lint
+  job of any kind, and never has (confirmed by reading the workflow file
+  directly, not inferred from a job name). A green CI run on a PR is
+  **not** evidence that `npm run lint` was ever run or passed on that PR
+  in this repo — only this local Completion gate step, or an explicit
+  local run, tells you that.

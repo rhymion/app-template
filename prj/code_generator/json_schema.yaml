@@ -3,6 +3,10 @@ format-version: 2.0
 x-generator:
   search:
     default_scope: all
+  mobile:
+    enabled: true
+  audit-log-storage:
+    enabled: true
 
 # PII and Privacy Annotations
 x-pii:
@@ -71,9 +75,107 @@ x-ledger-entities:
     pool: inventory
     ledger: inventory_transaction
     transactionable: inventory_transactionable
+    itemField: product_id
+    locationField: location_id
+    lotField: lot_number
+    expirationField: expiration_date
+
+# Nested sidebar navigation groups (x-nav-groups, entity-level x-nav.parent).
+# Sample grouping for this consumer schema's 51 flat entities, chosen along
+# real business lines (entities that touch the same ledger or workflow),
+# not an arbitrary bundling — see the task report for the rationale per
+# group. `inventory_ops` demonstrates a genuine two-level hierarchy: it
+# splits into `stock_ledger` (physical stock tracking: inventory/location/
+# product plus the inventory_transaction/movement/adjustment ledger trio)
+# and `procurement` (the sales_order -> purchase_order/ASN/goods_receipt chain,
+# which itself drives the same inventory_domain ledger via
+# x-reservation.transaction.ledgerDomain above) — two distinct workflows
+# under one domain, not depth added for its own sake. `supply_requests`
+# nests under `inventory_ops` and `workforce` nests under `facilities`, and
+# the demo-only fixtures (db_table, xxxxx_xxxxx, alpha_xxxxx_xxxxx, parent1,
+# setting1-4, procedure, approval_edit_terminal_test) sit in
+# `test_fixtures`, so the first level holds only Home plus four groups
+# (administration, inventory_ops, facilities, test_fixtures) and stays short
+# on narrow screens. The built-in administration entities are declared into
+# `administration` here too (as in the base schema), so the mobile footer
+# folds them into one tab instead of listing each as a root-level tab.
+x-nav-groups:
+  administration:
+    order: 900
+    icon: Settings
+  inventory_ops:
+    order: 10
+    icon: Inventory2
+  stock_ledger:
+    parent: inventory_ops
+    order: 1
+    icon: Inventory
+  procurement:
+    parent: inventory_ops
+    order: 2
+    icon: LocalShipping
+  facilities:
+    order: 20
+    icon: Assignment
+  workforce:
+    parent: facilities
+    order: 10
+    icon: People
+  supply_requests:
+    parent: inventory_ops
+    order: 3
+    icon: ShoppingCart
+  test_fixtures:
+    order: 50
+    icon: Widgets
+
+# x-state-machines (Issue #696, Stage 1 PR1): top-level pointer
+# map, `{model}.{field}: path/to.mmd`. goods_receipt.status was
+# previously retargeted away (to goods_receipt_line.status only)
+# because the generator's entity-level "Case E" precondition guard
+# rejected goods_receipt for carrying a writable embedded child
+# (`lines`) on an import-eligible entity. That guard has since been
+# removed from the generator: whether an entity's CSV import route can
+# converge through service.ts and whether one of its fields can be
+# governed by a state-transition diagram are independent questions.
+# The narrower real concern (an unconverged import route bypassing
+# validateOnAdd/Update for a governed field) is now closed at the
+# field level in the generator instead, so both entities' status
+# fields carry a pointer again. See
+# state-transition-generator-design.md's input-placement section.
+# NOTE: this repo's app-generator submodule pointer has not been
+# bumped past the guard removal yet (deferred to a follow-up task, see
+# the accompanying commit message) — running generate-code against the
+# pointer currently pinned here will still fail Case E on
+# goods_receipt.status until that bump lands.
+# audit_log operations (docs/knowledge/audit-log-operations.md). Thin handlers
+# in lib/scheduled-tasks/<task_id>/ call lib/audit-log-ops/jobs.ts, the same
+# library functions scripts/audit-log-digest.ts uses. Exporting a month for
+# retirement only stages the file and its SHA-256; detaching and dropping a
+# partition stays a manual step by the schema owner.
+x-scheduled-tasks:
+  - task_id: audit_log_digest_close
+    handler: closeAuditLogDigestPeriod
+    interval: "0 1 * * *"
+  - task_id: audit_log_digest_verify
+    handler: verifyAuditLogDigest
+    interval: "15 1 * * *"
+    depends_on: [audit_log_digest_close]
+  - task_id: audit_log_ensure_partitions
+    handler: ensureAuditLogPartitions
+    interval: "0 2 * * *"
+  - task_id: audit_log_export_for_retirement
+    handler: exportAuditLogMonthForRetirement
+    interval: "0 3 1 * *"
+x-state-machines:
+  goods_receipt.status: state_machines/goods_receipt_status.mmd
+  goods_receipt_line.status: state_machines/goods_receipt_line_status.mmd
 
 definitions:
   user:
+    x-nav:
+      parent: administration
+      order: 10
     x-generate:
       list: true
       view: true
@@ -89,7 +191,7 @@ definitions:
       search: false
       fields:
         - name
-        - image
+        - image_id
         - roles
     x-relationships:
       roles:
@@ -109,7 +211,7 @@ definitions:
         - additional_info:
             width: 250
     x-gdpr-mode: both
-    fields:
+    properties:
       name:
         minLength: 1
         x-pii: direct
@@ -127,8 +229,10 @@ definitions:
         x-custom-component:
           target:
             - upsert
-      image:
-        format: uri
+      image_id:
+        x-relationship:
+          target: attachment
+          type: direct
         x-pii: indirect
       mfa_enabled:
         default: false
@@ -137,15 +241,14 @@ definitions:
           target:
             - upsert
 
-    required:
-      - roles
-    properties:
       roles:
         type: array
         x-outputType: list
         items:
           $ref: "#/definitions/role"
 
+    required:
+      - roles
   setting:
     x-generate:
       list: false
@@ -158,7 +261,7 @@ definitions:
       fields:
         - name
         - email
-        - image
+        - image_id
         - password
         - api_key
         - mfa_enabled
@@ -166,19 +269,31 @@ definitions:
       roles:
         type: many-to-many
         target: role
-    allOf:
-      - $ref: "#/definitions/user"
-      - type: object
-        required:
-          - roles
-        properties:
-          roles:
-            type: array
-            x-outputType: list
-            items:
-              $ref: "#/definitions/role"
+    # x-self-only (cmd_631): `setting` is a proxy view of the acting
+    # user's OWN `user` row — id === creator_id always holds for every
+    # real account, so creator_id is exactly the right unconditional
+    # ownership filter here. admin_bypass: true lets an Administrator
+    # read another user's settings for support purposes, but only with
+    # an audit row written for the access (see lib/self_only.ts) — this
+    # scope is entity-name-keyed (`setting`), so it applies ONLY to
+    # settings pages/routes/getters and never touches the `user` entity
+    # itself or any other entity's FK reference to `user`.
+    x-self-only:
+      admin_bypass: true
+    x-view-of: user
+    required:
+      - roles
+    properties:
+      roles:
+        type: array
+        x-outputType: list
+        items:
+          $ref: "#/definitions/role"
 
   role:
+    x-nav:
+      parent: administration
+      order: 20
     x-generate:
       list: true
       view: true
@@ -197,23 +312,32 @@ definitions:
         type: many-to-many
         target: user
     x-import-key: [name]
-    fields:
+    x-display:
+      table:
+        - name:
+            primary: true
+            width: 200
+        - description:
+            width: 400
+    properties:
       name:
         minLength: 1
       description:
         x-ui:
           rows: 4
 
-    required:
-      - users
-    properties:
       users:
         type: array
         x-outputType: list
         items:
           $ref: "#/definitions/user"
 
+    required:
+      - users
   organization:
+    x-nav:
+      parent: administration
+      order: 40
     x-generate:
       list: true
       view: true
@@ -230,23 +354,32 @@ definitions:
     x-search:
       org_id_field: id
     x-import-key: [name]
-    fields:
+    x-display:
+      table:
+        - name:
+            primary: true
+            width: 200
+        - description:
+            width: 400
+    properties:
       name:
         minLength: 1
       description:
         x-ui:
           rows: 4
 
-    required:
-      - users
-    properties:
       users:
         type: array
         x-outputType: list
         items:
           $ref: "#/definitions/user"
 
+    required:
+      - users
   permission:
+    x-nav:
+      parent: administration
+      order: 30
     x-generate:
       list: true
       view: true
@@ -263,10 +396,11 @@ definitions:
     x-display:
       table:
         - name:
+            primary: true
             width: 200
         - role:
             width: 200
-    fields:
+    properties:
       name:
         minLength: 1
         x-entity-select: true
@@ -278,11 +412,13 @@ definitions:
       delete: {}
       import:
         default: false
-    properties:
       role:
         $ref: "#/definitions/role"
 
   approval_flow:
+    x-nav:
+      parent: administration
+      order: 50
     x-generate:
       list: true
       view: true
@@ -291,19 +427,17 @@ definitions:
       delete: true
       invalidate: false
       api: true
-      test: true
+      test: false
       import: true
     x-relationships:
       preceded_by:
         type: many-to-many
         target: approval_flow
-        labelField: entity_name
-        secondaryLabelField: approver_role.name
+        labelField: [entity_name, approver_role.name]
       followed_by:
         type: many-to-many
         target: approval_flow
-        labelField: entity_name
-        secondaryLabelField: approver_role.name
+        labelField: [entity_name, approver_role.name]
     x-import-key: [entity_name, approver_role.name]
     x-display:
       table:
@@ -314,7 +448,7 @@ definitions:
             width: 150
         - approver_role:
             width: 150
-    fields:
+    properties:
       entity_name:
         minLength: 1
         x-entity-select: true
@@ -322,10 +456,6 @@ definitions:
         x-relationship: {}
       approver_role_id:
         x-relationship: {}
-    required:
-      - approver_role
-      - preceding_transitions
-    properties:
       requestor_role:
         $ref: "#/definitions/role"
       approver_role:
@@ -341,6 +471,8 @@ definitions:
         items:
           $ref: "#/definitions/approval_flow"
 
+    required:
+      - approver_role
   approval_request:
     x-display:
       table:
@@ -348,7 +480,7 @@ definitions:
             width: 200
         - status:
             width: 100
-    fields:
+    properties:
       approvable_id:
         x-relationship:
           labelField: id
@@ -362,6 +494,12 @@ definitions:
           - approved
           - rejected
           - terminal_rejected
+          - withdrawn
+          # cmd_963 (app-generator): keep in sync with prisma/schema.prisma's
+          # ApprovalRequestStatus enum -- this json-schema enum drives the
+          # TS type emitted for approval_request's own `status` field.
+          - split_invalidated
+      round_id: {}
 
   approvable:
     x-generate:
@@ -373,17 +511,16 @@ definitions:
       invalidate: false
       api: false
       test: false
-    fields:
-      rejection_reason: {}
-    required:
-      - approval_requests
     properties:
+      rejection_reason: {}
       approval_requests:
         type: array
         x-outputType: list
         items:
           $ref: "#/definitions/approval_request"
 
+    required:
+      - approval_requests
   commentable:
     x-generate:
       list: false
@@ -404,7 +541,7 @@ definitions:
           $ref: "#/definitions/comment"
 
   comment:
-    fields:
+    properties:
       message:
         minLength: 1
         x-mention: true
@@ -414,7 +551,7 @@ definitions:
       page: false
       embed: false
       api: custom
-    fields:
+    properties:
       type:
         enum:
           - like
@@ -427,6 +564,7 @@ definitions:
       comment_id:
         x-relationship:
           labelField: id
+          constantParent: true
   attachable:
     x-generate:
       list: false
@@ -451,7 +589,7 @@ definitions:
         $ref: "#/definitions/product"
 
   attachment:
-    fields:
+    properties:
       type:
         enum:
           - image
@@ -467,7 +605,7 @@ definitions:
         format: uri
       attachable_id: {}
   dashboard_widget:
-    fields:
+    properties:
       dashboard_id:
         x-relationship: {}
       name:
@@ -480,7 +618,7 @@ definitions:
           - column
           - bar
           - line
-        default: 1
+        default: column
       stack_mode:
         enum:
           - grouped
@@ -494,6 +632,66 @@ definitions:
           - month
           - quarter
           - year
+      # Native enum `Timezone` shared with app_setting.timezone (prisma/schema.prisma). Bucket boundaries of a
+      # date-time group-by field are computed in this zone; the IANA spelling comes only from lib/_timezone.ts.
+      # Default utc keeps the former always-UTC behavior.
+      timezone:
+        enum:
+          - pacific_pago_pago
+          - pacific_honolulu
+          - pacific_marquesas
+          - america_anchorage
+          - america_los_angeles
+          - america_denver
+          - america_chicago
+          - america_mexico_city
+          - america_new_york
+          - america_toronto
+          - america_bogota
+          - america_caracas
+          - america_st_johns
+          - america_sao_paulo
+          - america_nuuk
+          - atlantic_azores
+          - utc
+          - europe_london
+          - europe_madrid
+          - europe_paris
+          - europe_berlin
+          - europe_rome
+          - africa_lagos
+          - africa_cairo
+          - africa_johannesburg
+          - asia_jerusalem
+          - europe_istanbul
+          - europe_moscow
+          - asia_tehran
+          - asia_dubai
+          - asia_kabul
+          - asia_karachi
+          - asia_kolkata
+          - asia_kathmandu
+          - asia_dhaka
+          - asia_yangon
+          - asia_bangkok
+          - asia_jakarta
+          - asia_shanghai
+          - asia_hong_kong
+          - asia_singapore
+          - asia_manila
+          - australia_perth
+          - australia_eucla
+          - asia_seoul
+          - asia_tokyo
+          - australia_adelaide
+          - australia_sydney
+          - australia_lord_howe
+          - pacific_noumea
+          - pacific_auckland
+          - pacific_chatham
+          - pacific_apia
+          - pacific_kiritimati
+        default: utc
       group_by_field:
         minLength: 1
       filter_field: {}
@@ -501,6 +699,9 @@ definitions:
       order:
         default: 0
   dashboard:
+    x-nav:
+      parent: administration
+      order: 60
     x-generate:
       list: true
       view: true
@@ -521,19 +722,21 @@ definitions:
         - name:
             primary: true
             width: 200
-    fields:
+    properties:
       name:
         minLength: 1
-    required:
-      - widgets
-    properties:
       widgets:
         type: array
         items:
           $ref: "#/definitions/dashboard_widget"
+        x-custom-component:
+          target:
+            - upsert
 
+    required:
+      - widgets
   field:
-    fields:
+    properties:
       name:
         minLength: 1
       type:
@@ -554,6 +757,9 @@ definitions:
       required:
         default: true
   db_table:
+    x-nav:
+      parent: test_fixtures
+      order: 1
     x-generate:
       list: true
       view: true
@@ -563,7 +769,14 @@ definitions:
       invalidate: false
       api: true
       test: true
-    fields:
+    x-display:
+      table:
+        - name:
+            primary: true
+            width: 200
+        - description:
+            width: 400
+    properties:
       name:
         minLength: 1
       description:
@@ -574,9 +787,6 @@ definitions:
         x-relationship:
           type: one-to-one_bridge
           labelField: id
-    required:
-      - fields
-    properties:
       fields:
         type: array
         items:
@@ -584,8 +794,10 @@ definitions:
       commentable:
         $ref: "#/definitions/commentable"
 
+    required:
+      - fields
   yyyyy_yyyyy:
-    fields:
+    properties:
       name:
         minLength: 1
       type:
@@ -604,6 +816,9 @@ definitions:
         default: true
       written_by: {}
   xxxxx_xxxxx:
+    x-nav:
+      parent: test_fixtures
+      order: 2
     x-generate:
       list: true
       view: true
@@ -613,21 +828,56 @@ definitions:
       invalidate: false
       api: true
       test: true
-    fields:
+    x-display:
+      table:
+        - name:
+            primary: true
+            width: 200
+        - description:
+            width: 400
+    properties:
       name:
         minLength: 1
       description: {}
       team: {}
-    required:
-      - yyyyy_yyyyys
-    properties:
       yyyyy_yyyyys:
         type: array
         items:
           $ref: "#/definitions/yyyyy_yyyyy"
 
+  # cmd_874/subtask_874f verification fixture: a restricted view of
+  # xxxxx_xxxxx showing/writable only for team=alpha rows. Proves
+  # x-filter-values end-to-end (list/detail/export/search hide non-alpha
+  # rows; PUT/DELETE on a non-alpha row 404; a legitimate PUT that moves a
+  # row's team out of alpha still succeeds, judged against the pre-image).
+    required:
+      - yyyyy_yyyyys
+  alpha_xxxxx_xxxxx:
+    x-nav:
+      parent: test_fixtures
+      order: 3
+    x-generate:
+      list: true
+      view: true
+      new: false
+      edit: true
+      delete: true
+      invalidate: false
+      api: true
+      test: true
+    x-filter-values:
+      team: [alpha]
+    x-display:
+      table:
+        - name:
+            primary: true
+            width: 200
+        - team:
+            width: 150
+    x-view-of: xxxxx_xxxxx
+
   parent1_child1:
-    fields:
+    properties:
       order: {}
       name:
         minLength: 1
@@ -654,7 +904,7 @@ definitions:
       written_by:
         maxLength: 100
   parent1_child2:
-    fields:
+    properties:
       name:
         minLength: 1
       required:
@@ -664,11 +914,14 @@ definitions:
       end_date:
         format: date
   parent1_list:
-    fields:
+    properties:
       name:
         minLength: 1
         maxLength: 100
   parent1:
+    x-nav:
+      parent: test_fixtures
+      order: 4
     x-generate:
       list: true
       view: true
@@ -677,7 +930,15 @@ definitions:
       delete: true
       invalidate: false
       api: true
-    fields:
+      test: true
+    x-display:
+      table:
+        - name:
+            primary: true
+            width: 200
+        - description:
+            width: 400
+    properties:
       name:
         minLength: 1
         maxLength: 100
@@ -692,12 +953,6 @@ definitions:
       image_url:
         format: uri
         x-uri-kind: link
-    required:
-      - organization
-      - parent1_child1s
-      - parent1_child2s
-      - parent1_lists
-    properties:
       organization:
         $ref: "#/definitions/organization"
       parent1_child1s:
@@ -714,23 +969,15 @@ definitions:
         items:
           $ref: "#/definitions/parent1_list"
 
-  parent_only:
-    x-generate:
-      list: true
-      view: true
-      new: true
-      edit: true
-      delete: true
-      invalidate: false
-      api: true
-      test: true
-    fields:
-      name:
-        minLength: 1
-      description: {}
-      login_time: {}
-      logout_time: {}
+    required:
+      - parent1_child1s
+      - parent1_child2s
+      - parent1_lists
+    x-import-key: [name]
   setting1:
+    x-nav:
+      parent: test_fixtures
+      order: 6
     x-generate:
       list: true
       view: true
@@ -740,18 +987,19 @@ definitions:
       invalidate: false
       api: true
       test: true
-    allOf:
-      - $ref: "#/definitions/xxxxx_xxxxx"
-      - type: object
-        required:
-          - yyyyy_yyyyys
-        properties:
-          yyyyy_yyyyys:
-            type: array
-            items:
-              $ref: "#/definitions/yyyyy_yyyyy"
+    x-view-of: xxxxx_xxxxx
+    required:
+      - yyyyy_yyyyys
+    properties:
+      yyyyy_yyyyys:
+        type: array
+        items:
+          $ref: "#/definitions/yyyyy_yyyyy"
 
   setting2:
+    x-nav:
+      parent: test_fixtures
+      order: 7
     x-generate:
       list: true
       view: true
@@ -764,10 +1012,12 @@ definitions:
       fields:
         - name
         - description
-    allOf:
-      - $ref: "#/definitions/xxxxx_xxxxx"
+    x-view-of: xxxxx_xxxxx
 
   setting3:
+    x-nav:
+      parent: test_fixtures
+      order: 8
     x-generate:
       list: true
       view: false
@@ -780,10 +1030,12 @@ definitions:
       fields:
         - name
         - description
-    allOf:
-      - $ref: "#/definitions/xxxxx_xxxxx"
+    x-view-of: xxxxx_xxxxx
 
   setting4:
+    x-nav:
+      parent: test_fixtures
+      order: 9
     x-generate:
       list: true
       view: false
@@ -793,32 +1045,7 @@ definitions:
       invalidate: false
       api: true
       test: true
-    allOf:
-      - $ref: "#/definitions/xxxxx_xxxxx"
-
-  setting5:
-    x-generate:
-      list: false
-      view: true
-      new: false
-      edit: true
-      delete: false
-      invalidate: false
-      api: true
-      test: true
-      fields:
-        - name
-        - yyyyy_yyyyys
-    allOf:
-      - $ref: "#/definitions/xxxxx_xxxxx"
-      - type: object
-        required:
-          - yyyyy_yyyyys
-        properties:
-          yyyyy_yyyyys:
-            type: array
-            items:
-              $ref: "#/definitions/yyyyy_yyyyy"
+    x-view-of: xxxxx_xxxxx
 
   setting6:
     x-generate:
@@ -830,16 +1057,14 @@ definitions:
       invalidate: false
       api: false
       test: true
-    allOf:
-      - $ref: "#/definitions/xxxxx_xxxxx"
-      - type: object
-        required:
-          - yyyyy_yyyyys
-        properties:
-          yyyyy_yyyyys:
-            type: array
-            items:
-              $ref: "#/definitions/yyyyy_yyyyy"
+    x-view-of: xxxxx_xxxxx
+    required:
+      - yyyyy_yyyyys
+    properties:
+      yyyyy_yyyyys:
+        type: array
+        items:
+          $ref: "#/definitions/yyyyy_yyyyy"
 
   setting7:
     x-generate:
@@ -851,8 +1076,7 @@ definitions:
       invalidate: false
       api: false
       test: true
-    allOf:
-      - $ref: "#/definitions/xxxxx_xxxxx"
+    x-view-of: xxxxx_xxxxx
 
   setting8:
     x-generate:
@@ -867,10 +1091,12 @@ definitions:
       fields:
         - name
         - description
-    allOf:
-      - $ref: "#/definitions/xxxxx_xxxxx"
+    x-view-of: xxxxx_xxxxx
 
   procedure:
+    x-nav:
+      parent: test_fixtures
+      order: 10
     x-generate:
       list: true
       view: true
@@ -887,7 +1113,14 @@ definitions:
       followed_by:
         type: many-to-many
         target: procedure
-    fields:
+    x-display:
+      table:
+        - name:
+            primary: true
+            width: 200
+        - description:
+            width: 400
+    properties:
       name:
         minLength: 1
       description: {}
@@ -897,11 +1130,6 @@ definitions:
       assignee_id:
         pattern: "^c[a-z0-9]{24,}$"
         x-relationship: {}
-    required:
-      - children
-      - preceded_by
-      - followed_by
-    properties:
       assignee:
         $ref: "#/definitions/user"
       parent:
@@ -922,7 +1150,14 @@ definitions:
         items:
           $ref: "#/definitions/procedure"
 
+    required:
+      - children
+      - preceded_by
+      - followed_by
   resource:
+    x-nav:
+      parent: facilities
+      order: 5
     x-generate:
       list: true
       view: true
@@ -956,7 +1191,7 @@ definitions:
         - organization:
             width: 200
       dashboard: true
-    fields:
+    properties:
       name:
         minLength: 1
       description: {}
@@ -968,15 +1203,18 @@ definitions:
         x-relationship:
           type: one-to-one_bridge
           labelField: id
-    required:
-      - organization
-    properties:
       organization:
         $ref: "#/definitions/organization"
       attachable:
         $ref: "#/definitions/attachable"
 
+    required:
+      - organization
+    x-import-key: [name]
   booking:
+    x-nav:
+      parent: facilities
+      order: 4
     x-generate:
       list: true
       view: true
@@ -1001,7 +1239,7 @@ definitions:
         span: week
         row_by: resource
       dashboard: true
-    fields:
+    properties:
       name:
         minLength: 1
       resource_id:
@@ -1009,13 +1247,15 @@ definitions:
         x-relationship: {}
       start_time: {}
       end_time: {}
-    required:
-      - resource
-    properties:
       resource:
         $ref: "#/definitions/resource"
 
+    required:
+      - resource
   shift_template:
+    x-nav:
+      parent: workforce
+      order: 1
     x-generate:
       list: true
       view: true
@@ -1038,7 +1278,7 @@ definitions:
             width: 150
         - end_time:
             width: 150
-    fields:
+    properties:
       user_id:
         pattern: "^c[a-z0-9]{24,}$"
         x-relationship: {}
@@ -1055,13 +1295,15 @@ definitions:
         format: time
       end_time:
         format: time
-    required:
-      - user
-    properties:
       user:
         $ref: "#/definitions/user"
 
+    required:
+      - user
   shift:
+    x-nav:
+      parent: workforce
+      order: 2
     x-generate:
       list: true
       view: true
@@ -1083,7 +1325,7 @@ definitions:
       chart:
         span: week
         row_by: user
-    fields:
+    properties:
       user_id:
         pattern: "^c[a-z0-9]{24,}$"
         x-relationship: {}
@@ -1095,13 +1337,15 @@ definitions:
           - approved
           - cancelled
 
-    required:
-      - user
-    properties:
       user:
         $ref: "#/definitions/user"
 
+    required:
+      - user
   product:
+    x-nav:
+      parent: stock_ledger
+      order: 6
     x-generate:
       list: true
       view: true
@@ -1132,7 +1376,7 @@ definitions:
         - price:
             width: 100
       dashboard: true
-    fields:
+    properties:
       code:
         minLength: 1
       name:
@@ -1144,11 +1388,20 @@ definitions:
         x-relationship:
           type: one-to-one_bridge
           labelField: id
-    properties:
+      warranty_card_id:
+        x-relationship:
+          target: attachment
+          type: direct
+      spec_sheet_url:
+        format: uri
+        x-uri-kind: file
       attachable:
         $ref: "#/definitions/attachable"
 
   inventory:
+    x-nav:
+      parent: stock_ledger
+      order: 1
     x-generate:
       list: true
       view: true
@@ -1170,11 +1423,11 @@ definitions:
     x-readonly-fields:
       - quantity
       - reserved_quantity
-    fields:
+    properties:
       product_id:
         pattern: "^c[a-z0-9]{24,}$"
         x-relationship:
-          searchField: name
+          labelField: name
       quantity:
         minimum: 0
         default: 0
@@ -1183,40 +1436,85 @@ definitions:
         default: 0
       location_id:
         x-relationship:
-          searchField: name
+          labelField: name
       lot_number: {}
       expiration_date:
         format: date
-    required:
-      - product
-    properties:
       product:
         $ref: "#/definitions/product"
+      location:
+        $ref: "#/definitions/location"
 
+    required:
+      - product
+      - location
   location:
+    x-nav:
+      parent: stock_ledger
+      order: 5
     x-generate:
       list: true
       view: true
       new: true
       edit: true
-      delete: true
-      invalidate: false
+      delete: false
+      invalidate:
+        enabled: true
+        module: lib/location/invalidate_location
+        handler: doInvalidateLocation
       api: true
       test: false
     x-display:
       table:
         - name:
             primary: true
-    fields:
+    properties:
       name: {}
-  inventory_transactionable: {}
+
+  inventory_transactionable:
+    x-generate:
+      list: false
+      view: false
+      new: false
+      edit: false
+      delete: false
+      invalidate: false
+      api: false
+      test: false
+
   inventory_transaction:
+    x-nav:
+      parent: stock_ledger
+      order: 2
     x-generate:
       new: false
       edit: false
       delete: false
       invalidate: false     # O-1: entity level read-only (list/view only, no UI mutation)
-    fields:
+      api: true              # align with proj_g inventory_transaction x-generate
+      test: true             # align with proj_g inventory_transaction x-generate
+    # subtask_925d (2026-09-03): without x-display.table, page_list_context()
+    # (app-generator code_generator/generators.py) emits no displayFields/
+    # primaryField, so the generated list page falls back to
+    # DataGridClient's hardcoded name/description columns — fields this
+    # entity doesn't have — and the grid cell renders the raw row id
+    # instead of any readable label. That silently broke the
+    # generated UI e2e assertions (`Inventory Transaction 1`) the moment
+    # test:true (above) started generating/running them.
+    # product_id is a plain required string (not a real relation despite
+    # the _id suffix — see prisma/schema.prisma), unique per seeded row,
+    # so it's a safe non-FK primary (cf. proj_g's inventory_transaction
+    # comment on why an aliased FK primary breaks the generated spec).
+    x-display:
+      table:
+        - product_id:
+            primary: true
+            width: 200
+        - event_type:
+            width: 140
+        - quantity_delta:
+            width: 140
+    properties:
       inventory_transactionable_id:
         pattern: "^c[a-z0-9]{24,}$"
       event_type:
@@ -1231,7 +1529,7 @@ definitions:
       quantity_delta: {}
       reserved_delta: {}
       product_id: {}
-      location: {}
+      location_id: {}
       lot_number: {}
       expiration_date:
         format: date
@@ -1240,6 +1538,9 @@ definitions:
         pattern: "^c[a-z0-9]{24,}$"
         x-relationship: {}
   inventory_movement:
+    x-nav:
+      parent: stock_ledger
+      order: 3
     x-generate:
       list: true
       view: true
@@ -1277,7 +1578,7 @@ definitions:
       fromPoolIdField: from_inventory_id   # 出庫側 inventory FK フィールド名
       toPoolIdField: to_inventory_id       # 入庫側 inventory FK フィールド名
       quantity_delta_field: quantity
-    fields:
+    properties:
       from_inventory_id:
         pattern: "^c[a-z0-9]{24,}$"
         x-relationship:
@@ -1308,7 +1609,6 @@ definitions:
           labelField: id
       inventory_transactionable_id:
         pattern: "^c[a-z0-9]{24,}$"
-    properties:
       from_inventory:
         $ref: "#/definitions/inventory"
       to_inventory:
@@ -1317,6 +1617,9 @@ definitions:
         $ref: "#/definitions/approvable"
 
   inventory_adjustment:
+    x-nav:
+      parent: stock_ledger
+      order: 4
     x-generate:
       list: true
       view: true
@@ -1351,7 +1654,16 @@ definitions:
       event_type: adjust
       poolIdField: inventory_id           # 対象 inventory FK フィールド名
       quantity_delta_field: quantity_delta
-    fields:
+    # cmd_1029: quantity_delta must allow both directions -- a positive
+    # value adds stock (a count came out higher than the system's
+    # record), a negative value removes it (a write-off, damage, etc.).
+    # The generator's default minimum of 0 (generators.py `mn =
+    # prop.get('minimum', 0)`) silently blocked negative input from the
+    # New form -- declare an explicit minimum here so negative
+    # corrections can be entered. No business-level lower bound is
+    # documented, so the type's own lower bound (Int/int32) is used
+    # rather than an arbitrary business threshold.
+    properties:
       inventory_id:
         pattern: "^c[a-z0-9]{24,}$"
         x-relationship:
@@ -1360,7 +1672,8 @@ definitions:
             - location.name
             - lot_number
             - expiration_date
-      quantity_delta: {}
+      quantity_delta:
+        minimum: -2147483648
       reason: {}
       status:
         enum:
@@ -1374,13 +1687,15 @@ definitions:
           labelField: id
       inventory_transactionable_id:
         pattern: "^c[a-z0-9]{24,}$"
-    properties:
       inventory:
         $ref: "#/definitions/inventory"
       approvable:
         $ref: "#/definitions/approvable"
 
-  purchase_order:
+  sales_order:
+    x-nav:
+      parent: procurement
+      order: 1
     x-generate:
       list: true
       view: true
@@ -1418,29 +1733,31 @@ definitions:
           - lot_number: asc
           - id: asc
       result:
-        parentField: purchase_order_id
+        parentField: sales_order_id
         lineTransactionableField: inventory_transactionable_id
       # No "actions" block: under strategy: ledger_transaction, ship/cancel are
-      # driven by the standard approve/reject flow on purchase_per_item.approvable_id
-      # (see purchase_per_item's x-approval below), not by bespoke action routes.
-    fields:
+      # driven by the standard approve/reject flow on sales_order_line.approvable_id
+      # (see sales_order_line's x-approval below), not by bespoke action routes.
+    properties:
       order_no:
         minLength: 1
       customer_id:
         pattern: "^c[a-z0-9]{24,}$"
         x-relationship: {}
-    required:
-      - customer
-      - items
-    properties:
       customer:
         $ref: "#/definitions/user"
       items:
         type: array
         items:
-          $ref: "#/definitions/purchase_per_item"
+          $ref: "#/definitions/sales_order_line"
 
+    required:
+      - customer
+      - items
   leave_request:
+    x-nav:
+      parent: workforce
+      order: 3
     x-generate:
       list: true
       view: true
@@ -1472,6 +1789,8 @@ definitions:
         end_field: end_date
       dashboard: true
     x-approval:
+      submit_on:
+        status: pending
       on_approved:
         set_fields:
           status: "approved"
@@ -1481,10 +1800,16 @@ definitions:
         set_fields:
           status: "rejected"
         emit_hook: false
-    fields:
+      on_withdrawn:
+        set_fields:
+          status: "draft"
+    properties:
       user_id:
         pattern: "^c[a-z0-9]{24,}$"
         x-relationship: {}
+        x-server-value:
+          source: actor
+          override_permission: delete
       start_date:
         format: date
       end_date:
@@ -1496,6 +1821,10 @@ definitions:
         x-relationship:
           type: one-to-one_bridge
           labelField: id
+      medical_certificate_id:
+        x-relationship:
+          target: attachment
+          type: direct
       status:
         default: pending
         x-enum-namespace: LeaveRequestStatus
@@ -1503,12 +1832,10 @@ definitions:
           - pending
           - approved
           - rejected
+          - draft
       assignee_id:
         pattern: "^c[a-z0-9]{24,}$"
         x-relationship: {}
-    required:
-      - user
-    properties:
       user:
         $ref: "#/definitions/user"
       approvable:
@@ -1521,7 +1848,12 @@ definitions:
   # quantityField lives on the request entity itself; no lines child.
   # ============================================================
 
+    required:
+      - user
   supply_pool:
+    x-nav:
+      parent: supply_requests
+      order: 1
     x-generate:
       list: true
       view: true
@@ -1531,7 +1863,14 @@ definitions:
       invalidate: false
       api: true
       test: true
-    fields:
+    x-display:
+      table:
+        - name:
+            primary: true
+            width: 200
+        - description:
+            width: 400
+    properties:
       name:
         minLength: 1
       description:
@@ -1543,6 +1882,9 @@ definitions:
         minimum: 0
         default: 0
   supply_request:
+    x-nav:
+      parent: supply_requests
+      order: 2
     x-generate:
       list: true
       view: true
@@ -1564,7 +1906,14 @@ definitions:
         allocationEntity: supply_allocation
         parentField: supply_request_id
         allocationAudit: false
-    fields:
+    x-display:
+      table:
+        - name:
+            primary: true
+            width: 200
+        - description:
+            width: 400
+    properties:
       name:
         minLength: 1
       description:
@@ -1573,7 +1922,10 @@ definitions:
       quantity:
         minimum: 1
   supply_allocation:
-    fields:
+    x-nav:
+      parent: supply_requests
+      order: 3
+    properties:
       supply_request_id:
         pattern: "^c[a-z0-9]{24,}$"
         x-relationship: {}
@@ -1583,6 +1935,9 @@ definitions:
       quantity:
         minimum: 1
   room_type:
+    x-nav:
+      parent: facilities
+      order: 1
     x-generate:
       list: true
       view: true
@@ -1592,7 +1947,14 @@ definitions:
       invalidate: false
       api: true
       test: true
-    fields:
+    x-display:
+      table:
+        - name:
+            primary: true
+            width: 200
+        - description:
+            width: 400
+    properties:
       name:
         minLength: 1
       capacity:
@@ -1600,8 +1962,18 @@ definitions:
       description:
         x-ui:
           rows: 4
+      # Stripe Price id charged per night for a reservation of a room of this
+      # type (x-payment on room_reservation reads it through room_type_id).
+      # Rooms of one type are not told apart by price. The default is an
+      # obvious placeholder: checkout refuses to start until a real Price id
+      # is set on the room type.
+      stripe_price_id:
+        default: ""
 
   room:
+    x-nav:
+      parent: facilities
+      order: 2
     x-generate:
       list: true
       view: true
@@ -1611,7 +1983,6 @@ definitions:
       invalidate: false
       api: true
       test: true
-      mobile: true
     x-display:
       table:
         - room_no:
@@ -1619,7 +1990,7 @@ definitions:
             width: 200
         - room_type:
             width: 200
-    fields:
+    properties:
       room_no:
         minLength: 1
       room_type_id:
@@ -1631,14 +2002,16 @@ definitions:
         enum:
           - available
           - maintenance
-
-    required:
-      - room_type
-    properties:
       room_type:
         $ref: "#/definitions/room_type"
 
+    required:
+      - room_type
   room_reservation:
+    x-payment: true
+    x-nav:
+      parent: facilities
+      order: 3
     x-generate:
       list: true
       view: true
@@ -1681,7 +2054,7 @@ definitions:
           - id: asc
       result:
         allocatedField: room_id
-    fields:
+    properties:
       guest_name:
         minLength: 1
       room_type_id:
@@ -1695,7 +2068,6 @@ definitions:
         format: date
       check_out:
         format: date
-    properties:
       room_type:
         $ref: "#/definitions/room_type"
       room:
@@ -1705,9 +2077,12 @@ definitions:
   # Receiving lifecycle (PO / ASN / Receipt).
   # ============================================================
 
-  receiving_purchase_order_line:
-    fields:
-      receiving_purchase_order_id:
+  purchase_order_line:
+    x-nav:
+      parent: procurement
+      order: 4
+    properties:
+      purchase_order_id:
         pattern: "^c[a-z0-9]{24,}$"
         x-relationship:
           labelField: order_no
@@ -1732,7 +2107,10 @@ definitions:
           - fully_received
           - cancelled
         default: outstanding
-  receiving_purchase_order:
+  purchase_order:
+    x-nav:
+      parent: procurement
+      order: 3
     x-generate:
       list: true
       view: true
@@ -1749,7 +2127,7 @@ definitions:
             width: 200
         - status:
             width: 150
-    fields:
+    properties:
       order_no:
         minLength: 1
       status:
@@ -1760,17 +2138,19 @@ definitions:
           - received
           - cancelled
 
-    required:
-      - lines
-    properties:
       lines:
         type: array
         items:
-          $ref: "#/definitions/receiving_purchase_order_line"
+          $ref: "#/definitions/purchase_order_line"
 
-  receiving_asn_line:
-    fields:
-      receiving_asn_id:
+    required:
+      - lines
+  asn_line:
+    x-nav:
+      parent: procurement
+      order: 6
+    properties:
+      asn_id:
         pattern: "^c[a-z0-9]{24,}$"
         x-relationship:
           labelField: asn_no
@@ -1795,7 +2175,10 @@ definitions:
           - fully_matched
           - cancelled
         default: outstanding
-  receiving_asn:
+  asn:
+    x-nav:
+      parent: procurement
+      order: 5
     x-generate:
       list: true
       view: true
@@ -1812,7 +2195,7 @@ definitions:
             width: 200
         - status:
             width: 150
-    fields:
+    properties:
       asn_no:
         minLength: 1
       purchase_order_id:
@@ -1827,17 +2210,19 @@ definitions:
           - matched
           - cancelled
 
-    required:
-      - lines
-    properties:
       purchase_order:
-        $ref: "#/definitions/receiving_purchase_order"
+        $ref: "#/definitions/purchase_order"
       lines:
         type: array
         items:
-          $ref: "#/definitions/receiving_asn_line"
+          $ref: "#/definitions/asn_line"
 
-  receiving_receipt:
+    required:
+      - lines
+  goods_receipt:
+    x-nav:
+      parent: procurement
+      order: 7
     x-generate:
       list: true
       view: true
@@ -1857,7 +2242,7 @@ definitions:
             width: 150
     x-approval-lines:
       - lines
-    fields:
+    properties:
       receipt_no:
         minLength: 1
       purchase_order_id:
@@ -1875,19 +2260,21 @@ definitions:
           - confirmed
           - cancelled
       confirmed_at: {}
-    required:
-      - lines
-    properties:
       purchase_order:
-        $ref: "#/definitions/receiving_purchase_order"
+        $ref: "#/definitions/purchase_order"
       asn:
-        $ref: "#/definitions/receiving_asn"
+        $ref: "#/definitions/asn"
       lines:
         type: array
         items:
-          $ref: "#/definitions/receiving_receipt_line"
+          $ref: "#/definitions/goods_receipt_line"
 
-  receiving_receipt_line:
+    required:
+      - lines
+  goods_receipt_line:
+    x-nav:
+      parent: procurement
+      order: 8
     x-generate:
       list: true
       view: true
@@ -1908,7 +2295,7 @@ definitions:
         - product:
             primary: true
             width: 200
-        - receiving_receipt:
+        - goods_receipt:
             width: 150
         - inventory:
             width: 250
@@ -1939,12 +2326,12 @@ definitions:
       # Declared explicitly instead of adding x-relationship to parent_id,
       # which would pull it into unrelated generator paths (FormUpsert,
       # column_def, getters include) for an entity whose x-generate already
-      # disables new/edit (receiving_receipt_line_detail).
+      # disables new/edit (goods_receipt_line_detail).
       parentField: parent_id
       ledgerDomain: inventory_domain
       poolIdField: inventory_id
-    fields:
-      receiving_receipt_id:
+    properties:
+      goods_receipt_id:
         pattern: "^c[a-z0-9]{24,}$"
         x-relationship:
           labelField: receipt_no
@@ -1973,7 +2360,7 @@ definitions:
         # autocomplete_filter.ts). Reaches split_action_section.tsx.jinja2's
         # SplitActionSection via this field's membership in x-splittable's
         # perPartRequired below — the FormUpsert path is unreachable here
-        # (receiving_receipt_line_detail has new:false/edit:false).
+        # (goods_receipt_line_detail has new:false/edit:false).
         x-autocomplete-context:
           - product_id
       approvable_id:
@@ -1990,9 +2377,8 @@ definitions:
       assignee_id:
         pattern: "^c[a-z0-9]{24,}$"
         x-relationship: {}
-    properties:
-      receiving_receipt:
-        $ref: "#/definitions/receiving_receipt"
+      goods_receipt:
+        $ref: "#/definitions/goods_receipt"
       product:
         $ref: "#/definitions/product"
       inventory:
@@ -2002,7 +2388,10 @@ definitions:
       assignee:
         $ref: "#/definitions/user"
 
-  purchase_per_item:
+  sales_order_line:
+    x-nav:
+      parent: procurement
+      order: 2
     x-generate:
       list: true
       view: true
@@ -2022,7 +2411,7 @@ definitions:
         - product:
             primary: true
             width: 200
-        - purchase_order:
+        - sales_order:
             width: 150
         - inventory:
             width: 250
@@ -2031,11 +2420,16 @@ definitions:
         - status:
             width: 120
     x-approval:
+      submit_on:
+        status: pending
       on_approved:
         emit_hook: true
       on_rejected:
         terminal: true
         emit_hook: true
+      on_withdrawn:
+        set_fields:
+          status: draft
     x-splittable:
       quantityField: quantity
       parentField: parent_id
@@ -2043,8 +2437,8 @@ definitions:
       poolIdField: inventory_id
       perPartRequired:
         - inventory_id
-    fields:
-      purchase_order_id:
+    properties:
+      sales_order_id:
         pattern: "^c[a-z0-9]{24,}$"
         x-relationship:
           labelField: order_no
@@ -2055,10 +2449,11 @@ definitions:
         minimum: 1
       status:
         enum:
+          - draft
           - pending
           - split
           - rejected
-        default: pending
+        default: draft
       price:
         minimum: 0
       parent_id:
@@ -2079,12 +2474,291 @@ definitions:
             - lot_number
             - expiration_date
 
-    required:
-      - product
-    properties:
-      purchase_order:
-        $ref: "#/definitions/purchase_order"
+      sales_order:
+        $ref: "#/definitions/sales_order"
       product:
         $ref: "#/definitions/product"
       approvable:
         $ref: "#/definitions/approvable"
+
+  # ============================================================
+  # Permanent regression fixtures. These three entities exist purely
+  # to keep known code-generator defect patterns (partial-match list
+  # clicks, enum primary display, FK labelField mismatches, skipped
+  # non-nullable URI fields, composite/dotted-path FK labels, Decimal
+  # and date fields that are optional in the UI but non-nullable in
+  # the database, list tables with no declared primary column,
+  # role-gated approval flows, and -- as of cmd_1200 -- real-browser
+  # list-column filter/sort for `boolean` and `Decimal`-typed columns
+  # (app-generator#756/#759: a browser <input type="number"> round-trips
+  # a typed Decimal filter value through IEEE-754 before buildFilter ever
+  # sees it) under standing end-to-end coverage in a schema that stays
+  # put, instead of relying on the business schema (which changes shape
+  # over time) to happen to exercise them. Do not remove an individual
+  # trap without first confirming the corresponding generator defect is
+  # now covered elsewhere.
+  # ============================================================
+
+    required:
+      - product
+  asset:
+    x-nav:
+      parent: stock_ledger
+      order: 20
+    x-generate:
+      list: true
+      view: true
+      new: true
+      edit: true
+      delete: true
+      invalidate: false
+      api: true
+      test: true
+    x-display:
+      table:
+        - asset_tag:
+            primary: true
+            width: 200
+        - unit_cost:
+            width: 150
+        - under_warranty:
+            width: 150
+    properties:
+      asset_tag:
+        minLength: 1
+      parent_asset_id:
+        pattern: "^c[a-z0-9]{24,}$"
+        x-relationship:
+          labelField: asset_tag
+      manual_url:
+        format: uri
+      unit_cost: {}
+      commissioned_at:
+        format: date
+      under_warranty: {}
+      parent_asset:
+        $ref: "#/definitions/asset"
+      components:
+        type: array
+        items:
+          $ref: "#/definitions/asset_component"
+
+  # Inline DataGrid child of `asset` (no x-generate — never a standalone
+  # page). Carries the two FK-labelField patterns whose confirmed failures
+  # are specific to the child-DataGrid select, not the top-level parent-form
+  # autocomplete (which already resolves a non-`name` or composite labelField
+  # correctly via the dependency helper's `.name` alias — see the report for
+  # the asset entity's own `linked_product`/`assigned_room` fields, which do
+  # NOT reproduce the same defect at the top level).
+    required:
+      - components
+  asset_component:
+    properties:
+      asset_id:
+        x-relationship:
+          labelField: asset_tag
+      note:
+        minLength: 1
+      component_product_id:
+        pattern: "^c[a-z0-9]{24,}$"
+        x-relationship:
+          labelField: code
+      component_room_id:
+        pattern: "^c[a-z0-9]{24,}$"
+        x-relationship:
+          labelField:
+            - room_type.name
+            - room_no
+
+  spare_part:
+    x-nav:
+      parent: stock_ledger
+      order: 21
+    x-generate:
+      list: true
+      view: true
+      new: true
+      edit: true
+      delete: true
+      invalidate: false
+      api: true
+      test: true
+    x-display:
+      table:
+        - related_product:
+            width: 200
+        - name:
+            primary: true
+            width: 200
+        - description:
+            width: 200
+    properties:
+      name:
+        minLength: 1
+      description: {}
+      related_product_id:
+        pattern: "^c[a-z0-9]{24,}$"
+        x-relationship: {}
+      related_product:
+        $ref: "#/definitions/product"
+
+    required:
+      - related_product
+  maintenance_ticket:
+    x-nav:
+      parent: stock_ledger
+      order: 22
+    x-generate:
+      list: true
+      view: true
+      new: true
+      edit: true
+      delete: true
+      invalidate: false
+      api: true
+      test: true
+    x-custom-components:
+      - name: ApprovalSection
+        path: "@/components/_standard/ApprovalSection"
+        target:
+          - view
+          - edit
+    x-display:
+      table:
+        - category:
+            primary: true
+            width: 150
+        - organization:
+            width: 200
+    x-approval:
+      submit_on:
+        status: open
+      on_approved:
+        set_fields:
+          status: "approved"
+        emit_hook: true
+      on_rejected:
+        terminal: false
+        set_fields:
+          status: "rejected"
+        emit_hook: false
+      on_withdrawn:
+        set_fields:
+          status: "draft"
+    properties:
+      category:
+        _required: true
+        default: general
+        x-enum-namespace: MaintenanceTicketCategory
+        enum:
+          - general
+          - urgent
+      status:
+        _required: true
+        default: open
+        x-enum-namespace: MaintenanceTicketStatus
+        enum:
+          - open
+          - approved
+          - rejected
+          - draft
+      organization_id:
+        pattern: "^c[a-z0-9]{24,}$"
+        x-relationship: {}
+      approvable_id:
+        pattern: "^c[a-z0-9]{24,}$"
+        x-relationship:
+          type: one-to-one_bridge
+          labelField: id
+      organization:
+        $ref: "#/definitions/organization"
+      approvable:
+        $ref: "#/definitions/approvable"
+
+  # cmd_825/cmd_826: no entity in this schema combines edit:true with
+  # terminal:true + submit_on -- the four terminal x-approval entities
+  # above (inventory_movement/inventory_adjustment/sales_order_line/
+  # goods_receipt_line) are all edit:false, so testing "terminal
+  # rejection blocks resubmission" against them only proves the schema's
+  # own edit lockout, not the generator's own guard (cmd_826 甲/戊). This
+  # fixture is editable specifically so the generated resubmit tests
+  # exercise the edge-trigger's positive-predicate guard itself, the same
+  # role the other permanent regression fixtures above play for their own
+  # generator defect patterns. status's schema default stays 'pending'
+  # (matching submit_on, same as leave_request/maintenance_ticket above --
+  # deliberately NOT changed to a distinct default such as 'draft': the
+  # standard generated "creates approval requests" test (11.x) assumes
+  # create-time firing is unconditional and asserts a fixed
+  # approval_request count, which a mismatched default would silently
+  # break for every submit_on entity, this one included). The enum keeps
+  # a fourth 'draft' value purely so the generated "created but not yet
+  # submitted, then explicitly submitted" test (cmd_825, submit_on's whole
+  # reason for existing) can POST an explicit status: 'draft' override to
+  # reach that state without touching the schema-wide default.
+    required:
+      - organization
+  approval_edit_terminal_test:
+    x-nav:
+      parent: test_fixtures
+      order: 11
+    x-generate:
+      list: true
+      view: true
+      new: true
+      edit: true
+      delete: true
+      invalidate: false
+      api: true
+      test: true
+    x-custom-components:
+      - name: ApprovalSection
+        path: "@/components/_standard/ApprovalSection"
+        target:
+          - view
+          - edit
+    x-display:
+      table:
+        - title:
+            primary: true
+            width: 200
+        - status:
+            width: 150
+    x-approval:
+      submit_on:
+        status: pending
+      on_approved:
+        set_fields:
+          status: "approved"
+        emit_hook: false
+      on_rejected:
+        terminal: true
+        set_fields:
+          status: "rejected"
+        emit_hook: false
+      on_withdrawn:
+        set_fields:
+          status: "draft"
+    x-write-locked-values:
+      status:
+        - archived
+    properties:
+      title:
+        minLength: 1
+      status:
+        _required: true
+        default: pending
+        x-enum-namespace: ApprovalEditTerminalTestStatus
+        enum:
+          - pending
+          - approved
+          - rejected
+          - draft
+          - archived
+      approvable_id:
+        pattern: "^c[a-z0-9]{24,}$"
+        x-relationship:
+          type: one-to-one_bridge
+          labelField: id
+      approvable:
+        $ref: "#/definitions/approvable"
+    required:
