@@ -1,0 +1,24 @@
+# Dependabot configuration.
+#
+# Purpose: keep the app-generator git submodule of this repository following
+# app-generator's `main` branch, so that dependency and security fixes made in
+# the generator reach the running system (deployed from `main`) through a
+# regular weekly pull request that bumps the submodule pointer.
+#
+# Notes
+# -----
+# - Dependabot reads this file only from the repository's default branch
+#   (`main`). A copy on `develop` would not be read, so none is needed there.
+# - `target-branch: main` makes the pointer-bump pull requests target `main`
+#   only. Submodule pointers on `develop` are not touched by this file.
+# - One open pull request at a time keeps the review load (and the CI cost of
+#   each pointer-bump run) bounded.
+
+version: 2
+updates:
+  - package-ecosystem: "gitsubmodule"
+    directory: "/"
+    target-branch: "main"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 1
