@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { requireSession, handleApiError, ApiError } from '@/lib/api-auth';
+import { requireCaller, requireApiPermission, handleApiError, ApiError } from '@/lib/api-auth';
+import { resolvePermissions } from '@/lib/authz';
 import prisma from '@/lib/prisma';
 
 /**
@@ -32,12 +33,24 @@ class InsufficientInventoryMoveError extends Error {
   }
 }
 
+// A reservation exists only for a line that was submitted for approval and has
+// not been closed: draft has none yet, split hands its reservation to the child
+// lines, rejected is a terminal cancel.
+const MOVABLE_LINE_STATUS = 'pending';
+
 type Params = { params: Promise<{ id: string }> };
 
 export async function POST(req: NextRequest, { params }: Params) {
   try {
-    const { userId: actorId } = await requireSession();
+    // X-API-Key / Authorization when present, session cookie otherwise.
+    const { userId: actorId } = await requireCaller(req);
     const { id: salesOrderId } = await params;
+
+    // Moving a reservation rewrites the order's inventory ledger, so it needs
+    // the same permission as editing the order. The coarse check runs before
+    // any record is read. sales_order has no organization column, so there is
+    // no organization scoping to apply.
+    const basePerms = await requireApiPermission(actorId, 'sales_order', 'update');
 
     let body: { sales_order_line_id?: unknown };
     try {
@@ -50,12 +63,20 @@ export async function POST(req: NextRequest, { params }: Params) {
       throw new ApiError(400, 'sales_order_line_id is required');
     }
 
+    const order = await prisma.sales_order.findUnique({ where: { id: salesOrderId } });
+    if (!order) throw new ApiError(404, 'sales_order not found');
+    const resolved = await resolvePermissions(basePerms, order as Record<string, unknown>, actorId);
+    if (!resolved.update) throw new ApiError(403, 'Access denied: sales_order.update');
+
     const item = await prisma.sales_order_line.findFirst({
       where: { id: salesOrderLineId, sales_order_id: salesOrderId },
-      select: { id: true, inventory_transactionable_id: true },
+      select: { id: true, status: true, inventory_transactionable_id: true },
     });
     if (!item) {
       throw new ApiError(404, 'sales_order_line not found or does not belong to this sales_order');
+    }
+    if (item.status !== MOVABLE_LINE_STATUS) {
+      throw new ApiError(400, `Cannot move the reservation of a line with status: ${item.status}`);
     }
     if (!item.inventory_transactionable_id) {
       throw new ApiError(400, 'sales_order_line has no reservation to move');

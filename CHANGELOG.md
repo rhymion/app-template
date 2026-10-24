@@ -23,6 +23,7 @@ Detailed change history will begin from the first versioned release.
   (`x-generate.test: false`) until the generator's tests support `x-payment` (app-generator #788).
 
 ### Changed
+- **`moveReservation` requires `sales_order` update permission and a pending line.** The action route checks the caller's permission through the generator's standard helpers and rejects lines whose status is not `pending`. `sales_order` has no organization column, so no organization scoping applies.
 - **The first-level menu is bundled into four groups** (`x-nav-groups`/`x-nav`): `administration`,
   `inventory_ops` (now also holding `supply_requests`), `facilities` (now also holding
   `workforce`) and a new `test_fixtures` group for the demo-only fixture entities. The sidebar root
