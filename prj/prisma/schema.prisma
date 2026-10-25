@@ -207,6 +207,7 @@ model user {
   @@index([tenant_id])
   @@index([updater_id])
   @@index([name])
+  uploaded_attachments attachment[] @relation("AttachmentUploader")
 }
 
 model role {
@@ -721,7 +722,11 @@ model attachment {
   user_image              user?      @relation("UserImage")
   created_at              DateTime   @default(now()) @db.Timestamptz(0)
   updated_at              DateTime   @updatedAt @db.Timestamptz(0)
+  uploader_id              String?
+  uploader                 user?   @relation("AttachmentUploader", fields: [uploader_id], references: [id], onDelete: SetNull)
+  uploader_organization_id String?
   @@index([attachable_id])
+  @@index([uploader_id])
 }
 
 model dashboard {
