@@ -23,6 +23,7 @@ Detailed change history will begin from the first versioned release.
   (`x-generate.test: false`) until the generator's tests support `x-payment` (app-generator #788).
 
 ### Changed
+- **app-generator bumped to `d02ccfc0` (v5.0.3 plus later develop commits).** Brings the upload MIME and extension allow-lists, safe-URL rendering in the editable list wrappers, the `VersionHistory` messages fix for `x-version-of` identities, and the 5.0.x authorization fixes. `.github/workflows/ci.yml` is synced with the canonical source, which pins the GitHub Actions to commit SHAs.
 - **`moveReservation` requires `sales_order` update permission and a pending line.** The action route checks the caller's permission through the generator's standard helpers and rejects lines whose status is not `pending`. `sales_order` has no organization column, so no organization scoping applies.
 - **The first-level menu is bundled into four groups** (`x-nav-groups`/`x-nav`): `administration`,
   `inventory_ops` (now also holding `supply_requests`), `facilities` (now also holding
