@@ -2,8 +2,9 @@
 // two standard components (SingleAttachmentUpload / SingleAttachmentDisplay):
 //   - x-relationship: { target: attachment, type: direct } -- a single-file
 //     FK (product.warranty_card_id, leave_request.medical_certificate_id).
-//   - x-uri-kind: file -- a plain URL-string field that uploads like an
-//     image but displays as a download link, not an <img> (product.spec_sheet_url).
+//   - x-uri-kind: file -- a plain URL-string field: the form takes a pasted
+//     URL (no upload) and the view page shows it as a download link, not an
+//     <img> (product.spec_sheet_url).
 //
 // The generated API spec suite (cypress/e2e/api/product.cy.ts,
 // cypress/e2e/api/leave_request.cy.ts) already exercises these fields as
@@ -80,6 +81,8 @@ function pdfFile(name: string) {
   };
 }
 
+const specSheetUrl = 'https://example.com/files/spec-sheet.pdf';
+
 function loginAs(email: string, password: string = TEST_CREDENTIALS.password) {
   Cypress.session.clearAllSavedSessions();
   cy.clearCookies();
@@ -108,9 +111,9 @@ describe('UI: direct-attachment FK + x-uri-kind: file (SingleAttachmentUpload/Si
       attachmentTestid('single-attachment-upload-warrantyCard-file').selectFile(pngFile('warranty.png'), { force: true });
       attachmentTestid('single-attachment-upload-warrantyCard-value', { timeout: 10000 }).should('have.value', 'warranty.png');
 
-      // x-uri-kind: file (mode='url'): upload a PDF -- displays as a download link, not an <img>.
-      attachmentTestid('single-attachment-upload-specSheetUrl-file').selectFile(pdfFile('spec-sheet.pdf'), { force: true });
-      attachmentTestid('single-attachment-upload-specSheetUrl-value', { timeout: 10000 }).should('have.value', 'spec-sheet.pdf');
+      // x-uri-kind: file (mode='url'): paste a URL -- displays as a download link, not an <img>.
+      attachmentTestid('single-attachment-upload-specSheetUrl-value').type(specSheetUrl);
+      attachmentTestid('single-attachment-upload-specSheetUrl-value').should('have.value', specSheetUrl);
 
       cy.get('button[aria-label="Save"]').click();
       cy.url().should('not.include', '/edit/');
@@ -119,8 +122,8 @@ describe('UI: direct-attachment FK + x-uri-kind: file (SingleAttachmentUpload/Si
       // Direct-attachment FK renders as an <img> for an image-kind attachment.
       cy.get('img[alt="Warranty Card"]').should('be.visible');
       // x-uri-kind: file renders as a plain link, never an <img>, even
-      // though it went through the same upload widget as the image above.
-      cy.contains('a', 'spec-sheet.pdf').should('be.visible').should('not.match', 'img');
+      // though it shares its display component with the image above.
+      cy.get(`a[href="${specSheetUrl}"]`).should('be.visible');
       cy.get('img[alt="Spec Sheet Url"]').should('not.exist');
     });
   });
