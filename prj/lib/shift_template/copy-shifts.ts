@@ -1,7 +1,7 @@
 'use server';
 
 import prisma from '@/lib/prisma';
-import { requirePermission, getSessionUserIdOrThrow } from '@/lib/authz';
+import { requireEntityPermission, getSessionUserIdOrThrow } from '@/lib/authz';
 import dayjs from 'dayjs';
 import utcPlugin from 'dayjs/plugin/utc';
 import timezonePlugin from 'dayjs/plugin/timezone';
@@ -64,7 +64,7 @@ export async function copyShiftTemplatesToShifts(
   endDateStr: string,
   timeZone: string = 'UTC',
 ): Promise<CopyShiftsResult> {
-  await requirePermission('shift_template', 'create');
+  await requireEntityPermission('shift_template', 'create');
   const userId = await getSessionUserIdOrThrow();
 
   // Iterate day by day in the specified timezone
