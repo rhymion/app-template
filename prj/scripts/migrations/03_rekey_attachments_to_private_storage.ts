@@ -37,12 +37,20 @@
 //     OLD_LOCAL_DIR                       directory of the old local files (default `public/uploads`)
 //     GCS_BUCKET_NAME                     bucket of old `/api/gcs/<path>` objects (the same bucket holds
 //                                         the new keys; Application Default Credentials)
-//   New location (the backend is chosen exactly as lib/attachment/storage.ts does):
+//   New location (one of the three must be set, or both phases refuse to run):
 //     GCS_BUCKET_NAME                     -> Google Cloud Storage
 //     NEW_STORE_BLOB_READ_WRITE_TOKEN     -> Vercel Blob, private store. The token is always passed to the
 //                                         SDK explicitly; the SDK's default credential resolution
-//                                         (BLOB_READ_WRITE_TOKEN, OIDC) is never relied on.
-//     neither                             -> local disk under ATTACHMENT_LOCAL_DIR (default `.uploads`)
+//                                         (BLOB_READ_WRITE_TOKEN, OIDC) is never relied on. It must be set
+//                                         in the shell (or a `.env*` file of the directory the script runs
+//                                         from): a variable set on Vercel is not visible here.
+//     NEW_STORE_BLOB_STORE_ID             optional: the new store's id (`store_...`). When set, the store id
+//                                         inside NEW_STORE_BLOB_READ_WRITE_TOKEN must match it.
+//     ATTACHMENT_LOCAL_DIR                -> local disk under this directory. Used only when neither of the
+//                                         two above is set; it is never chosen by default, because a
+//                                         missing token would otherwise move every file to the operator's
+//                                         own disk while the database is updated to the new keys.
+//   The first line of output names the target (`New storage backend: vercel store=store_<id>`).
 //
 // Options:
 //   --phase rekey|delete-old   phase to run (default rekey)
@@ -63,19 +71,17 @@
 //   npx tsx scripts/migrations/03_rekey_attachments_to_private_storage.ts --phase delete-old --backup-file /secure/path/rekey.csv --yes
 import path from 'node:path';
 import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
-import { readFile, rm, stat } from 'node:fs/promises';
+import { mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { loadEnvConfig } from '@next/env';
 loadEnvConfig(path.resolve(process.cwd()), process.env.NODE_ENV !== 'production');
-import { Prisma, PrismaClient } from '@/app/generated/prisma/client';
-import { PrismaPg } from '@prisma/adapter-pg';
+import type { Prisma as PrismaNamespace, PrismaClient } from '@/app/generated/prisma/client';
 import { encryptFileName } from '@/lib/compliance/attachment_name_crypto';
 import { UPLOAD_CONTENT_TYPE_BY_EXTENSION } from '@/lib/_upload_validation';
-import { isStorageKey, localStorageRoot, newStorageKey, putStoredObject } from '@/lib/attachment/storage';
+import { isStorageKey, localStorageRoot, newStorageKey } from '@/lib/attachment/storage';
 
-const connectionString = process.env.DATABASE_URL;
-if (!connectionString) throw new Error('DATABASE_URL is required.');
-if (!process.env.AUTH_SECRET) throw new Error('AUTH_SECRET is required (file-name encryption).');
-const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString }) });
+// Connected in main(), so the pure helpers below can be imported by tests without a database.
+let prisma: PrismaClient;
+let Prisma: typeof PrismaNamespace;
 
 function option(name: string): string | undefined {
   const index = process.argv.indexOf(name);
@@ -90,7 +96,47 @@ const CONFIRMED = process.argv.includes('--yes');
 const OLD_LOCAL_DIR = path.resolve(process.cwd(), process.env.OLD_LOCAL_DIR || 'public/uploads');
 const NEW_BLOB_TOKEN = process.env.NEW_STORE_BLOB_READ_WRITE_TOKEN;
 const OLD_BLOB_TOKEN = process.env.OLD_STORE_BLOB_READ_WRITE_TOKEN;
-const NEW_BACKEND = process.env.GCS_BUCKET_NAME ? 'gcs' : NEW_BLOB_TOKEN ? 'vercel' : 'local';
+
+type Backend = 'gcs' | 'vercel' | 'local';
+
+/** The backend of the NEW storage. BLOB_READ_WRITE_TOKEN is deliberately not consulted; local disk is never a default. */
+export function newBackend(env: Record<string, string | undefined> = process.env): Backend {
+  if (env.GCS_BUCKET_NAME) return 'gcs';
+  if (env.NEW_STORE_BLOB_READ_WRITE_TOKEN) return 'vercel';
+  if (env.ATTACHMENT_LOCAL_DIR) return 'local';
+  throw new Error(
+    'No new storage is configured in this shell. Export NEW_STORE_BLOB_READ_WRITE_TOKEN (Vercel Blob) or ' +
+      'GCS_BUCKET_NAME; variables set on Vercel are not visible to this script. Set ATTACHMENT_LOCAL_DIR only ' +
+      'to migrate to local disk on purpose.',
+  );
+}
+
+/** The store id inside a Vercel Blob read-write token (`vercel_blob_rw_<storeId>_<secret>`). */
+export function blobTokenStoreId(token: string): string {
+  return token.split('_')[3] ?? '';
+}
+
+/**
+ * Where the new objects go, for the first line of output. For Vercel Blob it names the store the token
+ * belongs to, and refuses a token whose store differs from NEW_STORE_BLOB_STORE_ID when that is set.
+ */
+export function newTarget(env: Record<string, string | undefined> = process.env): string {
+  const backend = newBackend(env);
+  if (backend === 'gcs') return `gcs bucket=${env.GCS_BUCKET_NAME}`;
+  if (backend === 'local') return `local dir=${localStorageRoot(env)}`;
+  const storeId = blobTokenStoreId(env.NEW_STORE_BLOB_READ_WRITE_TOKEN!);
+  const expected = env.NEW_STORE_BLOB_STORE_ID?.trim().replace(/^store_/, '');
+  if (expected && expected.toLowerCase() !== storeId.toLowerCase()) {
+    throw new Error(
+      `NEW_STORE_BLOB_READ_WRITE_TOKEN belongs to store ${storeId}, but NEW_STORE_BLOB_STORE_ID is store_${expected}. ` +
+        'Copy the token of the new store again.',
+    );
+  }
+  return `vercel store=store_${storeId}`;
+}
+
+// Set in main() from newTarget(), before either phase runs.
+let NEW_BACKEND: Backend;
 
 type OldLocation =
   | { kind: 'url'; url: string }
@@ -157,7 +203,15 @@ async function putNew(key: string, body: Buffer, contentType: string): Promise<v
     await put(key, body, { access: 'private', addRandomSuffix: false, contentType, token: NEW_BLOB_TOKEN });
     return;
   }
-  await putStoredObject(key, body, contentType);
+  // GCS and local disk are written directly, not through lib/attachment/storage.ts's putStoredObject():
+  // that function picks its own backend and would follow a BLOB_READ_WRITE_TOKEN loaded from `.env.local`.
+  if (NEW_BACKEND === 'gcs') {
+    await (await gcsBucket()).file(key).save(body, { metadata: { contentType } });
+    return;
+  }
+  const root = localStorageRoot();
+  await mkdir(root, { recursive: true });
+  await writeFile(path.join(root, key), body);
 }
 
 async function deleteNew(key: string): Promise<void> {
@@ -254,7 +308,6 @@ async function provenanceFor(
 async function rekey(): Promise<number> {
   if (!DRY_RUN && !BACKUP_FILE) throw new Error('--backup-file is required for a real run (it is the rollback record).');
   if (BACKUP_FILE && !DRY_RUN && !existsSync(BACKUP_FILE)) writeFileSync(BACKUP_FILE, 'attachment_id,old_path,new_key\n', { mode: 0o600 });
-  console.log(`New storage backend: ${NEW_BACKEND}${DRY_RUN ? ' (dry run: nothing is written)' : ''}`);
 
   const owners = await discoverOwners();
   const rows = await prisma.attachment.findMany({
@@ -390,12 +443,27 @@ async function deleteOldPhase(): Promise<number> {
 
 async function main() {
   if (PHASE !== 'rekey' && PHASE !== 'delete-old') throw new Error(`Unknown --phase ${PHASE}`);
+  // Both phases use the new storage (delete-old checks each new object before deleting the old one), so
+  // the target is resolved and printed before anything else.
+  const target = newTarget();
+  NEW_BACKEND = newBackend();
+  console.log(`New storage backend: ${target}${DRY_RUN ? ' (dry run: nothing is written)' : ''}`);
+  const connectionString = process.env.DATABASE_URL;
+  if (!connectionString) throw new Error('DATABASE_URL is required.');
+  if (!process.env.AUTH_SECRET) throw new Error('AUTH_SECRET is required (file-name encryption).');
+  const client = await import('@/app/generated/prisma/client');
+  const { PrismaPg } = await import('@prisma/adapter-pg');
+  Prisma = client.Prisma;
+  prisma = new client.PrismaClient({ adapter: new PrismaPg({ connectionString }) });
   process.exitCode = PHASE === 'rekey' ? await rekey() : await deleteOldPhase();
 }
 
-main()
-  .catch((error) => {
-    console.error(error);
-    process.exitCode = 1;
-  })
-  .finally(() => prisma.$disconnect());
+// Run only when executed as a script, not when a test imports the helpers above.
+if (process.argv[1] && path.basename(process.argv[1]).startsWith('03_rekey_attachments_to_private_storage')) {
+  main()
+    .catch((error) => {
+      console.error(error);
+      process.exitCode = 1;
+    })
+    .finally(() => prisma?.$disconnect());
+}
