@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireCaller, requireApiPermission, handleApiError, ApiError } from '@/lib/api-auth';
 import { resolveRecordPermissions } from '@/lib/authz';
+import { getRateLimiter } from '@/lib/rate-limit';
 import prisma from '@/lib/prisma';
 
 /**
@@ -44,6 +45,15 @@ export async function POST(req: NextRequest, { params }: Params) {
   try {
     // X-API-Key / Authorization when present, session cookie otherwise.
     const { userId: actorId } = await requireCaller(req);
+    // app-generator 7.0.0 (Issue #1245): every route is rate-limited. Same
+    // bucket and 429 shape as the generated write routes.
+    const _rl = await getRateLimiter().check('api:write', actorId);
+    if (!_rl.allowed) {
+      return NextResponse.json(
+        { error: 'rate_limited', retryAfter: _rl.retryAfterSeconds },
+        { status: 429, headers: { 'Retry-After': String(_rl.retryAfterSeconds), 'X-RateLimit-Bucket': 'api:write' } },
+      );
+    }
     const { id: salesOrderId } = await params;
 
     // Moving a reservation rewrites the order's inventory ledger, so it needs

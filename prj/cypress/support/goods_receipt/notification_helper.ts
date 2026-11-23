@@ -1,4 +1,4 @@
-import { prisma, ALL_ENTITIES } from '../db-helpers';
+import { prisma, ALL_ENTITIES, createKeyedUser } from '../db-helpers';
 import { TEST_CREDENTIALS } from '../test-credentials';
 
 async function getTestUser() {
@@ -48,24 +48,26 @@ export async function setupGoodsReceiptNotificationFixture() {
     )
   );
 
-  const approverUser = await prisma.user.create({
+  // The database stores only the key's hash (app-generator 7.0.0); the
+  // returned user carries the plain key as `api_key` for request headers.
+  const approverUser = await createKeyedUser(`test_mk_rr_notification_approver_${Date.now()}`, {
     data: {
       name: 'Test RR Notification Approver',
       email: `test-rr-notification-approver-${Date.now()}@example.com`,
       password: hashedPw,
-      api_key: `test_mk_rr_notification_approver_${Date.now()}`,
       creator_id: testUser.id,
       updater_id: testUser.id,
       roles: { connect: [{ id: approverRole.id }] },
     },
   });
 
-  const requestorUser = await prisma.user.create({
+  // The database stores only the key's hash (app-generator 7.0.0); the
+  // returned user carries the plain key as `api_key` for request headers.
+  const requestorUser = await createKeyedUser(`test_mk_rr_notification_requestor_${Date.now()}`, {
     data: {
       name: 'Test RR Notification Requestor',
       email: `test-rr-notification-requestor-${Date.now()}@example.com`,
       password: hashedPw,
-      api_key: `test_mk_rr_notification_requestor_${Date.now()}`,
       creator_id: testUser.id,
       updater_id: testUser.id,
       roles: { connect: [{ id: requestorRole.id }] },

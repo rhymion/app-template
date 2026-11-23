@@ -4,6 +4,7 @@
 // Pattern: bridge create → business entity update → inventory_transaction INSERT → inventory cache update
 
 import type { PrismaClient } from '@/app/generated/prisma/client';
+import { AppError } from '@/lib/_errors';
 
 type Tx = Omit<PrismaClient, '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'>;
 
@@ -65,9 +66,13 @@ export async function afterApprove(
   // Cross-product guard: inventory lot must belong to the same product as the line.
   // Divergence would write the receive ledger against the wrong product's cache — fail
   // hard inside this transaction so the status flip and all other writes roll back.
+  // AppError('RELATED_RECORD_INVALID') -> 422 with this message: since
+  // app-generator 7.0.0 a plain Error answers a generic 500 with the message hidden.
   if (inventory.product_id !== entity.product_id) {
-    throw new Error(
-      `Inventory ${entity.inventory_id} belongs to a different product than this line (different product)`
+    throw new AppError(
+      'RELATED_RECORD_INVALID',
+      `Inventory ${entity.inventory_id} belongs to a different product than this line (different product)`,
+      'inventory_id',
     );
   }
 
