@@ -173,7 +173,11 @@ describe('API: Goods Receipt Line — Approve / Receive Ledger (cmd_309 item3)',
               url: `/api/approval_request/${approvalRequests[0].id}/approve`,
               failOnStatusCode: false,
             }).then((res) => {
-              expect(res.status).to.eq(500);
+              // app-generator 7.0.0: a rejection the caller can act on is an
+              // AppError (RELATED_RECORD_INVALID -> 422); a plain Error would be
+              // a 500 whose message is hidden.
+              expect(res.status).to.eq(422);
+              expect(res.body.code).to.eq('RELATED_RECORD_INVALID');
               expect(res.body.error || res.body.message).to.match(/different product/i);
 
               // tx abort: approval_request never flipped, approvable never marked approved.

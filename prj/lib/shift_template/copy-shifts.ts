@@ -2,6 +2,10 @@
 
 import prisma from '@/lib/prisma';
 import { requireEntityPermission, getSessionUserIdOrThrow } from '@/lib/authz';
+import { AppError } from '@/lib/_errors';
+import { enforceActionRateLimit } from '@/lib/rate-limit/action';
+import { logSecurityEventForError } from '@/lib/security-event';
+import { logger } from '@/lib/logger';
 import dayjs from 'dayjs';
 import utcPlugin from 'dayjs/plugin/utc';
 import timezonePlugin from 'dayjs/plugin/timezone';
@@ -66,6 +70,10 @@ export async function copyShiftTemplatesToShifts(
 ): Promise<CopyShiftsResult> {
   await requireEntityPermission('shift_template', 'create');
   const userId = await getSessionUserIdOrThrow();
+  // app-generator 7.0.0 (Issue #1245): a data-changing Server Action spends the
+  // same per-user `api:write` bucket as the REST writes. Throws
+  // AppError('RATE_LIMITED').
+  await enforceActionRateLimit(userId);
 
   // Iterate day by day in the specified timezone
   const startDay = dayjs.tz(startDateStr, timeZone);
@@ -112,7 +120,7 @@ export async function copyShiftTemplatesToShifts(
       try {
         await prisma.$transaction(async (tx) => {
           if (await hasShiftOverlap(tx, template.user_id, shiftStart, shiftEnd)) {
-            throw new Error('Shift time overlaps with an existing shift for this user');
+            throw new AppError('CONFLICT', 'Shift time overlaps with an existing shift for this user');
           }
           await tx.shift.create({
             data: {
@@ -127,9 +135,17 @@ export async function copyShiftTemplatesToShifts(
         });
         success++;
       } catch (error) {
+        // app-generator 7.0.0: an action that turns errors into results logs
+        // the security event the error stands for, and only an expected
+        // AppError's message reaches the client -- an unexpected error's
+        // message (e.g. a Prisma error) is logged, never returned.
+        logSecurityEventForError(error);
+        if (!(error instanceof AppError)) {
+          logger.error('copyShiftTemplatesToShifts: unexpected error for', label, error);
+        }
         failures.push({
           label,
-          reason: error instanceof Error ? error.message : 'Unknown error',
+          reason: error instanceof AppError ? error.message : 'Unknown error',
         });
       }
     }

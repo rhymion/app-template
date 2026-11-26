@@ -4,8 +4,10 @@
 // validateCustomRules() is called unconditionally from validateOnAdd()/
 // validateOnUpdate() (see lib/organization/service_validation.ts), after the
 // generated schema-driven checks (required fields, one-to-one uniqueness).
-// Throw an Error to reject the save — the message surfaces to the caller
-// (UI form or direct API request) as the save failure.
+// Throw an AppError('VALIDATION', ...) to reject the save. Since
+// app-generator 7.0.0, handleApiError answers 500 for a plain Error, so a
+// rejection meant for the caller must be an AppError (the generated wrapper
+// tags it with reason 'invalid').
 //
 // `data` is the same raw create/update payload service_validation.ts
 // receives, including every connect-style (many-to-many / optional-FK-list)
@@ -56,22 +58,18 @@
 // being submitted) cannot answer that on its own.
 // See test/flows/pre_edit_row_custom_validation.test.ts for the real-DB
 // regression test this line exists to keep green.
+
+import { AppError } from '@/lib/_errors';
+
 const LOCK_MARKER = 'PRE_EDIT_ROW_FIXTURE_LOCKED';
 
 export async function validateCustomRules(
   _tx: unknown,
   data: Record<string, unknown>,
   _currentId: string | null,
-  // Optional (defaulted, not required): this submodule's pointer is not
-  // yet bumped past app-generator's cmd_834 merge, so the currently
-  // generated service_validation.ts still calls validateCustomRules()
-  // with only 3 arguments (no widening cast yet -- that lives in the
-  // newer template). A required 4th parameter here would fail tsc
-  // ("Expected 4 arguments, but got 3"). The default keeps this file
-  // compiling -- and this rule correctly inert, since prevRow is never
-  // supplied pre-bump, so the lock can never fire -- against BOTH the
-  // current 3-argument call site and the future 4-argument one once this
-  // submodule's pointer is bumped past the merge.
+  // The generated service_validation.ts passes the pre-edit row here on
+  // update and null on create (cmd_834). Kept defaulted so a direct caller
+  // that omits it gets the inert create-path behavior.
   prevRow: Record<string, unknown> | null = null,
 ): Promise<void> {
   const hadLockedDescription = typeof prevRow?.description === 'string' && prevRow.description.includes(LOCK_MARKER);
@@ -80,6 +78,6 @@ export async function validateCustomRules(
   const incoming = data.description;
   const stillLocked = typeof incoming === 'string' && incoming.includes(LOCK_MARKER);
   if (!stillLocked) {
-    throw new Error('description cannot be cleared once locked');
+    throw new AppError('VALIDATION', 'description cannot be cleared once locked', 'description');
   }
 }
