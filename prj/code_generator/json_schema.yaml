@@ -2080,7 +2080,7 @@ definitions:
       name:
         minLength: 1
       capacity:
-        minimum: 1
+        minimum: 0
       description:
         x-ui:
           rows: 4
