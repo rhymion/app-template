@@ -1,6 +1,7 @@
 'use server';
 
 import prisma from '@/lib/prisma';
+import { AppError } from '@/lib/_errors';
 
 type TransactionClient = Pick<typeof prisma, 'booking'>;
 
@@ -58,7 +59,7 @@ export async function validateOnAdd(_tx: unknown, data: Record<string, unknown>)
   };
   if (!resource_id || !start_time || !end_time) return;
   if (start_time >= end_time) {
-    throw new Error('Start time must be before end time');
+    throw new AppError('VALIDATION', 'Start time must be before end time', 'end_time', 'invalid');
   }
   await assertNoBookingOverlap(prisma, resource_id, start_time, end_time);
 }
@@ -71,7 +72,7 @@ export async function validateOnUpdate(_tx: unknown, id: string, data: Record<st
   };
   if (!resource_id || !start_time || !end_time) return;
   if (start_time >= end_time) {
-    throw new Error('Start time must be before end time');
+    throw new AppError('VALIDATION', 'Start time must be before end time', 'end_time', 'invalid');
   }
   await assertNoBookingOverlap(prisma, resource_id, start_time, end_time, id);
 }
@@ -84,6 +85,8 @@ async function assertNoBookingOverlap(
   excludeId?: string | null,
 ): Promise<void> {
   if (await hasOverlap(tx, resourceId, startTime, endTime, excludeId)) {
-    throw new Error('Booking time overlaps with an existing booking for this resource');
+    // AppError, not Error: since app-generator 7.0.0 handleApiError answers
+    // 500 for a plain Error, hiding a rejection the caller can act on.
+    throw new AppError('CONFLICT', 'Booking time overlaps with an existing booking for this resource', 'start_time');
   }
 }
