@@ -1,0 +1,1 @@
+../app-generator/scripts/vercel-region.sh
