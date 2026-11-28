@@ -88,10 +88,27 @@ order.
 4. **(Operator)** Roles belong to a Neon branch. Repeat steps 1 to 3 for each
    branch that serves an environment (staging and production each need their own
    `app_runtime` and password).
-5. **(Operator)** `scripts/vercel-setup.sh` and `scripts/vercel-env.sh inject`
-   set `DATABASE_URL` to the schema owner's pooled URL. After running either,
-   set `DATABASE_URL` for each Vercel environment back to the `app_runtime`
-   connection string.
+5. **(Operator)** Record the `app_runtime` URLs so that `scripts/vercel-setup.sh`
+   and `scripts/vercel-env.sh inject` keep them. Put the role's **pooled**
+   connection string in `.env.production.local` as `DATABASE_URL_APP_PROD`
+   (Production) and `DATABASE_URL_APP_STAGING` (Preview). When one is set, both
+   scripts inject it as `DATABASE_URL` for that environment. `DIRECT_URL` stays
+   the schema owner's unpooled URL. When one is not set, the scripts inject the
+   owner's pooled URL as `DATABASE_URL` and print a warning; set the variable and
+   re-run, instead of correcting `DATABASE_URL` by hand in Vercel.
+
+   **Known issue:** once a Neon branch has both the owner and `app_runtime`,
+   `scripts/vercel-setup.sh` stops in Step A with `ERROR: Multiple roles found
+   for the branch, please provide one with the --role-name option: neondb_owner,
+   app_runtime`. It asks `neonctl connection-string` for the owner's URLs
+   without naming a role, which only works when the branch has a single role.
+   Nothing after Step A runs. Having two roles is correct; the fix belongs in
+   app-generator (Issue #1432: the script passes `--role-name` for the owner). Until this
+   repository's app-generator pointer includes that fix, do not re-run
+   `vercel-setup.sh` against branches that have `app_runtime`. To refresh
+   environment variables only, `scripts/vercel-env.sh inject production` and
+   `scripts/vercel-env.sh inject preview` still work, because they read the URLs
+   already saved in `.env.production.local` and do not call `neonctl`.
 6. **(Operator)** Limit who holds the owner credential and hosting-console
    access to the database.
 
